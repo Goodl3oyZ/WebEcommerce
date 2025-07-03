@@ -1,0 +1,22 @@
+# Node modules
+node_modules/
+
+# Next.js build output
+.next/
+
+# dotenv
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+
+# Build artifacts (ถ้ามี export)
+out/
