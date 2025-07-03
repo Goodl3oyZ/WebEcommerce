@@ -1,0 +1,21 @@
+# Node modules
+node_modules/
+
+# dotenv
+.env
+
+# Logs and temp
+logs/
+*.log
+
+# Build artifacts (ถ้ามี build process)
+dist/
+build/
+
+# Database
+*.sqlite
+*.sqlite3
+drizzle/
+
+# Coverage
+coverage/

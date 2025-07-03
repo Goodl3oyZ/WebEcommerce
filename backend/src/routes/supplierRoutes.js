@@ -1,0 +1,66 @@
+import express from "express";
+import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { requireRole, ROLES } from "../middlewares/authorizationMiddleware.js";
+import { supplierController } from "../controllers/supplierController.js";
+import { validationMiddleware } from "../middlewares/validationMiddleware.js";
+import { supplierDto } from "../dtos/supplier.dto.js";
+import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+
+const router = express.Router();
+
+// Apply rate limiter to all supplier routes
+router.use(apiRateLimiter);
+
+// Protected routes (auth required)
+router.use(authMiddleware);
+
+// Admin routes
+router.get("/", requireRole(ROLES.ADMIN), supplierController.getAllSuppliers);
+router.get(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  supplierController.getSupplierById
+);
+router.post(
+  "/",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(supplierDto.createSupplier),
+  supplierController.createSupplier
+);
+router.put(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(supplierDto.updateSupplier),
+  supplierController.updateSupplier
+);
+router.delete(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  supplierController.deleteSupplier
+);
+
+// Supplier products
+router.get(
+  "/:id/products",
+  requireRole(ROLES.ADMIN),
+  supplierController.getSupplierProducts
+);
+router.post(
+  "/:id/products",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(supplierDto.addSupplierProduct),
+  supplierController.addSupplierProduct
+);
+router.put(
+  "/:id/products/:productId",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(supplierDto.updateSupplierProduct),
+  supplierController.updateSupplierProduct
+);
+router.delete(
+  "/:id/products/:productId",
+  requireRole(ROLES.ADMIN),
+  supplierController.removeSupplierProduct
+);
+
+export default router;
