@@ -6,7 +6,6 @@ import {
   cartItems,
 } from "../models/schema.js";
 import { eq, and } from "drizzle-orm";
-import { NotFoundError } from "../middlewares/errorHandler.js";
 
 // Get user's wishlist
 const getUserWishlist = async (userId) => {

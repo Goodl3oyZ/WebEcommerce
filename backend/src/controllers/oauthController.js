@@ -35,10 +35,10 @@ export const oauthController = {
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: "/",
       });
-      res.redirect(`${ENV.FRONTEND_URL}/auth/callback?success=true`);
+      res.redirect(`${ENV.SERVER.FRONTEND_URL}/auth/callback?success=true`);
     } catch (error) {
       res.redirect(
-        `${ENV.FRONTEND_URL}/auth/callback?error=Authentication failed`
+        `${ENV.SERVER.FRONTEND_URL}/auth/callback?error=Authentication failed`
       );
     }
   },
