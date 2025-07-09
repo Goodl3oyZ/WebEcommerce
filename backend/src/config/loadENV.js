@@ -29,6 +29,7 @@ export const REDIS_CONFIG = {
 
 // Minio Configuration
 export const MINIO_CONFIG = {
+  HOST: process.env.MINIO_HOST || "localhost",
   ROOT_USER: process.env.MINIO_ROOT_USER,
   ROOT_PASSWORD: process.env.MINIO_ROOT_PASSWORD,
   API_PORT: parseInt(process.env.MINIO_API_PORT) || 9000,

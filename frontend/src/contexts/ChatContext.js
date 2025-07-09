@@ -25,12 +25,15 @@ export const ChatProvider = ({ children }) => {
     if (!user) return;
 
     // Initialize socket connection
-    const socketInstance = io(
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
-      {
-        withCredentials: true,
-      }
-    );
+    const wsUrl =
+      typeof window !== "undefined" && window.location.hostname === "localhost"
+        ? "ws://localhost:5000"
+        : process.env.NEXT_PUBLIC_WS_URL || "ws://backend-dev:5000";
+
+    const socketInstance = io(wsUrl, {
+      withCredentials: true,
+      transports: ["websocket"],
+    });
 
     socketInstance.on("connect", () => {
       console.log("Connected to chat server");

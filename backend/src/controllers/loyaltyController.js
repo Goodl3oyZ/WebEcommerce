@@ -37,7 +37,7 @@ const getPointsHistory = async (req, res, next) => {
       `SELECT 
         ph.*,
         o.id as order_id,
-        o.total_amount
+        o.total
       FROM points_history ph
       LEFT JOIN orders o ON ph.order_id = o.id
       WHERE ph.user_id = ?

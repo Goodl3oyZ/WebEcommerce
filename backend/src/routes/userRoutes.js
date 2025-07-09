@@ -5,6 +5,7 @@ import { requireRole, ROLES } from "../middlewares/authorizationMiddleware.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { userDto } from "../dtos/user.dto.js";
 import multer from "multer";
+import { catchAsync } from "../utils/catchAsync.js";
 
 const router = express.Router();
 
@@ -27,9 +28,11 @@ const upload = multer({
 router.use(authMiddleware);
 
 // User profile routes
-router.get("/profile", userController.getProfile);
-router.put("/profile", upload.single("avatar"), userController.updateProfile);
-router.delete("/profile/image", userController.deleteProfileImage);
+router
+  .route("/profile")
+  .get(catchAsync(userController.getProfile))
+  .put(upload.single("avatar"), catchAsync(userController.updateProfile));
+router.delete("/profile/image", catchAsync(userController.deleteProfileImage));
 
 // User preferences routes
 router.get("/preferences", userController.getPreferences);

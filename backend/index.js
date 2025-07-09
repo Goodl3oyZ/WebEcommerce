@@ -13,7 +13,7 @@ import passport from "./src/config/passport.js";
 import { createClient } from "redis";
 import { RedisStore } from "connect-redis";
 import cookieParser from "cookie-parser";
-import { initializeBuckets } from "./src/config/minio.js";
+// import { initializeBuckets } from "./src/config/minio.js";
 import { createServer } from "http";
 import { Server } from "socket.io";
 
@@ -36,25 +36,27 @@ import shippingRoutes from "./src/routes/shippingRoutes.js";
 import storeRoutes from "./src/routes/storeRoutes.js";
 import loyaltyRoutes from "./src/routes/loyaltyRoutes.js";
 import uploadRoutes from "./src/routes/uploadRoutes.js";
+import adminRoutes from "./src/routes/adminRoutes.js";
+import settingsRoutes from "./src/routes/settingsRoutes.js";
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ENV.FRONTEND_URL,
+    origin: true, // allow all origins for dev
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
 // Initialize MinIO buckets
-try {
-  await initializeBuckets();
-  console.log("MinIO buckets initialized successfully");
-} catch (error) {
-  console.error("Failed to initialize MinIO buckets:", error);
-  process.exit(1);
-}
+// try {
+//   await initializeBuckets();
+//   console.log("MinIO buckets initialized successfully");
+// } catch (error) {
+//   console.error("Failed to initialize MinIO buckets:", error);
+//   process.exit(1);
+// }
 
 const redisClient = createClient({ url: ENV.REDIS.URL });
 
@@ -158,6 +160,8 @@ app.use("/api/loyalty", loyaltyRoutes);
 app.use("/api/addresses", addressRoute);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/addressData", addressDataRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // WebSocket connection handling
 io.on("connection", (socket) => {

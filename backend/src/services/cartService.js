@@ -54,7 +54,6 @@ export const cartService = {
             description: true,
             price: true,
             imageUrl: true,
-            stock: true,
           },
         });
 
@@ -77,14 +76,12 @@ export const cartService = {
         let productImages = [];
         if (product && product.imageUrl) {
           if (Array.isArray(product.imageUrl)) {
-            productImages = await Promise.all(
-              product.imageUrl.map(async (img) =>
-                img ? await FileService.getFileUrl(BUCKETS.PRODUCTS, img) : null
-              )
+            productImages = product.imageUrl.map((img) =>
+              img ? FileService.getFileUrl(BUCKETS.PRODUCTS, img) : null
             );
           } else if (typeof product.imageUrl === "string") {
             productImages = [
-              await FileService.getFileUrl(BUCKETS.PRODUCTS, product.imageUrl),
+              FileService.getFileUrl(BUCKETS.PRODUCTS, product.imageUrl),
             ];
           }
         }
@@ -93,14 +90,12 @@ export const cartService = {
         let variantImages = [];
         if (variant && variant.imageUrl) {
           if (Array.isArray(variant.imageUrl)) {
-            variantImages = await Promise.all(
-              variant.imageUrl.map(async (img) =>
-                img ? await FileService.getFileUrl(BUCKETS.PRODUCTS, img) : null
-              )
+            variantImages = variant.imageUrl.map((img) =>
+              img ? FileService.getFileUrl(BUCKETS.PRODUCTS, img) : null
             );
           } else if (typeof variant.imageUrl === "string") {
             variantImages = [
-              await FileService.getFileUrl(BUCKETS.PRODUCTS, variant.imageUrl),
+              FileService.getFileUrl(BUCKETS.PRODUCTS, variant.imageUrl),
             ];
           }
         }
@@ -314,14 +309,11 @@ export const cartService = {
       let subtotal = 0;
       let discount = 0;
 
-      for (const item of cart.items) {
-        // Validate stock
-        const variant = item.variantId
-          ? await tx.query.productVariants.findFirst({
-              where: eq(productVariants.id, item.variantId),
-            })
-          : null;
+      // สำหรับการเก็บข้อมูล items ที่ถูกต้องหลังจากการ fetch เพื่อใช้ในการสร้าง orderItems
+      const finalOrderItems = [];
 
+      for (const item of cart.items) {
+        // ดึง product เสมอเพื่อเอาข้อมูลชื่อและ base price (ถ้าไม่มี variant)
         const product = await tx.query.products.findFirst({
           where: eq(products.id, item.productId),
         });
@@ -330,30 +322,72 @@ export const cartService = {
           throw new ApiError(`Product ${item.productId} not found`, 404);
         }
 
-        const stock = variant ? variant.stock : product.stock;
-        if (stock < item.quantity) {
+        let currentPrice; // ราคาปัจจุบันของ item
+        let currentStock; // สต็อกปัจจุบันของ item
+
+        if (item.variantId) {
+          // ถ้ามี variantId, ดึงข้อมูล variant มา
+          const variant = await tx.query.productVariants.findFirst({
+            where: eq(productVariants.id, item.variantId),
+          });
+
+          if (!variant) {
+            throw new ApiError(
+              `Product variant ${item.variantId} not found`,
+              404
+            );
+          }
+
+          currentPrice = Number(variant.price); // ต้องมั่นใจว่าเป็น Number เพราะ decimal อาจจะ return เป็น string
+          currentStock = variant.stock;
+
+          // อัปเดต stock ของ variant
+          await tx
+            .update(productVariants)
+            .set({ stock: currentStock - item.quantity })
+            .where(eq(productVariants.id, variant.id));
+        } else {
+          // ถ้าไม่มี variantId, ใช้ข้อมูลจาก product โดยตรง (สำหรับสินค้าที่ไม่มี variant)
+          // **ข้อควรระวัง:** ถ้าตาราง products ไม่มี stock แล้ว โค้ดนี้จะใช้ไม่ได้
+          // ดังนั้น สต็อกควรถูกจัดการที่ variant เท่านั้น
+          // หรือถ้า product ไม่มี variant จะต้องมีสต็อกของตัวเองที่ product level (ซึ่งเราตกลงว่าไม่ควรมี)
+          // ทางที่ดีที่สุดคือทุกสินค้าควรมี variant แม้จะมีแค่ 1 variant (เช่น 'default' color/size)
+
+          // **สมมติฐานใหม่:** เมื่อเราลบ stock จาก `products` แล้ว
+          // ทุก item ในตะกร้า **ต้องมี** `variantId` หากต้องการตรวจสอบ stock
+          // ถ้าสินค้าไม่มี variant ในระบบของคุณ (เช่น เป็นสินค้าเดี่ยวๆ ไม่มีสี/ไซส์)
+          // คุณควรสร้าง "variant default" สำหรับสินค้านั้นๆ ในตาราง productVariants
+          // เพื่อให้ stock และ price อยู่ในที่เดียวกันเสมอ
+
           throw new ApiError(
-            `Insufficient stock for product ${product.name}`,
+            `Product ${product.name} (ID: ${product.id}) requires a variant to be purchased.`,
+            400
+          );
+          // หรือถ้าคุณยืนยันว่าสินค้านั้นไม่มี variant จริงๆ และ stock ควรดึงจาก product:
+          // currentPrice = Number(product.price);
+          // currentStock = product.stock; // **จะ Error เพราะไม่มี column stock ใน products แล้ว**
+        }
+
+        // ตรวจสอบ stock
+        if (currentStock < item.quantity) {
+          throw new ApiError(
+            `Insufficient stock for product ${product.name} (variant: ${
+              item.variantId || "N/A"
+            }) - Available: ${currentStock}, Requested: ${item.quantity}`,
             400
           );
         }
 
-        // Calculate price
-        const price = variant ? variant.price : product.price;
-        subtotal += price * item.quantity;
+        // เพิ่มราคาสินค้าใน subtotal
+        subtotal += currentPrice * item.quantity;
 
-        // Update stock
-        if (variant) {
-          await tx
-            .update(productVariants)
-            .set({ stock: stock - item.quantity })
-            .where(eq(productVariants.id, variant.id));
-        } else {
-          await tx
-            .update(products)
-            .set({ stock: stock - item.quantity })
-            .where(eq(products.id, product.id));
-        }
+        // เก็บข้อมูลสำหรับสร้าง Order Item
+        finalOrderItems.push({
+          productId: item.productId, // ควรเก็บ productId ไว้ด้วยเพื่อความสมบูรณ์
+          variantId: item.variantId,
+          quantity: item.quantity,
+          price: currentPrice, // ใช้ราคาที่ดึงมาจริง
+        });
       }
 
       // 4. Apply coupon if provided
@@ -391,11 +425,11 @@ export const cartService = {
         .returning();
 
       // 6. Create order items
-      const orderItemsData = cart.items.map((item) => ({
+      const orderItemsData = finalOrderItems.map((item) => ({
         orderId: order.id,
         variantId: item.variantId,
         quantity: item.quantity,
-        price: item.variant?.price || item.product.price,
+        price: item.price, // ใช้ราคาที่คำนวณไว้แล้ว
       }));
 
       await tx.insert(orderItems).values(orderItemsData);
@@ -415,7 +449,6 @@ export const cartService = {
       };
     });
   },
-
   async mergeGuestCart(userId, items) {
     // Get or create cart
     let cart = await db.query.carts.findFirst({

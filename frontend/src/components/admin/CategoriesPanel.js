@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
 import { categoriesAPI } from "@/lib/api"; // Adjust the import path as needed
+import { adminAPI } from "@/lib/api/admin";
 import {
   FaTags,
   FaEdit,
@@ -33,28 +34,18 @@ export function CategoriesPanel() {
 
   const onSubmit = async (data) => {
     try {
-      const url = editingId
-        ? `/api/categories/${editingId}`
-        : "/api/categories";
-      const method = editingId ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (response.ok) {
-        toast.success(editingId ? "Category updated!" : "Category created!");
-        reset();
-        setEditingId(null);
-        loadCategories();
+      if (editingId) {
+        await adminAPI.updateCategory(editingId, data);
+        toast.success("Category updated!");
       } else {
-        const error = await response.json();
-        toast.error(error.message || "Something went wrong");
+        await adminAPI.createCategory(data);
+        toast.success("Category created!");
       }
+      reset();
+      setEditingId(null);
+      loadCategories();
     } catch (error) {
-      toast.error("Failed to save category");
+      toast.error(error?.message || "Failed to save category");
     }
   };
 
@@ -69,18 +60,11 @@ export function CategoriesPanel() {
     if (!confirm("Are you sure you want to delete this category?")) return;
 
     try {
-      const response = await fetch(`/api/categories/${id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        toast.success("Category deleted!");
-        loadCategories();
-      } else {
-        toast.error("Failed to delete category");
-      }
+      await adminAPI.deleteCategory(id);
+      toast.success("Category deleted!");
+      loadCategories();
     } catch (error) {
-      toast.error("Failed to delete category");
+      toast.error(error?.message || "Failed to delete category");
     }
   };
 

@@ -63,15 +63,15 @@ export default function RegisterPage() {
 
   // Add OAuth registration functions
   const handleGithubRegister = () => {
-    window.location.href = `http://localhost:5000/oauth/github`;
+    window.location.href = `http://localhost:5000/api/oauth/github`;
   };
 
   const handleGoogleRegister = () => {
-    window.location.href = `http://localhost:5000/oauth/google`;
+    window.location.href = `http://localhost:5000/api/oauth/google`;
   };
 
   const handleFacebookRegister = () => {
-    window.location.href = `http://localhost:5000/oauth/facebook`;
+    window.location.href = `http://localhost:5000/api/oauth/facebook`;
   };
 
   return (

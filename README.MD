@@ -90,3 +90,5 @@ This project is a full-stack e-commerce platform, consisting of a frontend (Next
 
 - ระบบนี้ออกแบบมาเพื่อรองรับการขยายฟีเจอร์ในอนาคต เช่น ระบบแชท, ระบบวิเคราะห์ข้อมูล ฯลฯ
 - สามารถปรับแต่งและเพิ่มเติมโมดูลได้ตามความต้องการของธุรกิจ
+
+paymenttransaction เหมือนไม่มี order id กับ payment method id tracnsaction id and paymaent detail ทั้ง 4 เป็น null

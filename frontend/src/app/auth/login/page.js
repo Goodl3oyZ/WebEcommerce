@@ -51,7 +51,7 @@ export default function LoginPage() {
   };
 
   const handleOAuthLogin = (provider) => {
-    window.location.href = `http://localhost:5000/oauth/${provider}`;
+    window.location.href = `http://localhost:5000/api/oauth/${provider}`;
   };
 
   return (

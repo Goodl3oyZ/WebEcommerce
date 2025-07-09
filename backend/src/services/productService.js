@@ -110,16 +110,15 @@ export const productService = {
       productsList.map(async (product) => {
         if (product.imageUrl) {
           if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = await Promise.all(
-              product.imageUrl.map(async (img) =>
-                img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-              )
+            product.imageUrl = product.imageUrl.map((img) =>
+              img
+                ? img.startsWith("http")
+                  ? img
+                  : getFileUrl(BUCKETS.PRODUCTS, img)
+                : null
             );
           } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = await getFileUrl(
-              BUCKETS.PRODUCTS,
-              product.imageUrl
-            );
+            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
           } else if (
             typeof product.imageUrl === "object" &&
             product.imageUrl !== null
@@ -128,13 +127,15 @@ export const productService = {
             const newObj = {};
             for (const [key, val] of Object.entries(product.imageUrl)) {
               if (Array.isArray(val)) {
-                newObj[key] = await Promise.all(
-                  val.map(async (img) =>
-                    img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-                  )
+                newObj[key] = val.map((img) =>
+                  img
+                    ? img.startsWith("http")
+                      ? img
+                      : getFileUrl(BUCKETS.PRODUCTS, img)
+                    : null
                 );
               } else if (typeof val === "string") {
-                newObj[key] = await getFileUrl(BUCKETS.PRODUCTS, val);
+                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
               } else {
                 newObj[key] = val;
               }
@@ -183,13 +184,15 @@ export const productService = {
     // Generate fresh presigned URLs for product images
     if (product.imageUrl) {
       if (Array.isArray(product.imageUrl)) {
-        product.imageUrl = await Promise.all(
-          product.imageUrl.map(async (img) =>
-            img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-          )
+        product.imageUrl = product.imageUrl.map((img) =>
+          img
+            ? img.startsWith("http")
+              ? img
+              : getFileUrl(BUCKETS.PRODUCTS, img)
+            : null
         );
       } else if (typeof product.imageUrl === "string") {
-        product.imageUrl = await getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
+        product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
       } else if (
         typeof product.imageUrl === "object" &&
         product.imageUrl !== null
@@ -197,13 +200,15 @@ export const productService = {
         const newObj = {};
         for (const [key, val] of Object.entries(product.imageUrl)) {
           if (Array.isArray(val)) {
-            newObj[key] = await Promise.all(
-              val.map(async (img) =>
-                img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-              )
+            newObj[key] = val.map((img) =>
+              img
+                ? img.startsWith("http")
+                  ? img
+                  : getFileUrl(BUCKETS.PRODUCTS, img)
+                : null
             );
           } else if (typeof val === "string") {
-            newObj[key] = await getFileUrl(BUCKETS.PRODUCTS, val);
+            newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
           } else {
             newObj[key] = val;
           }
@@ -240,16 +245,15 @@ export const productService = {
       productsList.map(async (product) => {
         if (product.imageUrl) {
           if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = await Promise.all(
-              product.imageUrl.map(async (img) =>
-                img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-              )
+            product.imageUrl = product.imageUrl.map((img) =>
+              img
+                ? img.startsWith("http")
+                  ? img
+                  : getFileUrl(BUCKETS.PRODUCTS, img)
+                : null
             );
           } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = await getFileUrl(
-              BUCKETS.PRODUCTS,
-              product.imageUrl
-            );
+            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
           } else if (
             typeof product.imageUrl === "object" &&
             product.imageUrl !== null
@@ -257,13 +261,15 @@ export const productService = {
             const newObj = {};
             for (const [key, val] of Object.entries(product.imageUrl)) {
               if (Array.isArray(val)) {
-                newObj[key] = await Promise.all(
-                  val.map(async (img) =>
-                    img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-                  )
+                newObj[key] = val.map((img) =>
+                  img
+                    ? img.startsWith("http")
+                      ? img
+                      : getFileUrl(BUCKETS.PRODUCTS, img)
+                    : null
                 );
               } else if (typeof val === "string") {
-                newObj[key] = await getFileUrl(BUCKETS.PRODUCTS, val);
+                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
               } else {
                 newObj[key] = val;
               }
@@ -319,16 +325,15 @@ export const productService = {
       productsList.map(async (product) => {
         if (product.imageUrl) {
           if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = await Promise.all(
-              product.imageUrl.map(async (img) =>
-                img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-              )
+            product.imageUrl = product.imageUrl.map((img) =>
+              img
+                ? img.startsWith("http")
+                  ? img
+                  : getFileUrl(BUCKETS.PRODUCTS, img)
+                : null
             );
           } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = await getFileUrl(
-              BUCKETS.PRODUCTS,
-              product.imageUrl
-            );
+            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
           } else if (
             typeof product.imageUrl === "object" &&
             product.imageUrl !== null
@@ -336,13 +341,15 @@ export const productService = {
             const newObj = {};
             for (const [key, val] of Object.entries(product.imageUrl)) {
               if (Array.isArray(val)) {
-                newObj[key] = await Promise.all(
-                  val.map(async (img) =>
-                    img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-                  )
+                newObj[key] = val.map((img) =>
+                  img
+                    ? img.startsWith("http")
+                      ? img
+                      : getFileUrl(BUCKETS.PRODUCTS, img)
+                    : null
                 );
               } else if (typeof val === "string") {
-                newObj[key] = await getFileUrl(BUCKETS.PRODUCTS, val);
+                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
               } else {
                 newObj[key] = val;
               }
@@ -369,13 +376,15 @@ export const productService = {
   async withPresignedImageUrl(product) {
     if (!product || !product.imageUrl) return product;
     if (Array.isArray(product.imageUrl)) {
-      product.imageUrl = await Promise.all(
-        product.imageUrl.map(async (img) =>
-          img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-        )
+      product.imageUrl = product.imageUrl.map((img) =>
+        img
+          ? img.startsWith("http")
+            ? img
+            : getFileUrl(BUCKETS.PRODUCTS, img)
+          : null
       );
     } else if (typeof product.imageUrl === "string") {
-      product.imageUrl = await getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
+      product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
     } else if (
       typeof product.imageUrl === "object" &&
       product.imageUrl !== null
@@ -383,13 +392,15 @@ export const productService = {
       const newObj = {};
       for (const [key, val] of Object.entries(product.imageUrl)) {
         if (Array.isArray(val)) {
-          newObj[key] = await Promise.all(
-            val.map(async (img) =>
-              img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-            )
+          newObj[key] = val.map((img) =>
+            img
+              ? img.startsWith("http")
+                ? img
+                : getFileUrl(BUCKETS.PRODUCTS, img)
+              : null
           );
         } else if (typeof val === "string") {
-          newObj[key] = await getFileUrl(BUCKETS.PRODUCTS, val);
+          newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
         } else {
           newObj[key] = val;
         }
@@ -809,16 +820,15 @@ export const productService = {
       finalProducts.map(async (product) => {
         if (product.imageUrl) {
           if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = await Promise.all(
-              product.imageUrl.map(async (img) =>
-                img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-              )
+            product.imageUrl = product.imageUrl.map((img) =>
+              img
+                ? img.startsWith("http")
+                  ? img
+                  : getFileUrl(BUCKETS.PRODUCTS, img)
+                : null
             );
           } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = await getFileUrl(
-              BUCKETS.PRODUCTS,
-              product.imageUrl
-            );
+            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
           } else if (
             typeof product.imageUrl === "object" &&
             product.imageUrl !== null
@@ -826,13 +836,15 @@ export const productService = {
             const newObj = {};
             for (const [key, val] of Object.entries(product.imageUrl)) {
               if (Array.isArray(val)) {
-                newObj[key] = await Promise.all(
-                  val.map(async (img) =>
-                    img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-                  )
+                newObj[key] = val.map((img) =>
+                  img
+                    ? img.startsWith("http")
+                      ? img
+                      : getFileUrl(BUCKETS.PRODUCTS, img)
+                    : null
                 );
               } else if (typeof val === "string") {
-                newObj[key] = await getFileUrl(BUCKETS.PRODUCTS, val);
+                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
               } else {
                 newObj[key] = val;
               }

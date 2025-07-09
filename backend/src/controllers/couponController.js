@@ -233,20 +233,20 @@ const deactivateCoupon = async (req, res, next) => {
 const getCouponStatistics = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
-
     const [stats] = await db.query(
       `SELECT 
         COUNT(*) as totalCoupons,
-        SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END) as activeCoupons,
-        SUM(usage_count) as totalUsage,
-        SUM(discount_amount) as totalDiscount
+        SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END) as activeCoupons
       FROM coupons
       WHERE (? IS NULL OR created_at >= ?)
       AND (? IS NULL OR created_at <= ?)`,
       [startDate, startDate, endDate, endDate]
     );
-
-    res.json(stats[0]);
+    const [coupons] = await db.query("SELECT * FROM coupons");
+    res.json({
+      ...stats[0],
+      coupons,
+    });
   } catch (error) {
     next(error);
   }

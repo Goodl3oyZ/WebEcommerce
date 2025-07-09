@@ -174,7 +174,7 @@ export const storeService = {
     const [totalSales, totalOrders, averageOrderValue, topProducts] =
       await Promise.all([
         db
-          .select({ total: sql`sum(total_amount)` })
+          .select({ total: sql`sum(total)` })
           .from(orders)
           .where(
             and(
@@ -194,7 +194,7 @@ export const storeService = {
             )
           ),
         db
-          .select({ avg: sql`avg(total_amount)` })
+          .select({ avg: sql`avg(total)` })
           .from(orders)
           .where(
             and(

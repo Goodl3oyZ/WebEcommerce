@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
 import { brandsAPI } from "@/lib/api";
+import { adminAPI } from "@/lib/api/admin";
 import {
   FaBuilding,
   FaEdit,
@@ -13,6 +14,7 @@ import {
   FaCheckCircle,
   FaTimesCircle,
 } from "react-icons/fa";
+import Image from "next/image";
 
 export function BrandsPanel() {
   const [brands, setBrands] = useState([]);
@@ -34,24 +36,16 @@ export function BrandsPanel() {
 
   const onSubmit = async (data) => {
     try {
-      const url = editingId ? `/api/brands/${editingId}` : "/api/brands";
-      const method = editingId ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (response.ok) {
-        toast.success(editingId ? "Brand updated!" : "Brand created!");
-        reset();
-        setEditingId(null);
-        loadBrands();
+      if (editingId) {
+        await adminAPI.updateBrand(editingId, data);
+        toast.success("Brand updated!");
       } else {
-        const error = await response.json();
-        toast.error(error.message || "Something went wrong");
+        await adminAPI.createBrand(data);
+        toast.success("Brand created!");
       }
+      reset();
+      setEditingId(null);
+      loadBrands();
     } catch {
       toast.error("Failed to save brand");
     }
@@ -68,13 +62,9 @@ export function BrandsPanel() {
     if (!confirm("Are you sure you want to delete this brand?")) return;
 
     try {
-      const response = await fetch(`/api/brands/${id}`, { method: "DELETE" });
-      if (response.ok) {
-        toast.success("Brand deleted!");
-        loadBrands();
-      } else {
-        toast.error("Failed to delete brand");
-      }
+      await adminAPI.deleteBrand(id);
+      toast.success("Brand deleted!");
+      loadBrands();
     } catch {
       toast.error("Failed to delete brand");
     }
@@ -163,10 +153,12 @@ export function BrandsPanel() {
               >
                 <div className="flex items-center gap-3 flex-1">
                   {brand.logo_url ? (
-                    <img
+                    <Image
                       src={brand.logo_url}
                       alt={brand.name}
-                      className="w-10 h-10 rounded-full object-cover border"
+                      width={40}
+                      height={40}
+                      style={{ objectFit: "cover" }}
                     />
                   ) : (
                     <FaImage className="w-10 h-10 text-gray-300" />

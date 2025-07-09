@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { useRouter } from "next/navigation";
 import { authAPI } from "@/lib/api/auth";
 import { config } from "@/lib/config";
@@ -24,24 +30,25 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const clearCartStore = useCartStore((state) => state.clearCart);
-  const clearAuthData = () => {
+  const clearAuthData = useCallback(() => {
     setUser(null);
     localStorage.removeItem("user");
-  };
+  }, []);
 
-  const setUserData = (userData) => {
-    if (!userData) {
-      clearAuthData();
-      return;
-    }
-
-    const userWithDefaultProfile = {
-      ...userData,
-    };
-
-    setUser(userWithDefaultProfile);
-    localStorage.setItem("user", JSON.stringify(userWithDefaultProfile));
-  };
+  const setUserData = useCallback(
+    (userData) => {
+      if (!userData) {
+        clearAuthData();
+        return;
+      }
+      const userWithDefaultProfile = {
+        ...userData,
+      };
+      setUser(userWithDefaultProfile);
+      localStorage.setItem("user", JSON.stringify(userWithDefaultProfile));
+    },
+    [clearAuthData]
+  );
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -69,7 +76,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     checkAuth();
-  }, []); // เรียกเพียงครั้งเดียวตอน component mount
+  }, [setUserData]); // เพิ่ม setUserData ใน dependency array
 
   const login = async (credentials) => {
     try {

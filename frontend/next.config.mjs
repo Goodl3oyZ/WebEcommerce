@@ -21,18 +21,25 @@ const nextConfig = {
         pathname: "/products/**", // <-- ADD THIS LINE for product images
       },
     ],
+
     domains: [
       "avatars.githubusercontent.com", // GitHub
       "lh3.googleusercontent.com", // Google (Gmail)
       "platform-lookaside.fbsbx.com", // Facebook
       "graph.facebook.com", // Facebook (บางกรณีเก่า)
+      "minio",
     ],
   },
   async rewrites() {
+    const isDev = process.env.NODE_ENV === "development";
+    const backendUrl = isDev
+      ? "http://backend-dev:5000"
+      : "http://localhost:5000";
+
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:5000/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },

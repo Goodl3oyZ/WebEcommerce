@@ -15,7 +15,7 @@ import { PaymentsPanel } from "@/components/admin/PaymentsPanel";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
-import { SeedDataPanel } from "@/components/admin/SeedDataPanel";
+// import { SeedDataPanel } from "@/components/admin/SeedDataPanel";
 import {
   FaBoxOpen,
   FaTags,
@@ -30,18 +30,30 @@ import {
   FaChartBar,
   FaCog,
   FaDatabase,
+  FaMoneyBillWave,
+  FaUserPlus,
+  FaClipboardList,
+  FaChartLine,
+  FaBoxes,
 } from "react-icons/fa";
+import { adminAPI } from "@/lib/api/admin";
+import DashboardSummary from "@/components/admin/DashboardSummary";
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
+  const [dashboard, setDashboard] = useState(null);
+  const [dashLoading, setDashLoading] = useState(true);
 
   useEffect(() => {
     if (!loading && user) {
-      console.log("AdminPage user:", user);
+      adminAPI.getDashboard().then((data) => {
+        setDashboard(data);
+        setDashLoading(false);
+      });
     }
   }, [loading, user]);
 
-  if (loading) {
+  if (loading || dashLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -64,36 +76,25 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-4 animate-fade-in">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-4 md:mb-8 gap-4 animate-fade-in-down">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center justify-center bg-blue-100 text-blue-600 rounded-full p-3 text-3xl shadow animate-bounce">
-            <FaBoxOpen />
-          </span>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Manage your store's content and settings
-            </p>
-          </div>
-        </div>
-        <div className="text-right bg-gray-50 rounded-xl px-4 py-2 shadow flex flex-col items-end animate-fade-in">
-          <p className="text-sm text-gray-600 font-semibold">
-            Welcome, {user.name}
-          </p>
-          <p className="text-xs text-gray-500">{user.email}</p>
-        </div>
-      </div>
-      <Tabs defaultValue="products" orientation="vertical" className="flex flex-col md:flex-row gap-4">
+      <Tabs
+        defaultValue="product-dashboard"
+        orientation="vertical"
+        className="flex flex-col md:flex-row gap-4"
+      >
         {/* Sidebar Navigation */}
         <div className="w-full md:w-64 bg-white shadow-lg rounded-2xl md:rounded-r-2xl md:rounded-l-none p-2 md:p-4 mb-4 md:mb-0 overflow-x-auto md:overflow-visible">
           <TabsList className="flex md:flex-col flex-row gap-2 w-full bg-transparent min-w-max md:min-w-0">
             <TabsTrigger
               className="w-full flex items-center gap-3 p-3 text-left text-base font-medium transition-all duration-200 hover:bg-blue-50 hover:text-blue-600 rounded-xl data-[state=active]:bg-blue-100 data-[state=active]:text-blue-600"
+              value="product-dashboard"
+            >
+              <FaChartLine className="text-xl" /> Product Dashboard
+            </TabsTrigger>
+            <TabsTrigger
+              className="w-full flex items-center gap-3 p-3 text-left text-base font-medium transition-all duration-200 hover:bg-blue-50 hover:text-blue-600 rounded-xl data-[state=active]:bg-blue-100 data-[state=active]:text-blue-600"
               value="products"
             >
-              <FaBoxOpen className="text-xl" /> Products
+              <FaBoxOpen className="text-xl" /> Product Management
             </TabsTrigger>
             <TabsTrigger
               className="w-full flex items-center gap-3 p-3 text-left text-base font-medium transition-all duration-200 hover:bg-green-50 hover:text-green-600 rounded-xl data-[state=active]:bg-green-100 data-[state=active]:text-green-600"
@@ -161,16 +162,13 @@ export default function AdminPage() {
             >
               <FaCog className="text-xl" /> Settings
             </TabsTrigger>
-            <TabsTrigger
-              className="w-full flex items-center gap-3 p-3 text-left text-base font-medium transition-all duration-200 hover:bg-violet-50 hover:text-violet-600 rounded-xl data-[state=active]:bg-violet-100 data-[state=active]:text-violet-600"
-              value="seed"
-            >
-              <FaDatabase className="text-xl" /> Seed/Fake Data
-            </TabsTrigger>
           </TabsList>
         </div>
         {/* Main Content Area */}
         <div className="flex-1 bg-white rounded-2xl shadow-lg p-2 sm:p-4 md:p-6 w-full">
+          <TabsContent value="product-dashboard" className="mt-0">
+            <DashboardSummary dashboard={dashboard} loading={dashLoading} />
+          </TabsContent>
           <TabsContent value="products" className="mt-0">
             <ProductsPanel />
           </TabsContent>
@@ -206,9 +204,6 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="settings" className="mt-0">
             <SettingsPanel />
-          </TabsContent>
-          <TabsContent value="seed" className="mt-0">
-            <SeedDataPanel />
           </TabsContent>
         </div>
       </Tabs>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cartAPI } from "@/lib/api/cart";
 import useCartStore from "@/store/cartStore";
@@ -20,6 +20,7 @@ import {
   FiRefreshCw,
   FiAlertCircle,
 } from "react-icons/fi";
+import Image from "next/image";
 
 export default function CartPage() {
   const { user, authLoading } = useAuth();
@@ -48,7 +49,7 @@ export default function CartPage() {
     });
   };
 
-  const syncCartData = async () => {
+  const syncCartData = useCallback(async () => {
     try {
       const currentLocalItems = useCartStore.getState().items;
       console.log("🛒 Local cart items to sync:", currentLocalItems);
@@ -79,7 +80,7 @@ export default function CartPage() {
     } finally {
       setIsSyncing(false);
     }
-  };
+  }, [clearCartStore]);
 
   // Main cart initialization effect
   useEffect(() => {
@@ -128,14 +129,14 @@ export default function CartPage() {
     };
 
     initializeCart();
-  }, [user, authLoading]);
+  }, [user, authLoading, getTotalPrice, localItems, syncCartData]);
 
   // Reset sync attempt flag when user logs out
   useEffect(() => {
     if (!user) {
       syncAttemptedRef.current = false;
     }
-  }, [user]);
+  }, [user, getTotalPrice, localItems, syncCartData]);
 
   // Update quantity with loading state
   const updateQuantity = async (itemId, quantity, variantId = null) => {
@@ -383,7 +384,7 @@ export default function CartPage() {
                       >
                         {/* Product Image */}
                         <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow">
-                          <img
+                          <Image
                             src={
                               user
                                 ? item.product?.imageUrl[0] ||
@@ -391,7 +392,8 @@ export default function CartPage() {
                                 : item.imageUrl || "/images/placeholder.svg"
                             }
                             alt={user ? item.product?.name : item.name}
-                            className="object-cover w-full h-full"
+                            fill
+                            style={{ objectFit: "cover" }}
                           />
                         </div>
                         {/* Product Details */}

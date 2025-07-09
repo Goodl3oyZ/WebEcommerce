@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import ClientLayout from "@/components/Chat/ClientLayout"; // อย่าลืม import
 import { Kanit } from "next/font/google";
+import Script from "next/script";
 
 const kanit = Kanit({
   subsets: ["thai", "latin"],
@@ -29,7 +30,10 @@ export default function RootLayout({ children }) {
           <ChatProvider>
             <Toaster position="top-center" />
             <Header />
-            <script src="https://cdn.omise.co/omise.js" />
+            <Script
+              src="https://cdn.omise.co/omise.js"
+              strategy="afterInteractive"
+            />
             <main className="w-full min-h-screen">
               {/* ใช้ ClientLayout เพื่อจัดการกับการแชท */}
               <ClientLayout>{children}</ClientLayout>

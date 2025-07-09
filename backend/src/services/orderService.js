@@ -37,13 +37,11 @@ function normalizePaymentCode(code) {
 async function withPresignedImageUrl(product) {
   if (!product || !product.imageUrl) return product;
   if (Array.isArray(product.imageUrl)) {
-    product.imageUrl = await Promise.all(
-      product.imageUrl.map(async (img) =>
-        img ? await getFileUrl(BUCKETS.PRODUCTS, img) : null
-      )
+    product.imageUrl = product.imageUrl.map((img) =>
+      img ? getFileUrl(BUCKETS.PRODUCTS, img) : null
     );
   } else if (typeof product.imageUrl === "string") {
-    product.imageUrl = await getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
+    product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
   }
   return product;
 }
@@ -143,6 +141,17 @@ export const orderService = {
     return order;
   },
 
+  // ตรวจสอบให้แน่ใจว่าได้ import สิ่งเหล่านี้แล้ว
+  // import { db } from './db';
+  // import { addresses, paymentMethods, products, productVariants, orders, orderItems, coupons, shippingMethods, orderStatusHistory } from './schema'; // เพิ่ม shippingMethods, orderStatusHistory
+  // import { eq, and, gte } from 'drizzle-orm';
+  // import { ApiError } from './apiError';
+  // import { generateOrderNumber } from '../utils/orderUtils'; // สมมติว่ามี util นี้
+  // import { shippingService } from '../services/shippingService'; // สมมติว่ามี service นี้
+  // import { paymentService } from '../services/paymentService'; // สมมติว่ามี service นี้
+  // import { omiseService } from '../services/omiseService'; // สมมติว่ามี service นี้
+  // import { normalizePaymentCode } from '../utils/paymentUtils'; // สมมติว่ามี util นี้
+
   async createOrder(userId, orderData) {
     const {
       shippingAddressId,
@@ -150,11 +159,15 @@ export const orderService = {
       shippingMethodId,
       paymentMethodId,
       notes,
-      items,
+      items, // orderData.items ควรมี { productId, variantId, quantity }
     } = orderData;
 
+    // ตรวจสอบว่ามีรายการสินค้าในออร์เดอร์หรือไม่
+    if (!items || items.length === 0) {
+      throw new ApiError("Order must contain at least one item", 400);
+    }
+
     try {
-      // Start transaction
       return await db.transaction(async (tx) => {
         // 1. Validate addresses
         const [shippingAddress, billingAddress] = await Promise.all([
@@ -197,99 +210,113 @@ export const orderService = {
         // 4. ตรวจสอบและตัด stock แบบ atomic
         let subtotal = 0;
         const orderItemsData = [];
-        for (const item of items) {
-          const product = await tx.query.products.findFirst({
-            where: eq(products.id, item.productId),
-          });
-          if (!product) {
-            throw new ApiError(`Product not found: ${item.productId}`, 404);
-          }
-          let price = product.price;
-          let stock = product.stock;
-          let variant = null;
-          if (item.variantId) {
-            variant = await tx.query.productVariants.findFirst({
-              where: and(
-                eq(productVariants.id, item.variantId),
-                eq(productVariants.productId, item.productId)
-              ),
+
+        // ดึงข้อมูล product และ variant ทั้งหมดในครั้งเดียวเพื่อประสิทธิภาพที่ดีขึ้น
+        // แต่ยังคงตรวจสอบ stock และอัปเดตแยกกันในลูปเพื่อ atomicity
+        const productAndVariantData = await Promise.all(
+          items.map(async (item) => {
+            const product = await tx.query.products.findFirst({
+              where: eq(products.id, item.productId),
             });
-            if (!variant) {
-              throw new ApiError(`Variant not found: ${item.variantId}`, 404);
+            if (!product) {
+              throw new ApiError(`Product not found: ${item.productId}`, 404);
             }
-            price = variant.price || product.price;
-            stock = variant.stock;
+
+            let variant = null;
+            if (item.variantId) {
+              variant = await tx.query.productVariants.findFirst({
+                where: and(
+                  eq(productVariants.id, item.variantId),
+                  eq(productVariants.productId, item.productId)
+                ),
+              });
+              if (!variant) {
+                throw new ApiError(
+                  `Variant not found: ${item.variantId} for product ${product.name}`,
+                  404
+                );
+              }
+            } else {
+              // หากไม่มี variantId และเราได้ตกลงกันว่า stock อยู่ที่ variant เท่านั้น
+              // กรณีนี้ควร throw error หรือบังคับให้สินค้ามี default variant
+              throw new ApiError(
+                `Product ${product.name} requires a variant to be purchased.`,
+                400
+              );
+            }
+            return { item, product, variant };
+          })
+        );
+
+        for (const { item, product, variant } of productAndVariantData) {
+          // ณ จุดนี้ variant จะต้องมีค่าเสมอจากการตรวจสอบข้างต้น
+          const currentPrice = Number(variant.price); // ใช้ราคาจาก variant
+          const currentStock = variant.stock; // ใช้ stock จาก variant
+
+          if (item.quantity <= 0) {
+            throw new ApiError("Item quantity must be positive.", 400);
           }
-          if (item.quantity > stock) {
+
+          if (item.quantity > currentStock) {
             throw new ApiError(
-              `Insufficient stock for product: ${product.name}`,
+              `Insufficient stock for product ${product.name} (Variant: ${variant.color} ${variant.size}). Available: ${currentStock}, Requested: ${item.quantity}`,
               400
             );
           }
-          // ตัด stock แบบ atomic
-          if (item.variantId) {
-            const updated = await tx
-              .update(productVariants)
-              .set({ stock: stock - item.quantity })
-              .where(
-                and(
-                  eq(productVariants.id, item.variantId),
-                  eq(productVariants.stock, stock)
-                )
+
+          // ตัด stock แบบ atomic (optimistic locking)
+          const updated = await tx
+            .update(productVariants)
+            .set({ stock: currentStock - item.quantity })
+            .where(
+              and(
+                eq(productVariants.id, variant.id),
+                eq(productVariants.stock, currentStock) // ตรวจสอบ stock ก่อนอัปเดต
               )
-              .returning();
-            if (!updated.length) {
-              throw new ApiError(
-                `Stock changed, please try again: ${product.name}`,
-                409
-              );
-            }
-          } else {
-            const updated = await tx
-              .update(products)
-              .set({ stock: stock - item.quantity })
-              .where(
-                and(eq(products.id, item.productId), eq(products.stock, stock))
-              )
-              .returning();
-            if (!updated.length) {
-              throw new ApiError(
-                `Stock changed, please try again: ${product.name}`,
-                409
-              );
-            }
+            )
+            .returning();
+
+          if (!updated.length) {
+            // ถ้า updated.length เป็น 0 แสดงว่า stock มีการเปลี่ยนแปลงไปแล้ว
+            // เนื่องจากมีคนอื่นซื้อไป หรือมีการปรับสต็อก
+            throw new ApiError(
+              `Stock for product ${product.name} (Variant: ${variant.color} ${variant.size}) changed. Please try again.`,
+              409
+            );
           }
-          const itemSubtotal = price * item.quantity;
+
+          const itemSubtotal = currentPrice * item.quantity;
           subtotal += itemSubtotal;
+
           orderItemsData.push({
             productId: item.productId,
             variantId: item.variantId,
             quantity: item.quantity,
-            price,
+            price: currentPrice, // ใช้ราคาที่ดึงมาจาก variant
             subtotal: itemSubtotal,
           });
         }
 
         // 5. คำนวณค่าจัดส่งจริงด้วย shippingService
-        let shippingCost = orderData.shippingCost;
+        // ตรงนี้ยังคงใช้ shippingAddressId และ items เพื่อให้ shippingService คำนวณได้
+        let shippingCost = orderData.shippingCost; // ถ้า Frontend ส่งมาให้ใช้ (อาจเป็นค่าที่คำนวณแล้ว)
         if (shippingCost == null) {
-          // เรียก shippingService.calculateShippingCost
           const shippingCosts = await shippingService.calculateShippingCost(
             shippingAddressId,
-            items
+            items // ส่งรายการสินค้า เพื่อให้ shippingService คำนวณน้ำหนัก/ขนาด
           );
-          // เลือก shipping method ที่ตรงกับ shippingMethodId
           const selected = shippingCosts.find(
             (m) => m.methodId === shippingMethodId
           );
           if (!selected) {
             throw new ApiError(
-              "Shipping method not available for this address",
+              "Shipping method not available for this address or items",
               400
             );
           }
           shippingCost = selected.cost;
         }
+
         const tax = subtotal * 0.07; // 7% VAT
         const total = subtotal + shippingCost + tax;
 
@@ -298,7 +325,7 @@ export const orderService = {
           .insert(orders)
           .values({
             userId,
-            orderNumber: generateOrderNumber(),
+            orderNumber: generateOrderNumber(), // ตรวจสอบให้แน่ใจว่า generateOrderNumber() พร้อมใช้งาน
             status: "pending",
             paymentStatus: "pending",
             shippingStatus: "pending",
@@ -311,6 +338,8 @@ export const orderService = {
             shippingMethodId,
             paymentMethodId,
             notes,
+            createdAt: new Date(), // เพิ่ม createdAt ถ้า schema ไม่ได้ defaultNow()
+            updatedAt: new Date(), // เพิ่ม updatedAt
           })
           .returning();
 
@@ -318,7 +347,11 @@ export const orderService = {
         await tx.insert(orderItems).values(
           orderItemsData.map((item) => ({
             orderId: order.id,
-            ...item,
+            productId: item.productId, // ต้องใส่ productId ด้วยใน orderItems
+            variantId: item.variantId,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.subtotal,
           }))
         );
 
@@ -328,27 +361,33 @@ export const orderService = {
           status: "pending",
           comment: "Order created",
           createdBy: userId,
+          createdAt: new Date(), // เพิ่ม createdAt
         });
 
         // 9. Create shipment (เรียก shippingService แบบ production-grade ส่ง tx เข้าไป)
         let shipment;
         try {
+          // ควรส่งข้อมูลที่เพียงพอสำหรับ shippingService เช่น address, items details
           shipment = await shippingService.createShippingLabel(
-            order.id,
+            order.id, // Order ID
             shippingMethodId,
-            tx
+            shippingAddress, // ส่งข้อมูล address ให้ครบ
+            orderItemsData, // ส่งข้อมูล items ให้ครบ
+            tx // ส่ง transaction object
           );
+
           await tx
             .update(orders)
             .set({
               trackingNumber: shipment.trackingNumber,
-              carrier: shippingMethod.name,
-              estimatedDelivery: shipment.estimatedDelivery,
-              shippingStatus: "pending",
+              carrier: shippingMethod.name, // ใช้ชื่อจาก shippingMethod ที่ validate มาแล้ว
+              estimatedDelivery: shipment.estimatedDelivery || null, // อาจจะไม่มี
+              shippingStatus: "pending", // หรือสถานะที่ได้จาก shipment
               updatedAt: new Date(),
             })
             .where(eq(orders.id, order.id));
         } catch (err) {
+          console.error("Error creating shipment:", err); // Log error
           throw new ApiError("Failed to create shipment", 500);
         }
 
@@ -359,10 +398,11 @@ export const orderService = {
             userId,
             order.id,
             paymentMethod.code,
-            null,
+            total, // ส่งยอดรวมให้ paymentService
             tx
           );
         } catch (err) {
+          console.error("Error creating payment transaction:", err); // Log error
           throw new ApiError("Failed to create payment transaction", 500);
         }
 
@@ -378,10 +418,11 @@ export const orderService = {
           "source=",
           orderData.omiseSource
         );
+
         if (["omise", "card", "promptpay"].includes(normalizedCode)) {
           try {
             const chargeParams = {
-              amount: Math.round(total * 100),
+              amount: Math.round(total * 100), // Omise ใช้หน่วยสตางค์
               currency: "thb",
               description: `Order ${order.orderNumber}`,
               metadata: {
@@ -389,6 +430,7 @@ export const orderService = {
                 userId: userId,
               },
             };
+
             if (normalizedCode === "card") {
               if (!orderData.omiseToken) {
                 throw new ApiError(
@@ -407,16 +449,28 @@ export const orderService = {
               }
               chargeParams.source = orderData.omiseSource;
             }
+
             console.log(
               "[OrderService] Calling omiseService.createCharge",
               chargeParams
             );
+
             const charge = await omiseService.createCharge(chargeParams);
-            await paymentService.updatePayment(paymentTx.id, {
-              transactionId: charge.id,
-              paymentDetails: charge,
-              status: charge.status === "successful" ? "completed" : "pending",
-            });
+
+            // อัปเดต payment record
+            await paymentService.updatePayment(
+              paymentTx.id,
+              {
+                transactionId: charge.id,
+                paymentDetails: charge, // เก็บข้อมูล charge ทั้งหมด
+                status:
+                  charge.status === "successful" ? "completed" : "pending",
+                updatedAt: new Date(),
+              },
+              tx
+            ); // ส่ง tx เข้าไปใน paymentService.updatePayment ด้วย
+
+            // อัปเดตสถานะ payment ของ Order
             await tx
               .update(orders)
               .set({
@@ -429,9 +483,18 @@ export const orderService = {
               })
               .where(eq(orders.id, order.id));
           } catch (err) {
-            await paymentService.updatePayment(paymentTx.id, {
-              status: "failed",
-            });
+            console.error("Omise payment error:", err); // Log error
+            // อัปเดต payment record เป็น failed
+            await paymentService.updatePayment(
+              paymentTx.id,
+              {
+                status: "failed",
+                updatedAt: new Date(),
+              },
+              tx
+            ); // ส่ง tx เข้าไป
+
+            // อัปเดตสถานะ payment ของ Order เป็น failed
             await tx
               .update(orders)
               .set({
@@ -439,7 +502,8 @@ export const orderService = {
                 updatedAt: new Date(),
               })
               .where(eq(orders.id, order.id));
-            throw new ApiError("Omise payment failed", 400);
+
+            throw new ApiError("Omise payment failed", 400); // Throw error ให้ transaction roll back
           }
         } else {
           console.log(
@@ -450,12 +514,17 @@ export const orderService = {
             "source=",
             orderData.omiseSource
           );
+          // สำหรับวิธีการชำระเงินที่ไม่ใช่ Omise (เช่น โอนเงิน)
+          // สถานะการชำระเงินของ Order และ Payment Transaction ควรเป็น "pending" หรือ "waiting_for_payment"
+          // และจะถูกอัปเดตเมื่อมีการยืนยันการชำระเงินภายหลัง
         }
 
         // Return complete order with items (ใช้ tx)
         return await this.getOrderById(userId, order.id, tx);
       });
     } catch (err) {
+      console.error("Error creating order:", err); // Log error
+      // ข้อผิดพลาดจาก transaction จะถูก re-throw ออกมา
       throw err;
     }
   },

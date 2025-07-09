@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { orderAPI } from "@/lib/api/orders";
 import { toast } from "react-hot-toast";
@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { paymentsAPI } from "@/lib/api/payment";
+import Image from "next/image";
 
 const ORDER_STATUS = {
   PENDING: "รอการชำระเงิน",
@@ -136,10 +137,12 @@ function OrderStatusBadge({ status, tracking }) {
 function OrderItem({ item }) {
   return (
     <div className="flex items-center gap-4 py-4 border-b last:border-b-0">
-      <img
+      <Image
         src={item.product.imageUrl?.[0] || "/placeholder.png"}
         alt={item.product.name}
         className="w-20 h-20 object-cover rounded border shadow-sm"
+        fill
+        style={{ objectFit: "cover" }}
       />
       <div className="flex-1">
         <div className="font-medium text-gray-900">{item.product.name}</div>
@@ -384,17 +387,7 @@ export default function OrderDetailsPage() {
     cvc: "",
   });
 
-  useEffect(() => {
-    loadOrderDetails();
-  }, [id]);
-  useEffect(() => {
-    if (showToast) {
-      const timer = setTimeout(() => setShowToast(false), 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [showToast]);
-
-  const loadOrderDetails = async () => {
+  const loadOrderDetails = useCallback(async () => {
     try {
       const [orderResponse, trackingResponse] = await Promise.all([
         orderAPI.getOrder(id),
@@ -408,7 +401,17 @@ export default function OrderDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadOrderDetails();
+  }, [loadOrderDetails]);
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => setShowToast(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
 
   const handlePay = async () => {
     setIsPaying(true);

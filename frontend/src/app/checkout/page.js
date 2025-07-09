@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import useCartStore from "@/store/cartStore";
 import { FiPhone } from "react-icons/fi";
+import Image from "next/image";
 
 // เพิ่มฟังก์ชัน mapping error message เป็นภาษาไทย (วางไว้บนสุดของไฟล์)
 const omiseErrorMap = {
@@ -200,8 +201,17 @@ export default function CheckoutPage() {
     } else if (showPaymentModal) {
       setModalQrUrl(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPaymentModal, modalMethod]);
+  }, [
+    showPaymentModal,
+    modalMethod,
+    selectedAddressId,
+    shippingMethodId,
+    paymentMethodId,
+    cart.items,
+    shippingCost,
+    addresses,
+    cart.subtotal,
+  ]);
 
   // ตั้งค่า default paymentMethodId หลังโหลด paymentMethods
   useEffect(() => {
@@ -211,7 +221,7 @@ export default function CheckoutPage() {
       );
       setPaymentMethodId(credit ? credit.id : paymentMethods[0].id);
     }
-  }, [paymentMethods]);
+  }, [paymentMethods, paymentMethodId, cart.subtotal]);
 
   // เพิ่มฟังก์ชัน mapping code สำหรับ backend
   function getBackendPaymentMethod(code) {
@@ -278,8 +288,7 @@ export default function CheckoutPage() {
       }
     };
     fetchShippingCost();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddressId, cart.items]);
+  }, [selectedAddressId, cart.items, cart.subtotal]);
 
   // เพิ่มฟังก์ชันชำระเงินที่รองรับการชำระเงินสำเร็จและล้มเหลว
   const handleSubmit = async (e) => {
@@ -791,12 +800,14 @@ export default function CheckoutPage() {
                     className="py-4 flex items-center gap-4"
                   >
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                      <img
+                      <Image
                         src={
                           item.product.imageUrl[0] || "/images/placeholder.svg"
                         }
                         alt={item.product.name}
-                        className="object-cover w-full h-full"
+                        width={64}
+                        height={64}
+                        style={{ objectFit: "cover" }}
                       />
                     </div>
                     <div className="flex-grow min-w-0">
@@ -993,7 +1004,7 @@ export default function CheckoutPage() {
               {isSubmitting ? "กำลังดำเนินการ..." : "ยืนยันคำสั่งซื้อ"}
             </button>
             <p className="text-xs text-gray-500 mt-3 text-center">
-              การคลิกปุ่ม 'ชำระเงิน' หมายความว่าคุณยอมรับ
+              การคลิกปุ่ม &#39;ชำระเงิน&#39; หมายความว่าคุณยอมรับ
               <a href="#" className="text-blue-600 hover:underline">
                 ข้อกำหนดและเงื่อนไข
               </a>{" "}
@@ -1087,10 +1098,12 @@ export default function CheckoutPage() {
                 {modalQrUrl ? (
                   <>
                     <p className="mb-2 text-gray-700">สแกน QR เพื่อชำระเงิน</p>
-                    <img
+                    <Image
                       src={modalQrUrl}
                       alt="PromptPay QR"
-                      className="w-48 h-48"
+                      width={192}
+                      height={192}
+                      style={{ objectFit: "cover" }}
                     />
                     <button
                       className="bg-green-600 text-white px-4 py-2 rounded font-bold mt-4"

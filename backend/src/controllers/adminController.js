@@ -171,4 +171,16 @@ export const adminController = {
       });
     }
   },
+
+  // Dashboard
+  async getDashboard(req, res) {
+    try {
+      const data = await adminService.getDashboardData();
+      res.json(data);
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error fetching dashboard", error: error.message });
+    }
+  },
 };

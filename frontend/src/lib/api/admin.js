@@ -111,12 +111,6 @@ export const adminAPI = {
   // getSettings: async () => axiosInstance.get("/settings").then((r) => r.data),
   // updateSettings: async (data) =>
   //   axiosInstance.put("/settings", data).then((r) => r.data),
-
-  // --- Seed/Fake Data (admin only) ---
-  seedFakeOrders: async () =>
-    axiosInstance.post("/admin/seed/fake-orders").then((r) => r.data),
-  seedFakeUsers: async () =>
-    axiosInstance.post("/admin/seed/fake-users").then((r) => r.data),
-  seedFakeProducts: async () =>
-    axiosInstance.post("/admin/seed/fake-products").then((r) => r.data),
+  getDashboard: async () =>
+    axiosInstance.get("/admin/dashboard").then((r) => r.data),
 };

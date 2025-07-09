@@ -95,8 +95,8 @@ export const userController = {
           .where(eq(users.id, userId))
           .returning();
 
-        // Get presigned URL for the image
-        const imageUrl = await FileService.getFileUrl("profiles", fileName);
+        // Get public URL for the image
+        const imageUrl = FileService.getFileUrl("profiles", fileName);
         userWithImage.avatar = imageUrl;
 
         return res.json({

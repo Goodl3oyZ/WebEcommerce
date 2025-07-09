@@ -1,5 +1,5 @@
 import { Client } from "minio";
-import { MINIO_CONFIG } from "./loadENV.js";
+import { ENV, MINIO_CONFIG } from "./loadENV.js";
 
 const minioClient = new Client({
   endPoint: MINIO_CONFIG.HOST || "localhost",
@@ -65,13 +65,17 @@ export const deleteFile = async (bucket, fileName) => {
   }
 };
 
-export const getFileUrl = async (bucket, fileName) => {
-  try {
-    return await minioClient.presignedGetObject(bucket, fileName);
-  } catch (error) {
-    console.error("Error getting file URL:", error);
-    throw error;
+export const getFileUrl = (bucket, fileName) => {
+  // สร้าง public URL ตรงๆ (ไม่ใช้ presigned)
+  const protocol = MINIO_CONFIG.USE_SSL ? "https" : "http";
+  let host;
+  if (ENV.SERVER.NODE_ENV === "production") {
+    host = MINIO_CONFIG.HOST;
+  } else {
+    host = "localhost";
   }
+  const port = MINIO_CONFIG.API_PORT || 9000;
+  return `${protocol}://${host}:${port}/${bucket}/${fileName}`;
 };
 
 export default minioClient;

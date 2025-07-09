@@ -201,6 +201,10 @@ const productsAPI = {
   // Product variants (Admin only)
   createVariant: async (productId, variantData) => {
     try {
+      console.log("Sending variant data to backend:", variantData); // Debug log
+      console.log("Type of variantData:", typeof variantData); // Debug log
+      console.log("Is Array?", Array.isArray(variantData)); // Debug log
+
       const response = await axiosInstance.post(
         `/products/${productId}/variants`,
         variantData

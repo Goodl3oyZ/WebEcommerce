@@ -23,6 +23,7 @@ import {
 } from "react-icons/fi"; // Added more icons if needed
 import { Dialog, Transition } from "@headlessui/react";
 import { Button } from "@/components/ui/Button";
+import Image from "next/image";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -271,14 +272,16 @@ export default function ProductsPage() {
                       window.location.href = `/products/${item.id}`;
                     }}
                   >
-                    <img
+                    <Image
                       src={
                         Array.isArray(item.imageUrl)
                           ? item.imageUrl[0]
                           : item.imageUrl || "/images/placeholder.svg"
                       }
                       alt={item.name}
-                      className="w-8 h-8 object-cover rounded border"
+                      width={32}
+                      height={32}
+                      style={{ objectFit: "cover", borderRadius: "4px" }}
                     />
                     <div className="flex flex-col flex-1 min-w-0">
                       <span className="font-semibold text-gray-900 truncate text-sm">

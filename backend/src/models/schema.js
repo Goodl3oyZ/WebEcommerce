@@ -118,12 +118,10 @@ export const brandsRelations = relations(brands, ({ many }) => ({
 export const products = pgTable(
   "products",
   {
-    // id: uuid("id").primaryKey().defaultRandom(),
     id: uuid("id").primaryKey().defaultRandom(),
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
     price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-    stock: integer("stock").notNull(),
     imageUrl: jsonb("image_url"),
     categoryId: uuid("category_id").references(() => categories.id, {
       onDelete: "set null",
@@ -134,11 +132,11 @@ export const products = pgTable(
       onUpdate: "cascade",
     }),
     createdAt: timestamp("created_at").defaultNow(),
+    isActive: boolean("is_active").default(true),
   },
   (table) => ({
     nameIdx: index("products_name_idx").on(table.name),
     priceIdx: index("products_price_idx").on(table.price),
-    stockIdx: index("products_stock_idx").on(table.stock),
     categoryIdx: index("products_category_idx").on(table.categoryId),
     brandIdx: index("products_brand_idx").on(table.brandId),
     createdAtIdx: index("products_created_at_idx").on(table.createdAt),
@@ -164,7 +162,6 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   inventory: many(storeInventory),
 }));
 
-// Product Variants
 export const productVariants = pgTable("product_variants", {
   id: uuid("id").primaryKey().defaultRandom(),
   productId: uuid("product_id")
@@ -177,6 +174,7 @@ export const productVariants = pgTable("product_variants", {
   size: varchar("size", { length: 10 }).notNull(),
   sku: varchar("sku", { length: 100 }).unique().notNull(),
   stock: integer("stock").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
 });
 
 export const productVariantsRelations = relations(

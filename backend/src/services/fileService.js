@@ -1,8 +1,7 @@
-import minioClient, { BUCKETS } from "../config/minio.js";
+import minioClient, { BUCKETS, getFileUrl } from "../config/minio.js";
 import { v4 as uuidv4 } from "uuid";
 
 export class FileService {
-  // Upload file to MinIO
   static async uploadFile(file, bucket, folder = "") {
     try {
       const fileName = `${folder}/${uuidv4()}-${file.originalname}`;
@@ -16,21 +15,11 @@ export class FileService {
     }
   }
 
-  // Get file URL
-  static async getFileUrl(bucket, fileName) {
-    try {
-      return await minioClient.presignedGetObject(
-        bucket,
-        fileName,
-        24 * 60 * 60
-      ); // URL valid for 24 hours
-    } catch (error) {
-      console.error("Error getting file URL:", error);
-      throw error;
-    }
+  static getFileUrl(bucket, fileName) {
+    // เรียกใช้ getFileUrl จาก minio.js (public URL)
+    return getFileUrl(bucket, fileName);
   }
 
-  // Delete file
   static async deleteFile(bucket, fileName) {
     try {
       await minioClient.removeObject(bucket, fileName);
@@ -40,23 +29,12 @@ export class FileService {
     }
   }
 
-  // Upload profile image
-  static async uploadProfileImage(file, userId) {
-    return this.uploadFile(file, BUCKETS.PROFILES, `user-${userId}`);
-  }
-
-  // Upload product image
-  static async uploadProductImage(file, productId) {
-    return this.uploadFile(file, BUCKETS.PRODUCTS, `product-${productId}`);
-  }
-
-  // Upload store image
-  static async uploadStoreImage(file, storeId) {
-    return this.uploadFile(file, BUCKETS.STORES, `store-${storeId}`);
-  }
-
-  // Upload review image
-  static async uploadReviewImage(file, reviewId) {
-    return this.uploadFile(file, BUCKETS.REVIEWS, `review-${reviewId}`);
+  // ฟังก์ชันนี้ใช้แทนฟังก์ชัน upload เฉพาะแบบต่างๆ
+  // โดยส่ง bucket และ folder เป็น parameter มา
+  static async uploadByType(file, type, id) {
+    const bucket = BUCKETS[type.toUpperCase()];
+    if (!bucket) throw new Error(`Unknown bucket type: ${type}`);
+    const folder = `${type}-${id}`;
+    return this.uploadFile(file, bucket, folder);
   }
 }

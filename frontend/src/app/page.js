@@ -359,7 +359,7 @@ export default function HomePage() {
                 <div className="flex flex-col">
                   <div className="flex-grow">
                     <p className="text-gray-700 text-lg leading-relaxed mb-6">
-                      "{testimonial.quote}"
+                      &quot;{testimonial.quote}&quot;
                     </p>
                   </div>
                   <div className="flex items-center mt-4">

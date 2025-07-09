@@ -908,13 +908,16 @@ export default function Profile() {
                         className="flex items-center justify-between bg-white rounded-xl border p-4 mb-4 shadow-sm hover:shadow transition"
                       >
                         {/* รูปสินค้า */}
-                        <img
+                        <Image
                           src={
                             firstItem?.product?.imageUrl?.[0] ||
                             "/placeholder.png"
                           }
                           alt={firstItem?.product?.name || "Product"}
                           className="w-16 h-16 object-cover rounded border mr-4"
+                          width={64}
+                          height={64}
+                          style={{ objectFit: "cover" }}
                         />
                         {/* ข้อมูลออเดอร์ */}
                         <div className="flex-1 min-w-0">
@@ -932,8 +935,7 @@ export default function Profile() {
                             {firstItem?.product?.name}
                             {moreCount > 0 && (
                               <span className="text-indigo-600 ml-1">
-                                & {moreCount} more item
-                                {moreCount > 1 ? "s" : ""}
+                                & {moreCount} more item&#39;s
                               </span>
                             )}
                           </div>

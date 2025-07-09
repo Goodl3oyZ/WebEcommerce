@@ -92,6 +92,20 @@
       "when": 1751211190963,
       "tag": "0012_right_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1751725791370,
+      "tag": "0013_youthful_baron_strucker",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1751805044120,
+      "tag": "0014_youthful_kronos",
+      "breakpoints": true
     }
   ]
 }
