@@ -20,6 +20,11 @@ const nextConfig = {
         port: "9000",
         pathname: "/products/**", // <-- ADD THIS LINE for product images
       },
+      {
+        protocol: "https",
+        hostname: "example.com",
+        pathname: "/**",
+      },
     ],
 
     domains: [

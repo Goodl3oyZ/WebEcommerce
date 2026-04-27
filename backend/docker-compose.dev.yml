@@ -55,7 +55,12 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    entrypoint: ["/bin/sh", "-c", "/scripts/init-minio.sh"]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "tr -d '\\r' < /scripts/init-minio.sh > /tmp/init-minio.sh && chmod +x /tmp/init-minio.sh && /bin/sh /tmp/init-minio.sh",
+      ]
     volumes:
       - ./scripts/init-minio.sh:/scripts/init-minio.sh
     networks:

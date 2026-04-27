@@ -35,7 +35,7 @@
     "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
     "dotenv": "^16.5.0",
-    "drizzle-orm": "^0.29.3",
+    "drizzle-orm": "^0.45.2",
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
     "express-mongo-sanitize": "^2.2.0",
@@ -47,7 +47,7 @@
     "minio": "^8.0.5",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.2",
-    "nodemailer": "^7.0.3",
+    "nodemailer": "^8.0.7",
     "npm": "^11.3.0",
     "omise": "^1.0.0",
     "passport": "^0.7.0",
@@ -59,7 +59,7 @@
     "redis": "^5.1.1",
     "socket.io": "^4.8.1",
     "ua-parser-js": "^2.0.3",
-    "uuid": "^11.1.0",
+    "uuid": "^14.0.0",
     "winston": "^3.17.0",
     "xss-clean": "^0.1.4",
     "zod": "^3.24.4"
@@ -67,7 +67,7 @@
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/supertest": "^6.0.2",
-    "drizzle-kit": "^0.20.14",
+    "drizzle-kit": "^0.31.10",
     "jest": "^29.7.0",
     "nodemon": "^3.1.10",
     "supertest": "^6.3.4"

@@ -1,94 +1,107 @@
-# Project Overview
+# WebEcommerce
 
-This project is a full-stack e-commerce platform, consisting of a frontend (Next.js/React) and a backend (Node.js/Express). The system is designed to provide a seamless shopping experience, robust management tools, and scalable architecture.
+Full-stack e-commerce platform with:
+- `frontend`: Next.js 15 + React 19
+- `backend`: Express + Drizzle ORM + PostgreSQL + Redis + MinIO
+- Local infra via Docker Compose (dev)
 
----
+## Project Structure
 
-## ระบบหลักของโปรเจกต์ (Main Systems)
+```text
+WebEcommerce/
+├── frontend/                  # Next.js app
+├── backend/                   # Express API + Drizzle schema/seed
+├── DEVELOPMENT.md             # Development workflow (Docker/local)
+└── README.MD                  # You are here
+```
 
-### 1️⃣ ระบบข้อมูลผู้ใช้ (User Profile / Manage Account)
+## Core Modules
 
-- **ฟีเจอร์:** ดู/แก้ไขข้อมูลส่วนตัว, ที่อยู่, password
-- **ตารางที่เกี่ยวข้อง:**
-  - `users` (ข้อมูลผู้ใช้)
-  - `addresses` (ที่อยู่)
-  - `user_social_links` (โซเชียลลิงก์)
+- **Authentication & User Management**: register/login, profile, session, roles
+- **Catalog**: products, categories, brands, variants, attributes, tags
+- **Cart & Wishlist**: shopping cart flow and saved products
+- **Orders & Payments**: checkout, order items, payment records, refunds
+- **Shipping**: methods, rates, zones, shipment status/history
+- **Discounts & Coupons**: product/category/order discount logic
+- **Reviews & Loyalty**: rating/review, points and loyalty tracking
+- **Store/Seller Management**: stores, settings, inventory, payouts
 
-### 2️⃣ ระบบสินค้า (Product Listing / Catalog)
+## Prerequisites
 
-- **ฟีเจอร์:** แสดงรายการสินค้า, ค้นหา, กรองหมวดหมู่/แบรนด์
-- **ตารางที่เกี่ยวข้อง:**
-  - `products`, `brands`, `categories`, `product_variants`, `product_attributes`, `product_tags`, `product_tags_to_products`, `collections`, `collection_products`, `product_discounts`, `category_discounts`, `store_inventory`
+- Docker Desktop (recommended for full local stack)
+- Node.js 20+ and npm (optional for non-Docker workflow)
 
-### 3️⃣ ระบบตะกร้าสินค้า (Cart / Wishlist)
+## Quick Start (Recommended: Docker)
 
-- **ฟีเจอร์:** เพิ่ม/ลบสินค้าในตะกร้า, wish list
-- **ตารางที่เกี่ยวข้อง:**
-  - `carts`, `cart_items`, `wishlist_items`
+1. Create/update backend env:
+   - Ensure `backend/.env` exists with DB/Redis/MinIO/JWT variables.
+2. Start all services:
+   - `cd backend`
+   - `docker compose -f docker-compose.dev.yml up --build`
+3. Open services:
+   - Frontend: `http://localhost:3000`
+   - Backend API: `http://localhost:5000`
+   - MinIO Console: `http://localhost:9001`
+   - pgAdmin: `http://localhost:8080`
 
-### 4️⃣ ระบบสั่งซื้อ (Checkout / Order)
+## Database Setup
 
-- **ฟีเจอร์:** ทำรายการสั่งซื้อ, เลือกวิธีชำระเงิน/จัดส่ง
-- **ตารางที่เกี่ยวข้อง:**
-  - `orders`, `order_items`, `payment_methods`, `payment_transactions`, `order_coupons`, `shipments`, `shipping_methods`, `shipping_rates`, `shipping_zones`, `store_pickups`
+Run these after containers are up (or when schema changes):
 
-### 5️⃣ ระบบคูปองและส่วนลด (Coupons & Discounts)
+```bash
+cd backend
+docker compose -f docker-compose.dev.yml exec -T backend npm run migrate
+docker compose -f docker-compose.dev.yml exec -T backend npm run seed
+```
 
-- **ฟีเจอร์:** ใช้คูปอง, auto discount
-- **ตารางที่เกี่ยวข้อง:**
-  - `coupons`, `discounts`, `order_coupons`, `product_discounts`, `category_discounts`
+## Local (Without Docker)
 
-### 6️⃣ ระบบจัดส่ง / ติดตามสถานะ (Shipping & Tracking)
+Backend:
+```bash
+cd backend
+npm install
+npm run dev
+```
 
-- **ฟีเจอร์:** ติดตามสถานะคำสั่งซื้อ, การจัดส่ง
-- **ตารางที่เกี่ยวข้อง:**
-  - `order_status_history`, `shipments`, `shipping_history`
+Frontend:
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-### 7️⃣ ระบบรีวิว (Review System)
+Note: without Docker, you must manually provide PostgreSQL, Redis, and MinIO.
 
-- **ฟีเจอร์:** รีวิวสินค้า/ร้าน
-- **ตารางที่เกี่ยวข้อง:**
-  - `product_reviews`, `store_reviews`
+## Useful Commands
 
-### 8️⃣ ระบบ Loyalty / คะแนนสะสม (Loyalty & Points)
+```bash
+# Start
+cd backend && docker compose -f docker-compose.dev.yml up --build
 
-- **ฟีเจอร์:** สะสม/ใช้แต้ม
-- **ตารางที่เกี่ยวข้อง:**
-  - `loyalty_programs`, `points_history`
+# Stop
+cd backend && docker compose -f docker-compose.dev.yml down
 
-### 9️⃣ ระบบร้านค้า (Seller / Store Management)
+# Re-run schema + seed
+cd backend && docker compose -f docker-compose.dev.yml exec -T backend npm run migrate
+cd backend && docker compose -f docker-compose.dev.yml exec -T backend npm run seed
 
-- **ฟีเจอร์:** ข้อมูลร้าน, การตั้งค่าร้าน, การตั้งค่าชำระเงิน
-- **ตารางที่เกี่ยวข้อง:**
-  - `stores`, `store_settings`, `store_inventory`, `store_payment_settings`, `store_reviews`
+# Check logs
+cd backend && docker compose -f docker-compose.dev.yml logs -f backend frontend
+```
 
-### 10️⃣ ระบบแจ้งเตือน (Notification)
+## Common Troubleshooting
 
-- **ฟีเจอร์:** แจ้งเตือนสถานะสั่งซื้อ, โปรโมชั่น ฯลฯ
-- **ตารางที่เกี่ยวข้อง:**
-  - `notifications`
+- **API returns `500 relation ... does not exist`**
+  - Run `npm run migrate` in backend container.
+- **Products/categories empty**
+  - Run `npm run seed` in backend container.
+- **`next/image` invalid hostname**
+  - Add host to `frontend/next.config.mjs` under `images.remotePatterns`.
+- **Docker engine not running**
+  - Start Docker Desktop, then run compose again.
 
----
+## Additional Docs
 
-## Quick Start
-
-### Frontend Setup
-
-- `cd frontend`
-- `npm install`
-- `npm run dev`
-
-### Backend Setup
-
-- `cd backend`
-- `npm install`
-- `node index.js`
-
----
-
-## Additional Notes
-
-- ระบบนี้ออกแบบมาเพื่อรองรับการขยายฟีเจอร์ในอนาคต เช่น ระบบแชท, ระบบวิเคราะห์ข้อมูล ฯลฯ
-- สามารถปรับแต่งและเพิ่มเติมโมดูลได้ตามความต้องการของธุรกิจ
-
-paymenttransaction เหมือนไม่มี order id กับ payment method id tracnsaction id and paymaent detail ทั้ง 4 เป็น null
+- `DEVELOPMENT.md`: deeper setup and hot reload details
+- `backend/README.MD`: backend architecture and backend commands
+- `frontend/README.md`: frontend structure and frontend workflow

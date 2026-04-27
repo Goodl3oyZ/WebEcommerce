@@ -1,7 +1,6 @@
 #!/bin/sh
 set -e
 
-# รอ MinIO พร้อม (retry จนกว่าจะสำเร็จ)
 RETRY=0
 MAX_RETRY=30
 until mc alias set myminio http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
@@ -12,16 +11,14 @@ until mc alias set myminio http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PAS
   fi
   echo "Waiting for MinIO to be ready... ($RETRY/$MAX_RETRY)"
   sleep 2
-  done
+done
 
-sleep 20  # รอ MinIO พร้อมจริง ๆ ก่อนสร้าง bucket (เพิ่มเวลารอ)
+sleep 20
 
-# ฟังก์ชันสร้าง bucket พร้อมเช็คว่ามีอยู่แล้ว
 create_bucket() {
   BUCKET=$1
   RETRY=0
   MAX_RETRY=10
-  # เช็คว่ามี bucket อยู่แล้วหรือยัง
   if mc ls myminio/$BUCKET 2>/dev/null; then
     echo "Bucket $BUCKET already exists. Skipping."
     return 0
@@ -37,15 +34,13 @@ create_bucket() {
   done
 }
 
-# สร้าง buckets
 create_bucket products
 create_bucket profiles
 create_bucket stores
 create_bucket reviews
 
-# ตั้ง policy public read
 for BUCKET in products profiles stores reviews; do
   mc anonymous set download myminio/$BUCKET || echo "Failed to set policy for $BUCKET"
 done
 
-echo "MinIO buckets and policies initialized." 
+echo "MinIO buckets and policies initialized."

@@ -10,20 +10,29 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Verify transporter configuration
-transporter.verify(function (error, success) {
-  if (error) {
-    console.error("SMTP Configuration Error:", {
-      message: error.message,
-      code: error.code,
-      command: error.command,
-      responseCode: error.responseCode,
-      response: error.response,
-    });
-  } else {
-    console.log("SMTP Server is ready to take our messages");
-  }
-});
+const hasSmtpCredentials =
+  Boolean(ENV.EMAIL.HOST) &&
+  Boolean(ENV.EMAIL.USER) &&
+  Boolean(ENV.EMAIL.PASSWORD);
+
+// Avoid noisy startup failures in local/dev when SMTP is not configured.
+if (hasSmtpCredentials) {
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.error("SMTP Configuration Error:", {
+        message: error.message,
+        code: error.code,
+        command: error.command,
+        responseCode: error.responseCode,
+        response: error.response,
+      });
+    } else {
+      console.log("SMTP Server is ready to take our messages");
+    }
+  });
+} else {
+  console.warn("SMTP verify skipped: missing SMTP environment configuration");
+}
 
 export const sendEmail = async ({ to, subject, text, html }) => {
   try {

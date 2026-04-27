@@ -13,12 +13,12 @@ async function seed() {
   try {
     // Clear existing data
     console.log("Clearing existing data...");
+    await db.delete(product_variants);
+    await db.delete(products);
     await db.delete(categories);
     await db.delete(brands);
-    await db.delete(products);
-    await db.delete(product_variants);
-    await db.delete(users);
     await db.delete(userRoles);
+    await db.delete(users);
     console.log("Existing data cleared!");
 
     // Insert Users
@@ -36,7 +36,7 @@ async function seed() {
       .returning();
 
     // Assign Admin Role
-    await db.insert(userRoles).values([{ userId: 6, role: "admin" }]);
+    await db.insert(userRoles).values([{ userId: adminUser.id, role: "admin" }]);
 
     // Insert Categories
     const [clothingCategory, accessoriesCategory, electronicsCategory] =
@@ -88,8 +88,7 @@ async function seed() {
           name: "Classic T-Shirt",
           description: "Comfortable cotton t-shirt",
           price: 29.99,
-          stock: 100,
-          imageUrl: "https://example.com/tshirt.jpg",
+          imageUrl: ["https://example.com/tshirt.jpg"],
           categoryId: clothingCategory.id,
           brandId: brand1.id,
         },
@@ -97,8 +96,7 @@ async function seed() {
           name: "Designer Watch",
           description: "Luxury timepiece",
           price: 299.99,
-          stock: 50,
-          imageUrl: "https://example.com/watch.jpg",
+          imageUrl: ["https://example.com/watch.jpg"],
           categoryId: accessoriesCategory.id,
           brandId: brand2.id,
         },
@@ -106,8 +104,7 @@ async function seed() {
           name: "Smartphone",
           description: "Latest smartphone model",
           price: 999.99,
-          stock: 30,
-          imageUrl: "https://example.com/phone.jpg",
+          imageUrl: ["https://example.com/phone.jpg"],
           categoryId: electronicsCategory.id,
           brandId: brand3.id,
         },
@@ -122,6 +119,7 @@ async function seed() {
         size: "M",
         sku: "TS-BLK-M-001",
         stock: 30,
+        price: 29.99,
       },
       {
         productId: product1.id,
@@ -129,6 +127,7 @@ async function seed() {
         size: "L",
         sku: "TS-WHT-L-001",
         stock: 25,
+        price: 29.99,
       },
       {
         productId: product2.id,
@@ -136,6 +135,7 @@ async function seed() {
         size: "One Size",
         sku: "WT-SLV-001",
         stock: 15,
+        price: 299.99,
       },
       {
         productId: product3.id,
@@ -143,6 +143,7 @@ async function seed() {
         size: "128GB",
         sku: "PH-SGR-128",
         stock: 10,
+        price: 999.99,
       },
     ]);
 
