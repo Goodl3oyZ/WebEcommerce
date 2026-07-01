@@ -7,60 +7,67 @@ import { notificationDto } from "../dtos/notification.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all notification routes
 router.use(apiRateLimiter);
-
-// Protected routes (auth required)
 router.use(authMiddleware);
 
-// User routes
-router.get("/", notificationController.getUserNotifications);
-router.get("/:id", notificationController.getNotificationById);
-router.put(
-  "/:id/read",
-  validationMiddleware(notificationDto.markAsRead),
-  notificationController.markAsRead
+// Admin static paths (before /:id)
+router.get("/admin/all", requireAdmin, notificationController.getAllNotifications);
+router.get("/admin/:id", requireAdmin, notificationController.getNotificationById);
+router.delete(
+  "/admin/:id",
+  requireAdmin,
+  validationMiddleware(notificationDto.deleteNotification),
+  notificationController.deleteNotification
 );
+
+router.get("/", notificationController.getUserNotifications);
 router.put(
   "/read-all",
   validationMiddleware(notificationDto.markAsRead),
   notificationController.markAllAsRead
 );
-router.delete(
-  "/:id",
-  validationMiddleware(notificationDto.deleteNotification),
-  notificationController.deleteNotification
+router.patch(
+  "/read-all",
+  validationMiddleware(notificationDto.markAsRead),
+  notificationController.markAllAsRead
 );
 
-// Admin routes
 router.post(
   "/",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
   validationMiddleware(notificationDto.createNotification),
   notificationController.createNotification
 );
+
+router.put(
+  "/:id/read",
+  validationMiddleware(notificationDto.markAsRead),
+  notificationController.markAsRead
+);
+router.patch(
+  "/:id/read",
+  validationMiddleware(notificationDto.markAsRead),
+  notificationController.markAsRead
+);
 router.put(
   "/:id",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
+  validationMiddleware(notificationDto.updateNotification),
+  notificationController.updateNotification
+);
+router.patch(
+  "/:id",
+  requireAdmin,
   validationMiddleware(notificationDto.updateNotification),
   notificationController.updateNotification
 );
 router.delete(
-  "/admin/:id",
-  requireRole(ROLES.ADMIN),
+  "/:id",
   validationMiddleware(notificationDto.deleteNotification),
   notificationController.deleteNotification
 );
-router.get(
-  "/admin/all",
-  requireRole(ROLES.ADMIN),
-  notificationController.getAllNotifications
-);
-router.get(
-  "/admin/:id",
-  requireRole(ROLES.ADMIN),
-  notificationController.getNotificationById
-);
+router.get("/:id", notificationController.getNotificationById);
 
 export default router;

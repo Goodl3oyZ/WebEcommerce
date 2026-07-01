@@ -1,8 +1,8 @@
 import { notificationService } from "../services/notificationService.js";
 import { catchAsync } from "../utils/catchAsync.js";
-import { AppError } from "../utils/appError.js";
 
-// Get all notifications for the current user
+const isAdminNotificationPath = (req) => req.path.startsWith("/admin/");
+
 const getUserNotifications = catchAsync(async (req, res) => {
   const notifications = await notificationService.getUserNotifications(
     req.user.id
@@ -10,19 +10,15 @@ const getUserNotifications = catchAsync(async (req, res) => {
   res.json(notifications);
 });
 
-// Get a specific notification by ID
 const getNotificationById = catchAsync(async (req, res) => {
+  const userId = isAdminNotificationPath(req) ? null : req.user.id;
   const notification = await notificationService.getNotificationById(
     req.params.id,
-    req.user.id
+    userId
   );
-  if (!notification) {
-    throw new AppError("Notification not found", 404);
-  }
   res.json(notification);
 });
 
-// Mark a notification as read
 const markAsRead = catchAsync(async (req, res) => {
   const notification = await notificationService.markAsRead(
     req.params.id,
@@ -31,34 +27,34 @@ const markAsRead = catchAsync(async (req, res) => {
   res.json(notification);
 });
 
-// Mark all notifications as read
 const markAllAsRead = catchAsync(async (req, res) => {
   await notificationService.markAllAsRead(req.user.id);
   res.json({ message: "All notifications marked as read" });
 });
 
-// Delete a notification
 const deleteNotification = catchAsync(async (req, res) => {
-  await notificationService.deleteNotification(req.params.id, req.user.id);
+  const userId = isAdminNotificationPath(req) ? null : req.user.id;
+  await notificationService.deleteNotification(req.params.id, userId);
   res.json({ message: "Notification deleted successfully" });
 });
 
-// Admin: Create a new notification
 const createNotification = catchAsync(async (req, res) => {
-  const notification = await notificationService.createNotification(req.body);
+  const notification = await notificationService.createNotification({
+    ...req.body,
+    userId: req.body.userId ?? req.body.recipients?.[0] ?? req.user.id,
+  });
   res.status(201).json(notification);
 });
 
-// Admin: Update a notification
 const updateNotification = catchAsync(async (req, res) => {
   const notification = await notificationService.updateNotification(
     req.params.id,
-    req.body
+    req.body,
+    null
   );
   res.json(notification);
 });
 
-// Admin: Get all notifications
 const getAllNotifications = catchAsync(async (req, res) => {
   const notifications = await notificationService.getAllNotifications();
   res.json(notifications);

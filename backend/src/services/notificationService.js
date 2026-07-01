@@ -1,124 +1,126 @@
 import { db } from "../config/db.js";
 import { notifications } from "../models/schema.js";
-import { eq, and, desc } from "drizzle-orm";
-import { AppError } from "../utils/appError.js";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { ApiError } from "../utils/ApiError.js";
 
-// Get all notifications for a user
 const getUserNotifications = async (userId) => {
-  return await db.query.notifications.findMany({
+  return db.query.notifications.findMany({
     where: eq(notifications.userId, userId),
-    orderBy: desc(notifications.createdAt),
+    orderBy: [desc(notifications.createdAt)],
   });
 };
 
-// Get unread notifications count
 const getUnreadCount = async (userId) => {
-  return await db.query.notifications.count({
-    where: and(
-      eq(notifications.userId, userId),
-      eq(notifications.isRead, false)
-    ),
-  });
+  const [result] = await db
+    .select({ count: sql`count(*)::int` })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false)
+      )
+    );
+  return result?.count ?? 0;
 };
 
-// Mark a notification as read
-const markAsRead = async (notificationId, userId) => {
-  const notification = await db.query.notifications.findFirst({
-    where: and(
-      eq(notifications.id, notificationId),
-      eq(notifications.userId, userId)
-    ),
-  });
-
-  if (!notification) {
-    throw new AppError("Notification not found", 404);
-  }
-
-  return await db.query.notifications.update({
-    where: eq(notifications.id, notificationId),
-    data: { isRead: true },
-  });
-};
-
-// Mark all notifications as read
-const markAllAsRead = async (userId) => {
-  return await db.query.notifications.updateMany({
-    where: and(
-      eq(notifications.userId, userId),
-      eq(notifications.isRead, false)
-    ),
-    data: { isRead: true },
-  });
-};
-
-// Delete a notification
-const deleteNotification = async (notificationId, userId) => {
-  const notification = await db.query.notifications.findFirst({
-    where: and(
-      eq(notifications.id, notificationId),
-      eq(notifications.userId, userId)
-    ),
-  });
-
-  if (!notification) {
-    throw new AppError("Notification not found", 404);
-  }
-
-  await db.query.notifications.delete({
-    where: eq(notifications.id, notificationId),
-  });
-};
-
-// Create a new notification
-const createNotification = async (notificationData) => {
-  return await db.query.notifications.create({
-    data: {
-      ...notificationData,
-      isRead: false,
-    },
-  });
-};
-
-// Get notification by ID
 const getNotificationById = async (notificationId, userId) => {
+  const conditions = [eq(notifications.id, notificationId)];
+  if (userId) {
+    conditions.push(eq(notifications.userId, userId));
+  }
+
   const notification = await db.query.notifications.findFirst({
-    where: and(
-      eq(notifications.id, notificationId),
-      eq(notifications.userId, userId)
-    ),
+    where: and(...conditions),
   });
 
   if (!notification) {
-    throw new AppError("Notification not found", 404);
+    throw ApiError.notFound("Notification not found");
   }
 
   return notification;
 };
 
-// Update notification
-const updateNotification = async (notificationId, userId, updateData) => {
-  const notification = await db.query.notifications.findFirst({
-    where: and(
-      eq(notifications.id, notificationId),
-      eq(notifications.userId, userId)
-    ),
-  });
+const markAsRead = async (notificationId, userId) => {
+  await getNotificationById(notificationId, userId);
 
-  if (!notification) {
-    throw new AppError("Notification not found", 404);
+  const [updated] = await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.userId, userId)
+      )
+    )
+    .returning();
+
+  return updated;
+};
+
+const markAllAsRead = async (userId) => {
+  await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false)
+      )
+    );
+};
+
+const deleteNotification = async (notificationId, userId) => {
+  await getNotificationById(notificationId, userId);
+
+  await db
+    .delete(notifications)
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.userId, userId)
+      )
+    );
+};
+
+const createNotification = async (notificationData) => {
+  const [created] = await db
+    .insert(notifications)
+    .values({
+      ...notificationData,
+      isRead: false,
+    })
+    .returning();
+
+  return created;
+};
+
+const updateNotification = async (notificationId, updateData, userId = null) => {
+  await getNotificationById(notificationId, userId);
+
+  const conditions = [eq(notifications.id, notificationId)];
+  if (userId) {
+    conditions.push(eq(notifications.userId, userId));
   }
 
-  return await db.query.notifications.update({
-    where: eq(notifications.id, notificationId),
-    data: updateData,
+  const [updated] = await db
+    .update(notifications)
+    .set(updateData)
+    .where(and(...conditions))
+    .returning();
+
+  return updated;
+};
+
+const getNotificationsByType = async (userId, type) => {
+  return db.query.notifications.findMany({
+    where: and(eq(notifications.userId, userId), eq(notifications.type, type)),
+    orderBy: [desc(notifications.createdAt)],
   });
 };
 
-// Get notifications by type
-const getNotificationsByType = async (userId, type) => {
-  return await db.query.notifications.findMany({
-    where: and(eq(notifications.userId, userId), eq(notifications.type, type)),
-    orderBy: desc(notifications.createdAt),
+const getAllNotifications = async () => {
+  return db.query.notifications.findMany({
+    orderBy: [desc(notifications.createdAt)],
   });
 };
 
@@ -132,4 +134,5 @@ export const notificationService = {
   getNotificationById,
   updateNotification,
   getNotificationsByType,
+  getAllNotifications,
 };

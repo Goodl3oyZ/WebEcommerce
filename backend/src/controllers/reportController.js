@@ -1,6 +1,5 @@
 import { reportService } from "../services/reportService.js";
 import { catchAsync } from "../utils/catchAsync.js";
-import { AppError } from "../utils/appError.js";
 
 // Generate sales report
 const generateSalesReport = catchAsync(async (req, res) => {

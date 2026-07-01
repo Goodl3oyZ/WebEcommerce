@@ -37,4 +37,8 @@ export class FileService {
     const folder = `${type}-${id}`;
     return this.uploadFile(file, bucket, folder);
   }
+
+  static async uploadProfileImage(file, userId) {
+    return this.uploadByType(file, "profiles", userId);
+  }
 }

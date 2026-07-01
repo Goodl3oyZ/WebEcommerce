@@ -1,6 +1,22 @@
 import { storeService } from "../services/storeService.js";
 
 export const storeController = {
+  async getAllStores(req, res) {
+    try {
+      const { page = 1, limit = 20 } = req.query;
+      const result = await storeService.getAllStores({
+        page,
+        limit,
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({
+        message: "Error fetching stores",
+        error: error.message,
+      });
+    }
+  },
+
   async createStore(req, res) {
     try {
       const userId = req.user.id;

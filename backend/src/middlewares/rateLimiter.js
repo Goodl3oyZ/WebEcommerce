@@ -2,7 +2,6 @@ import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import { getRedisClient } from "../config/redis.js";
 
-// Helper function to create Redis store with proper configuration
 const createRedisStore = (prefix) => {
   const client = getRedisClient();
   return new RedisStore({
@@ -11,101 +10,114 @@ const createRedisStore = (prefix) => {
   });
 };
 
-// General API rate limiter
-export const apiRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Increased from 100 to 1000 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message: "Too many requests, please try again later.",
-  },
+const limiterOptions = (prefix, options) => ({
+  ...options,
+  store: createRedisStore(prefix),
 });
 
-// Stricter rate limiter for auth routes
-export const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Increased from 50 to 200 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message: "Too many authentication attempts, please try again later.",
-  },
-});
+export const apiRateLimiter = rateLimit(
+  limiterOptions("rl:api:", {
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message: "Too many requests, please try again later.",
+    },
+  })
+);
 
-// Login rate limiter
-export const loginRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Increased from 5 to 20 login attempts per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message: "Too many login attempts, please try again after 15 minutes.",
-  },
-});
+export const authRateLimiter = rateLimit(
+  limiterOptions("rl:auth:", {
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message: "Too many authentication attempts, please try again later.",
+    },
+  })
+);
 
-// Register rate limiter
-export const registerRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Increased from 3 to 10 registration attempts per hour
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message: "Too many registration attempts, please try again after an hour.",
-  },
-});
+export const loginRateLimiter = rateLimit(
+  limiterOptions("rl:login:", {
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message: "Too many login attempts, please try again after 15 minutes.",
+    },
+  })
+);
 
-// Password reset rate limiter
-export const passwordResetRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Increased from 3 to 10 password reset attempts per hour
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message:
-      "Too many password reset attempts, please try again after an hour.",
-  },
-});
+export const registerRateLimiter = rateLimit(
+  limiterOptions("rl:register:", {
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message: "Too many registration attempts, please try again after an hour.",
+    },
+  })
+);
 
-// Refresh token rate limiter
-export const refreshTokenRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // Increased from 10 to 50 refresh token attempts per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message:
-      "Too many token refresh attempts, please try again after 15 minutes.",
-  },
-});
+export const passwordResetRateLimiter = rateLimit(
+  limiterOptions("rl:password-reset:", {
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message:
+        "Too many password reset attempts, please try again after an hour.",
+    },
+  })
+);
 
-// Verify email rate limiter
-export const verifyEmailRateLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // Increased from 5 to 20 email verification attempts per hour
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message:
-      "Too many email verification attempts, please try again after an hour.",
-  },
-});
+export const refreshTokenRateLimiter = rateLimit(
+  limiterOptions("rl:refresh:", {
+    windowMs: 15 * 60 * 1000,
+    max: 50,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message:
+        "Too many token refresh attempts, please try again after 15 minutes.",
+    },
+  })
+);
 
-// Logout rate limiter
-export const logoutRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Increased from 20 to 100 logout attempts per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: "error",
-    message: "Too many logout attempts, please try again after 15 minutes.",
-  },
-});
+export const verifyEmailRateLimiter = rateLimit(
+  limiterOptions("rl:verify-email:", {
+    windowMs: 60 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message:
+        "Too many email verification attempts, please try again after an hour.",
+    },
+  })
+);
+
+export const logoutRateLimiter = rateLimit(
+  limiterOptions("rl:logout:", {
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      status: "error",
+      message: "Too many logout attempts, please try again after 15 minutes.",
+    },
+  })
+);

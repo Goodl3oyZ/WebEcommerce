@@ -4,29 +4,28 @@ import { z } from "zod";
 export const wishlistDto = {
   // Add to wishlist
   addToWishlist: z.object({
-    productId: z.number(),
-    notes: z.string().optional(),
+    productId: z.string().uuid(),
+    variantId: z.string().uuid().optional(),
   }),
 
   // Remove from wishlist
   removeFromWishlist: z.object({
-    productId: z.number(),
+    productId: z.string().uuid(),
   }),
 
   // Update wishlist item
   updateWishlistItem: z
     .object({
-      productId: z.number(),
-      notes: z.string().optional(),
-      priority: z.enum(["low", "medium", "high"]).optional(),
+      productId: z.string().uuid(),
+      variantId: z.string().uuid().optional(),
     })
-    .refine((data) => Object.keys(data).length > 1, {
+    .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
     }),
 
   // Move to cart
   moveToCart: z.object({
-    productId: z.number(),
+    productId: z.string().uuid(),
     quantity: z.number().min(1),
   }),
 };

@@ -1,9 +1,18 @@
 // NO ONE CALL THIS FILE DIRECTLY
+const apiRoot = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "http://localhost:5000/api"
+).replace(/\/api\/?$/, "");
+
 const config = {
   api: {
-    baseURL:
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api",
+    baseURL: `${apiRoot}/api`,
     timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "30000", 10),
+  },
+  oauth: {
+    /** OAuth routes live at /oauth/* (not /api/oauth). Callbacks: /oauth/{provider}/callback */
+    startUrl: (provider) => `${apiRoot}/oauth/${provider}`,
   },
   auth: {
     tokenKey: "accessToken",

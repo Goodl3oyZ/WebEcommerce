@@ -4,18 +4,22 @@ import { Pool } from "pg";
 import { ENV } from "./loadENV.js";
 import * as schema from "../models/schema.js";
 
-// Create a PostgreSQL connection pool
 const pool = new Pool({
   connectionString: ENV.DB.URL,
-  ssl: false,
+  max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  ssl:
+    ENV.SERVER.NODE_ENV === "production"
+      ? {
+          rejectUnauthorized:
+            process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
+        }
+      : false,
 });
 
-// Create a Drizzle ORM instance with schema and relations
 export const db = drizzle(pool, {
-  schema: {
-    ...schema,
-    relations: schema.relations,
-  },
+  schema: { ...schema, ...schema.allRelations },
 });
 
 const MAX_RETRIES = 5;

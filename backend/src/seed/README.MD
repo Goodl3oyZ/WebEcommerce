@@ -1,16 +1,27 @@
 # คำอธิบายไฟล์ในโฟลเดอร์ seed
 
-- **seed.js**  
-  สคริปต์หลักสำหรับรัน seed ข้อมูลเบื้องต้นเข้าสู่ฐานข้อมูล เช่น ข้อมูลผู้ใช้ ตัวอย่างสินค้า หมวดหมู่ ฯลฯ
+- **seed.js** — ผู้ใช้, สินค้า, หมวดหมู่, แบรนด์ (`npm run seed`)
+- **seed-shipping-payment.js** — โซนขนส่ง, วิธีชำระเงิน (`npm run seed:shipping`)
+- **seed-address-thai.js** — จังหวัด/อำเภอ/ตำบล จาก `csv/` (`npm run seed:address`)
+- **clear.js** — ล้างตารางทั้งหมด (`npm run clearSeed`)
+- **csv/** — `provinces.csv`, `districts.csv`, `sub_districts.csv` (ต้องอยู่ใน image ตอน build)
 
-- **seed-address-thai.js**  
-  สคริปต์สำหรับ seed ข้อมูลที่อยู่ในประเทศไทย เช่น จังหวัด อำเภอ ตำบล โดยดึงข้อมูลจากไฟล์ CSV ที่อยู่ในโฟลเดอร์ csv
+## รัน seed ทั้งชุด
 
-- **seed-shipping-payment.js**  
-  สคริปต์สำหรับ seed ข้อมูลที่เกี่ยวข้องกับการขนส่งและการชำระเงิน เช่น ช่องทางการขนส่ง วิธีการชำระเงิน
+**ต้อง migrate ก่อนเสมอ** (สร้างตารางจาก schema):
 
-- **clear.js**  
-  สคริปต์สำหรับลบข้อมูลในฐานข้อมูลที่ถูก seed ไปแล้ว เพื่อเตรียมฐานข้อมูลให้พร้อมสำหรับการ seed ข้อมูลใหม่
+```bash
+# ใน Docker (หลัง rebuild image)
+docker compose exec backend npm run migrate      # sync จาก src/models/schema.js
+docker compose exec backend npm run seed:all
 
-- **csv/**  
-  โฟลเดอร์เก็บไฟล์ CSV ที่ใช้เป็นข้อมูลต้นทางสำหรับ seed ข้อมูลที่อยู่ในประเทศไทย เช่น provinces.csv, districts.csv, sub_districts.csv
+docker compose exec backend npm run db:setup   # migrate + seed
+```
+
+Schema อยู่ที่ `src/models/schema.js` — migrations เก่าถูกลบแล้ว ใช้ `drizzle-kit push` เป็นหลัก
+
+ถ้าเจอ `relation does not exist` → รัน `npm run migrate` ก่อน seed
+
+ลำดับใน `seed:all`: `seed.js` → `seed-shipping-payment.js` → `seed-address-thai.js`
+
+**หมายเหตุ:** ถ้า error ชี้ไป `frontend/public/CSV thailand map` แปลว่า container ยังใช้ image เก่า — รัน `docker compose build --no-cache backend` แล้ว up ใหม่

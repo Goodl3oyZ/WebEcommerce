@@ -1,4 +1,5 @@
 import { authService } from "../services/authService.js";
+import { userService } from "../services/userService.js";
 import { ENV } from "../config/loadENV.js";
 import { parseUserAgent } from "../utils/parseUserAgent.js";
 
@@ -49,18 +50,13 @@ export const oauthController = {
           .status(401)
           .json({ status: "error", message: "No active session found" });
       }
-      const { userController } = await import("./userController.js");
-      const result = await userController.getProfile(req.session.user.id);
-      if (!result || !result.data?.user) {
-        return res
-          .status(404)
-          .json({ status: "error", message: "User not found" });
-      }
+      const result = await userService.getProfile(req.session.user.id);
       res.json(result);
     } catch (error) {
-      res
-        .status(500)
-        .json({ status: "error", message: "Failed to get user data" });
+      const status = error?.statusCode === 404 || error?.message === 404 ? 404 : 500;
+      const message =
+        status === 404 ? "User not found" : "Failed to get user data";
+      res.status(status).json({ status: "error", message });
     }
   },
   async logout(req, res) {

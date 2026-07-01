@@ -7,36 +7,35 @@ import { reportDto } from "../dtos/report.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all report routes
 router.use(apiRateLimiter);
-
-// Protected routes (auth required)
 router.use(authMiddleware);
+router.use(requireAdmin);
 
-// Admin routes
 router.get(
   "/sales",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(reportDto.generateSalesReport),
+  validationMiddleware(reportDto.generateSalesReport, "query"),
+  reportController.generateSalesReport
+);
+router.get(
+  "/orders",
+  validationMiddleware(reportDto.generateSalesReport, "query"),
   reportController.generateSalesReport
 );
 router.get(
   "/inventory",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(reportDto.generateInventoryReport),
+  validationMiddleware(reportDto.generateInventoryReport, "query"),
   reportController.generateInventoryReport
 );
 router.get(
   "/customer",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(reportDto.generateCustomerReport),
+  validationMiddleware(reportDto.generateCustomerReport, "query"),
   reportController.generateCustomerReport
 );
 router.get(
   "/supplier",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(reportDto.generateSupplierReport),
+  validationMiddleware(reportDto.generateSupplierReport, "query"),
   reportController.generateSupplierReport
 );
 

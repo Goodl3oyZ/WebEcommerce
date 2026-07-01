@@ -6,7 +6,7 @@ export const categoryDto = {
   createCategory: z.object({
     name: z.string().min(1),
     description: z.string().optional(),
-    parentId: z.number().optional(),
+    parentId: z.string().uuid().optional(),
     image: z.string().url().optional(),
     isActive: z.boolean().default(true),
     attributes: z
@@ -26,7 +26,7 @@ export const categoryDto = {
     .object({
       name: z.string().min(1).optional(),
       description: z.string().optional(),
-      parentId: z.number().optional(),
+      parentId: z.string().uuid().optional(),
       image: z.string().url().optional(),
       isActive: z.boolean().optional(),
       attributes: z
@@ -103,7 +103,7 @@ export const categoryResponseDto = {
     id: z.string().uuid(),
     name: z.string(),
     description: z.string().optional(),
-    parentId: z.number().optional(),
+    parentId: z.string().uuid().optional(),
     image: z.string().url().optional(),
     isActive: z.boolean(),
     attributes: z

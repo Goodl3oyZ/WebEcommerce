@@ -1,28 +1,27 @@
 import multer from "multer";
+import { ENV } from "../config/loadENV.js";
 
-// ใช้ memoryStorage สำหรับ MinIO
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
+    if (ENV.UPLOAD.ALLOWED_FILE_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only image files are allowed!"), false);
+      cb(new Error("File type not allowed"), false);
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024, // จำกัดขนาดไฟล์ 5MB
+    fileSize: ENV.UPLOAD.MAX_FILE_SIZE,
   },
 });
 
 export const uploadSingle = upload.single("image");
 
-// Middleware สำหรับจัดการ error จาก multer
 export const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
       return res.status(400).json({
-        error: "File size is too large. Maximum size is 5MB",
+        error: `File size is too large. Maximum size is ${ENV.UPLOAD.MAX_FILE_SIZE} bytes`,
       });
     }
     return res.status(400).json({

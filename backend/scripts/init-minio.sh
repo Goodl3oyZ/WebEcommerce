@@ -13,8 +13,6 @@ until mc alias set myminio http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PAS
   sleep 2
 done
 
-sleep 20
-
 create_bucket() {
   BUCKET=$1
   RETRY=0

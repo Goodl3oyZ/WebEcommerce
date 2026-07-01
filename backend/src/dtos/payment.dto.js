@@ -70,6 +70,24 @@ export const paymentDto = {
   removePaymentMethod: z.object({
     paymentMethodId: z.string().uuid(),
   }),
+
+  createToken: z
+    .object({
+      card: z.object({
+        name: z.string().min(1),
+        number: z.string().min(13),
+        expiration_month: z.number().int().min(1).max(12),
+        expiration_year: z.number().int().min(new Date().getFullYear()),
+        security_code: z.string().min(3),
+      }),
+    })
+    .strict(),
+
+  verifyPayment: z
+    .object({
+      verificationCode: z.string().min(1),
+    })
+    .strict(),
 };
 
 // Response DTOs

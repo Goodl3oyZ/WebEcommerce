@@ -38,6 +38,7 @@ import {
 } from "react-icons/fa";
 import { adminAPI } from "@/lib/api/admin";
 import DashboardSummary from "@/components/admin/DashboardSummary";
+import { isAdmin } from "@/lib/auth";
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
@@ -45,11 +46,16 @@ export default function AdminPage() {
   const [dashLoading, setDashLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && user) {
-      adminAPI.getDashboard().then((data) => {
-        setDashboard(data);
-        setDashLoading(false);
-      });
+    if (!loading && isAdmin(user)) {
+      adminAPI
+        .getDashboard()
+        .then((data) => {
+          setDashboard(data);
+        })
+        .catch(() => setDashboard(null))
+        .finally(() => setDashLoading(false));
+    } else if (!loading) {
+      setDashLoading(false);
     }
   }, [loading, user]);
 
@@ -61,13 +67,17 @@ export default function AdminPage() {
     );
   }
 
-  if (!user) {
+  if (!user || !isAdmin(user)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
           <p className="mt-2 text-gray-600">
             You need admin privileges to access this page.
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            Use admin@example.com / admin123 after seed, or ask an admin to
+            upgrade your role.
           </p>
         </div>
       </div>

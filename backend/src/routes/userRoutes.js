@@ -31,7 +31,11 @@ router.use(authMiddleware);
 router
   .route("/profile")
   .get(catchAsync(userController.getProfile))
-  .put(upload.single("avatar"), catchAsync(userController.updateProfile));
+  .put(
+    upload.single("avatar"),
+    validationMiddleware(userDto.updateProfile),
+    catchAsync(userController.updateProfile)
+  );
 router.delete("/profile/image", catchAsync(userController.deleteProfileImage));
 
 // User preferences routes
@@ -52,13 +56,18 @@ router.get("/points/history", userController.getPointsHistory);
 // Admin only routes
 router.get("/", requireRole(ROLES.ADMIN), userController.getUsers);
 router.post(
+  "/",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(userDto.createUser),
+  userController.createUser
+);
+router.post(
   "/create",
   requireRole(ROLES.ADMIN),
   validationMiddleware(userDto.createUser),
   userController.createUser
 );
-
-// Add route for updating user role
+router.get("/:userId", requireRole(ROLES.ADMIN), userController.getUserById);
 router.put(
   "/:userId/role",
   requireRole(ROLES.ADMIN),

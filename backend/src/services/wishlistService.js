@@ -3,38 +3,38 @@ import {
   wishlistItems,
   products,
   productVariants,
-  cartItems,
 } from "../models/schema.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
+import { ApiError } from "../utils/ApiError.js";
+import { cartService } from "./cartService.js";
 
-// Get user's wishlist
-const getUserWishlist = async (userId) => {
-  return await db.query.wishlistItems.findMany({
-    where: eq(wishlistItems.userId, userId),
+const wishlistWith = {
+  product: {
     with: {
-      product: {
-        with: {
-          images: true,
-          category: true,
-        },
-      },
-      variant: true,
+      category: true,
+      brand: true,
     },
+  },
+  variant: true,
+};
+
+const getUserWishlist = async (userId) => {
+  return db.query.wishlistItems.findMany({
+    where: eq(wishlistItems.userId, userId),
+    with: wishlistWith,
+    orderBy: [desc(wishlistItems.createdAt)],
   });
 };
 
-// Add item to wishlist
 const addToWishlist = async (userId, productId, variantId = null) => {
-  // Check if product exists
   const product = await db.query.products.findFirst({
     where: eq(products.id, productId),
   });
 
   if (!product) {
-    throw new NotFoundError("Product not found");
+    throw ApiError.notFound("Product not found");
   }
 
-  // If variant is specified, check if it exists
   if (variantId) {
     const variant = await db.query.productVariants.findFirst({
       where: and(
@@ -44,40 +44,38 @@ const addToWishlist = async (userId, productId, variantId = null) => {
     });
 
     if (!variant) {
-      throw new NotFoundError("Product variant not found");
+      throw ApiError.notFound("Product variant not found");
     }
   }
 
-  // Check if item already exists in wishlist
+  const variantCondition = variantId
+    ? eq(wishlistItems.variantId, variantId)
+    : isNull(wishlistItems.variantId);
+
   const existingItem = await db.query.wishlistItems.findFirst({
     where: and(
       eq(wishlistItems.userId, userId),
       eq(wishlistItems.productId, productId),
-      variantId ? eq(wishlistItems.variantId, variantId) : undefined
+      variantCondition
     ),
   });
 
   if (existingItem) {
-    // Update existing item
-    return await db.query.wishlistItems.update({
-      where: eq(wishlistItems.id, existingItem.id),
-      data: {
-        updatedAt: new Date(),
-      },
-    });
+    return existingItem;
   }
 
-  // Create new wishlist item
-  return await db.query.wishlistItems.create({
-    data: {
+  const [created] = await db
+    .insert(wishlistItems)
+    .values({
       userId,
       productId,
-      variantId,
-    },
-  });
+      variantId: variantId ?? null,
+    })
+    .returning();
+
+  return created;
 };
 
-// Remove item from wishlist
 const removeFromWishlist = async (userId, wishlistItemId) => {
   const wishlistItem = await db.query.wishlistItems.findFirst({
     where: and(
@@ -87,97 +85,135 @@ const removeFromWishlist = async (userId, wishlistItemId) => {
   });
 
   if (!wishlistItem) {
-    throw new NotFoundError("Wishlist item not found");
+    throw ApiError.notFound("Wishlist item not found");
   }
 
-  await db.query.wishlistItems.delete({
-    where: eq(wishlistItems.id, wishlistItemId),
-  });
+  await db
+    .delete(wishlistItems)
+    .where(eq(wishlistItems.id, wishlistItemId));
 };
 
-// Move item from wishlist to cart
 const moveToCart = async (userId, wishlistItemId, quantity = 1) => {
   const wishlistItem = await db.query.wishlistItems.findFirst({
     where: and(
       eq(wishlistItems.id, wishlistItemId),
       eq(wishlistItems.userId, userId)
     ),
-    with: {
-      product: true,
-      variant: true,
-    },
   });
 
   if (!wishlistItem) {
-    throw new NotFoundError("Wishlist item not found");
+    throw ApiError.notFound("Wishlist item not found");
   }
 
-  // Create cart item
-  const cartItem = await db.query.cartItems.create({
-    data: {
-      userId,
-      productId: wishlistItem.productId,
-      variantId: wishlistItem.variantId,
-      quantity,
-    },
+  const cart = await cartService.addItem(userId, {
+    productId: wishlistItem.productId,
+    variantId: wishlistItem.variantId,
+    quantity,
   });
 
-  // Remove from wishlist
-  await db.query.wishlistItems.delete({
-    where: eq(wishlistItems.id, wishlistItemId),
-  });
+  await db
+    .delete(wishlistItems)
+    .where(eq(wishlistItems.id, wishlistItemId));
 
-  return cartItem;
+  return cart;
 };
 
-// Clear wishlist
 const clearWishlist = async (userId) => {
-  await db.query.wishlistItems.deleteMany({
-    where: eq(wishlistItems.userId, userId),
-  });
+  await db
+    .delete(wishlistItems)
+    .where(eq(wishlistItems.userId, userId));
 };
 
-// Get wishlist item by ID
 const getWishlistItemById = async (userId, wishlistItemId) => {
   const wishlistItem = await db.query.wishlistItems.findFirst({
     where: and(
       eq(wishlistItems.id, wishlistItemId),
       eq(wishlistItems.userId, userId)
     ),
-    with: {
-      product: {
-        with: {
-          images: true,
-          category: true,
-        },
-      },
-      variant: true,
-    },
+    with: wishlistWith,
   });
 
   if (!wishlistItem) {
-    throw new NotFoundError("Wishlist item not found");
+    throw ApiError.notFound("Wishlist item not found");
   }
 
   return wishlistItem;
 };
 
-// Get wishlist items by product
 const getWishlistItemsByProduct = async (userId, productId) => {
-  return await db.query.wishlistItems.findMany({
+  return db.query.wishlistItems.findMany({
     where: and(
       eq(wishlistItems.userId, userId),
       eq(wishlistItems.productId, productId)
     ),
+    with: wishlistWith,
+  });
+};
+
+const updateWishlistItem = async (wishlistItemId, userId, updateData = {}) => {
+  const item = await getWishlistItemById(userId, wishlistItemId);
+
+  if (updateData.variantId === undefined) {
+    return item;
+  }
+
+  if (updateData.variantId) {
+    const variant = await db.query.productVariants.findFirst({
+      where: and(
+        eq(productVariants.id, updateData.variantId),
+        eq(productVariants.productId, item.productId)
+      ),
+    });
+
+    if (!variant) {
+      throw ApiError.notFound("Product variant not found");
+    }
+  }
+
+  const [updated] = await db
+    .update(wishlistItems)
+    .set({ variantId: updateData.variantId ?? null })
+    .where(eq(wishlistItems.id, wishlistItemId))
+    .returning();
+
+  return db.query.wishlistItems.findFirst({
+    where: eq(wishlistItems.id, updated.id),
+    with: wishlistWith,
+  });
+};
+
+const getAllWishlists = async () => {
+  return db.query.wishlistItems.findMany({
     with: {
-      product: {
-        with: {
-          images: true,
-          category: true,
+      user: {
+        columns: {
+          id: true,
+          name: true,
+          email: true,
         },
       },
+      product: wishlistWith.product,
       variant: true,
     },
+    orderBy: [desc(wishlistItems.createdAt)],
+  });
+};
+
+const getProductWishlists = async (productId) => {
+  return db.query.wishlistItems.findMany({
+    where: eq(wishlistItems.productId, productId),
+    with: {
+      user: {
+        columns: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      product: wishlistWith.product,
+      variant: true,
+    },
+    orderBy: [desc(wishlistItems.createdAt)],
   });
 };
 
@@ -189,4 +225,7 @@ export const wishlistService = {
   clearWishlist,
   getWishlistItemById,
   getWishlistItemsByProduct,
+  updateWishlistItem,
+  getAllWishlists,
+  getProductWishlists,
 };

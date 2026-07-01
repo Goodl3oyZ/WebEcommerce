@@ -193,4 +193,25 @@ export const productController = {
       next(error);
     }
   },
+
+  async getProductReviews(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { page, limit } = req.query;
+      const reviews = await productService.getProductReviews(id, { page, limit });
+      res.json(reviews);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getProductVariants(req, res, next) {
+    try {
+      const { id } = req.params;
+      const variants = await productService.getProductVariants(id);
+      res.json(variants);
+    } catch (error) {
+      next(error);
+    }
+  },
 };

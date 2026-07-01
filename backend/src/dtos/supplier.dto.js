@@ -48,8 +48,7 @@ export const supplierDto = {
 
   // Add product to supplier
   addSupplierProduct: z.object({
-    supplierId: z.number(),
-    productId: z.number(),
+    productId: z.string().uuid(),
     sku: z.string().min(1),
     cost: z.number().min(0),
     leadTime: z.number().min(0),

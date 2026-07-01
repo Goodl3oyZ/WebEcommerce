@@ -59,6 +59,41 @@ export const loyaltyDto = {
     points: z.number().min(0),
     reward: z.string().min(1),
   }),
+
+  redeemReward: z.object({}).strict(),
+
+  createReward: z
+    .object({
+      name: z.string().min(1),
+      description: z.string().optional(),
+      pointsCost: z.number().min(0),
+      type: z.enum(["discount", "shipping", "gift"]).optional(),
+      value: z.number().min(0).optional(),
+      maxRedemptions: z.number().min(0).optional(),
+      userLimit: z.number().min(0).optional(),
+      startDate: z.string().datetime().optional(),
+      endDate: z.string().datetime().optional(),
+      isActive: z.boolean().optional(),
+    })
+    .strict(),
+
+  updateReward: z
+    .object({
+      name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      pointsCost: z.number().min(0).optional(),
+      type: z.enum(["discount", "shipping", "gift"]).optional(),
+      value: z.number().min(0).optional(),
+      maxRedemptions: z.number().min(0).optional(),
+      userLimit: z.number().min(0).optional(),
+      startDate: z.string().datetime().optional(),
+      endDate: z.string().datetime().optional(),
+      isActive: z.boolean().optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field must be provided for update",
+    })
+    .strict(),
 };
 
 // Response DTOs

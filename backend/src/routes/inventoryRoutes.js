@@ -7,62 +7,39 @@ import { inventoryDto } from "../dtos/inventory.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all inventory routes
 router.use(apiRateLimiter);
-
-// Protected routes (auth required)
 router.use(authMiddleware);
+router.use(requireAdmin);
 
-// Admin routes
-router.get(
-  "/",
-  requireRole(ROLES.ADMIN),
-  inventoryController.getAllInventoryItems
-);
-router.get(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  inventoryController.getInventoryItemById
-);
+// Static paths before /:id
+router.get("/low-stock", inventoryController.getLowStockItems);
+router.get("/product/:productId", inventoryController.getInventoryByProduct);
+router.get("/location/:location", inventoryController.getInventoryByLocation);
+
+router.get("/", inventoryController.getAllInventoryItems);
 router.post(
   "/",
-  requireRole(ROLES.ADMIN),
   validationMiddleware(inventoryDto.createInventoryItem),
   inventoryController.createInventoryItem
 );
-router.put(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(inventoryDto.updateInventoryItem),
-  inventoryController.updateInventoryItem
-);
+
 router.post(
   "/:id/adjust",
-  requireRole(ROLES.ADMIN),
   validationMiddleware(inventoryDto.adjustInventory),
   inventoryController.adjustInventory
 );
 router.post(
   "/:id/transfer",
-  requireRole(ROLES.ADMIN),
   validationMiddleware(inventoryDto.transferInventory),
   inventoryController.transferInventory
 );
-router.get(
-  "/product/:productId",
-  requireRole(ROLES.ADMIN),
-  inventoryController.getProductInventory
-);
-router.get(
-  "/location/:location",
-  requireRole(ROLES.ADMIN),
-  inventoryController.getLocationInventory
-);
-router.get(
-  "/low-stock",
-  requireRole(ROLES.ADMIN),
-  inventoryController.getLowStockItems
+router.get("/:id", inventoryController.getInventoryItemById);
+router.put(
+  "/:id",
+  validationMiddleware(inventoryDto.updateInventoryItem),
+  inventoryController.updateInventoryItem
 );
 
 export default router;

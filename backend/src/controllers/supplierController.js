@@ -1,6 +1,5 @@
 import { supplierService } from "../services/supplierService.js";
 import { catchAsync } from "../utils/catchAsync.js";
-import { AppError } from "../utils/appError.js";
 
 // Get all suppliers
 const getAllSuppliers = catchAsync(async (req, res) => {

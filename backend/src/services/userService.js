@@ -4,6 +4,7 @@
 import { db } from "../config/db.js";
 import {
   users,
+  userRoles,
   userPreferences,
   orders as ordersTable,
   pointsHistory,
@@ -49,18 +50,13 @@ export const userService = {
         failedLoginAttempts: 0,
       };
 
-      // Add isAdmin if provided
-      if (userData.isAdmin !== undefined) {
-        userInsertData.isAdmin = userData.isAdmin;
-      }
-
       // สร้างผู้ใช้ใหม่ในฐานข้อมูล
       const [newUser] = await db
         .insert(users)
         .values(userInsertData)
         .returning();
       // เพิ่มบทบาท (role) ให้ผู้ใช้ใหม่
-      const role = (userData.email = "panudetzx2@gmail.com" ? "admin" : "user"); // กำหนด default role เป็น 'user'
+      const role = userData.role || "user";
 
       await db.insert(userRoles).values({
         userId: newUser.id,

@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FaGithub, FaGoogle, FaFacebook } from "react-icons/fa";
+import { config } from "@/lib/config";
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
@@ -61,17 +62,8 @@ export default function RegisterPage() {
     }
   };
 
-  // Add OAuth registration functions
-  const handleGithubRegister = () => {
-    window.location.href = `http://localhost:5000/api/oauth/github`;
-  };
-
-  const handleGoogleRegister = () => {
-    window.location.href = `http://localhost:5000/api/oauth/google`;
-  };
-
-  const handleFacebookRegister = () => {
-    window.location.href = `http://localhost:5000/api/oauth/facebook`;
+  const handleOAuthRegister = (provider) => {
+    window.location.href = config.oauth.startUrl(provider);
   };
 
   return (
@@ -211,21 +203,21 @@ export default function RegisterPage() {
 
           <div className="mt-6 grid grid-cols-3 gap-3">
             <button
-              onClick={handleGithubRegister}
+              onClick={() => handleOAuthRegister("github")}
               className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
               <FaGithub className="h-5 w-5" />
             </button>
 
             <button
-              onClick={handleGoogleRegister}
+              onClick={() => handleOAuthRegister("google")}
               className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
               <FaGoogle className="h-5 w-5" />
             </button>
 
             <button
-              onClick={handleFacebookRegister}
+              onClick={() => handleOAuthRegister("facebook")}
               className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
               <FaFacebook className="h-5 w-5" />

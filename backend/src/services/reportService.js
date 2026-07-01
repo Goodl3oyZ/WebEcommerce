@@ -1,16 +1,11 @@
 import { db } from "../config/db.js";
 import {
   orders,
-  orderItems,
   products,
-  categories,
-  users,
-  inventoryItems,
-  supplierProducts,
-  suppliers,
+  storeInventory,
 } from "../models/schema.js";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { AppError } from "../utils/appError.js";
+import { supplierService } from "./supplierService.js";
 
 // Generate sales report
 const generateSalesReport = async ({ startDate, endDate, groupBy }) => {
@@ -70,37 +65,34 @@ const generateInventoryReport = async ({ location, category, lowStock }) => {
   const whereConditions = [];
 
   if (location) {
-    whereConditions.push(eq(inventoryItems.location, location));
-  }
-  if (category) {
-    whereConditions.push(eq(products.categoryId, category));
-  }
-  if (lowStock) {
-    whereConditions.push(
-      sql`${inventoryItems.quantity} <= ${inventoryItems.minStockLevel}`
-    );
+    whereConditions.push(eq(storeInventory.storeId, location));
   }
 
-  const items = await db.query.inventoryItems.findMany({
+  const items = await db.query.storeInventory.findMany({
     where: whereConditions.length > 0 ? and(...whereConditions) : undefined,
     with: {
-      product: {
-        with: {
-          category: true,
-          images: true,
-          variants: true,
-        },
-      },
+      store: true,
+      product: { with: { category: true } },
+      variant: true,
     },
-    orderBy: inventoryItems.quantity,
+    orderBy: [storeInventory.quantity],
   });
 
+  let filtered = items;
+  if (category) {
+    filtered = filtered.filter(
+      (item) => String(item.product?.categoryId) === String(category)
+    );
+  }
+  if (lowStock) {
+    filtered = filtered.filter((item) => item.quantity <= 5);
+  }
+
   return {
-    totalItems: items.length,
-    totalValue: calculateInventoryValue(items),
-    lowStockItems: items.filter((item) => item.quantity <= item.minStockLevel)
-      .length,
-    items,
+    totalItems: filtered.length,
+    totalValue: calculateInventoryValue(filtered),
+    lowStockItems: filtered.filter((item) => item.quantity <= 5).length,
+    items: filtered,
   };
 };
 
@@ -148,48 +140,23 @@ const generateCustomerReport = async ({ startDate, endDate, groupBy }) => {
 };
 
 // Generate supplier report
-const generateSupplierReport = async ({ startDate, endDate, groupBy }) => {
-  const whereConditions = [];
+const generateSupplierReport = async () => {
+  const allSuppliers = await supplierService.getAllSuppliers();
+  const supplierProductsData = [];
 
-  if (startDate && endDate) {
-    whereConditions.push(
-      gte(supplierProducts.createdAt, new Date(startDate)),
-      lte(supplierProducts.createdAt, new Date(endDate))
-    );
+  for (const supplier of allSuppliers) {
+    const products = await supplierService.getSupplierProducts(supplier.id);
+    products.forEach((p) => {
+      supplierProductsData.push({ ...p, supplier });
+    });
   }
 
-  const supplierProductsData = await db.query.supplierProducts.findMany({
-    where: whereConditions.length > 0 ? and(...whereConditions) : undefined,
-    with: {
-      supplier: true,
-      product: {
-        with: {
-          category: true,
-          images: true,
-        },
-      },
-    },
-  });
-
-  let report;
-  switch (groupBy) {
-    case "supplier":
-      report = groupBySupplier(supplierProductsData);
-      break;
-    case "product":
-      report = groupByProduct(supplierProductsData);
-      break;
-    default:
-      report = {
-        totalSuppliers: new Set(supplierProductsData.map((sp) => sp.supplierId))
-          .size,
-        totalProducts: supplierProductsData.length,
-        averageLeadTime: calculateAverageLeadTime(supplierProductsData),
-        supplierProducts: supplierProductsData,
-      };
-  }
-
-  return report;
+  return {
+    totalSuppliers: allSuppliers.length,
+    totalProducts: supplierProductsData.length,
+    averageLeadTime: calculateAverageLeadTime(supplierProductsData),
+    supplierProducts: supplierProductsData,
+  };
 };
 
 // Helper functions for sales report
@@ -282,10 +249,10 @@ const groupSalesByCategory = (orders) => {
 
 // Helper functions for inventory report
 const calculateInventoryValue = (items) => {
-  return items.reduce(
-    (total, item) => total + item.quantity * item.product.price,
-    0
-  );
+  return items.reduce((total, item) => {
+    const price = Number(item.product?.price ?? 0);
+    return total + item.quantity * price;
+  }, 0);
 };
 
 // Helper functions for customer report

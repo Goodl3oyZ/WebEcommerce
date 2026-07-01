@@ -46,6 +46,24 @@ export const storeService = {
     return store;
   },
 
+  async getAllStores({ page = 1, limit = 20 } = {}) {
+    const offset = (page - 1) * limit;
+    const items = await db.query.stores.findMany({
+      limit: parseInt(limit, 10),
+      offset,
+      orderBy: [desc(stores.createdAt)],
+    });
+    const [{ count }] = await db
+      .select({ count: sql`count(*)::int` })
+      .from(stores);
+    return {
+      items,
+      total: count,
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    };
+  },
+
   async getStoreById(storeId) {
     const store = await db.query.stores.findFirst({
       where: eq(stores.id, storeId),

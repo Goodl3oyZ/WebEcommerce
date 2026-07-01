@@ -23,11 +23,16 @@ export async function middleware(req) {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
 
-    if (route.role === "admin" && payload.role !== "admin") {
+    if (
+      route.role === "admin" &&
+      !["admin", "super_admin"].includes(payload.role)
+    ) {
       return NextResponse.redirect(new URL("/403", req.url));
     }
-    // user: ต้อง login (role เป็นอะไรก็ได้ที่ไม่ใช่ anonymous)
-    if (route.role === "user" && !["user", "admin"].includes(payload.role)) {
+    if (
+      route.role === "user" &&
+      !["user", "admin", "super_admin", "moderator"].includes(payload.role)
+    ) {
       return NextResponse.redirect(new URL("/auth/login", req.url));
     }
   } catch (err) {

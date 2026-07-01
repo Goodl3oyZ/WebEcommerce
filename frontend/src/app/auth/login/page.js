@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FaGithub, FaGoogle, FaFacebook } from "react-icons/fa";
+import { config } from "@/lib/config";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -51,7 +52,7 @@ export default function LoginPage() {
   };
 
   const handleOAuthLogin = (provider) => {
-    window.location.href = `http://localhost:5000/api/oauth/${provider}`;
+    window.location.href = config.oauth.startUrl(provider);
   };
 
   return (

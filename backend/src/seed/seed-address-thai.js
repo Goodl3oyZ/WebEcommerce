@@ -1,15 +1,33 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { parse } from "csv-parse/sync";
 import { db } from "../config/db.js";
 import { provinces, districts, subdistricts } from "../models/schema.js";
-import { eq } from "drizzle-orm";
 
-const CSV_DIR = path.resolve(process.cwd(), "frontend/public/CSV thailand map");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CSV_DIR = path.join(__dirname, "csv");
+
+const REQUIRED_CSV = ["provinces.csv", "districts.csv", "sub_districts.csv"];
+
+function assertCsvFiles() {
+  if (!fs.existsSync(CSV_DIR)) {
+    throw new Error(
+      `CSV directory not found: ${CSV_DIR}\n` +
+        "Expected backend/src/seed/csv/ with provinces.csv, districts.csv, sub_districts.csv"
+    );
+  }
+  for (const name of REQUIRED_CSV) {
+    const file = path.join(CSV_DIR, name);
+    if (!fs.existsSync(file)) {
+      throw new Error(`Missing CSV file: ${file}`);
+    }
+  }
+}
 
 function normalizeKey(key) {
   if (key === undefined || key === null) return "";
-  return String(key).trim().replace(/^0+/, ""); // remove leading zeros
+  return String(key).trim().replace(/^0+/, "");
 }
 
 async function seedProvinces() {
@@ -23,9 +41,9 @@ async function seedProvinces() {
   let inserted = 0;
   const provinceIdMap = {};
   for (const row of records) {
-    const name_th = row.PROVINCE_THAI;
-    if (!name_th) {
-      console.warn("Skip province row (no name_th):", row);
+    const nameTh = row.PROVINCE_THAI;
+    if (!nameTh) {
+      console.warn("Skip province row (no nameTh):", row);
       skipped++;
       continue;
     }
@@ -33,8 +51,8 @@ async function seedProvinces() {
       .insert(provinces)
       .values({
         code: row.CODE,
-        name_th,
-        name_en: row.PROVINCE_ENGLISH || null,
+        nameTh,
+        nameEn: row.PROVINCE_ENGLISH || null,
       })
       .returning({ id: provinces.id });
     provinceIdMap[normalizeKey(row.PROVINCE_ID)] = result[0].id;
@@ -54,15 +72,15 @@ async function seedDistricts(provinceIdMap) {
   const districtIdMap = {};
   const seenCodes = new Set();
   for (const row of records) {
-    const name_th = row.DISTRICT_THAI;
-    if (!name_th) {
-      console.warn("Skip district row (no name_th):", row);
+    const nameTh = row.DISTRICT_THAI;
+    if (!nameTh) {
+      console.warn("Skip district row (no nameTh):", row);
       skipped++;
       continue;
     }
-    const province_id = provinceIdMap[normalizeKey(row.PROVINCE_ID)];
-    if (!province_id) {
-      console.warn("Skip district row (no province_id):", row, {
+    const provinceId = provinceIdMap[normalizeKey(row.PROVINCE_ID)];
+    if (!provinceId) {
+      console.warn("Skip district row (no provinceId):", row, {
         PROVINCE_ID: row.PROVINCE_ID,
       });
       skipped++;
@@ -79,14 +97,14 @@ async function seedDistricts(provinceIdMap) {
       .insert(districts)
       .values({
         code: row.CODE,
-        province_id,
-        name_th,
-        name_en: row.DISTRICT_ENGLISH || null,
+        provinceId,
+        nameTh,
+        nameEn: row.DISTRICT_ENGLISH || null,
       })
-      .returning({ id: districts.id, province_id: districts.province_id });
+      .returning({ id: districts.id, provinceId: districts.provinceId });
     districtIdMap[normalizeKey(row.DISTRICT_ID)] = {
       id: result[0].id,
-      province_id: result[0].province_id,
+      provinceId: result[0].provinceId,
     };
     inserted++;
   }
@@ -94,7 +112,7 @@ async function seedDistricts(provinceIdMap) {
   return districtIdMap;
 }
 
-async function seedSubDistricts(provinceIdMap, districtIdMap) {
+async function seedSubDistricts(districtIdMap) {
   await db.delete(subdistricts);
   const file = path.join(CSV_DIR, "sub_districts.csv");
   const csv = fs.readFileSync(file, "utf8");
@@ -102,18 +120,18 @@ async function seedSubDistricts(provinceIdMap, districtIdMap) {
   let skipped = 0;
   let inserted = 0;
   for (const row of records) {
-    const name_th = row.SUB_DISTRICT_THAI;
-    if (!name_th) {
-      console.warn("Skip subdistrict row (no name_th):", row);
+    const nameTh = row.SUB_DISTRICT_THAI;
+    if (!nameTh) {
+      console.warn("Skip subdistrict row (no nameTh):", row);
       skipped++;
       continue;
     }
     const districtObj = districtIdMap[normalizeKey(row.DISTRICT_ID)];
-    const district_id = districtObj?.id;
-    const province_id = districtObj?.province_id;
-    if (!district_id || !province_id) {
+    const districtId = districtObj?.id;
+    const provinceId = districtObj?.provinceId;
+    if (!districtId || !provinceId) {
       console.warn(
-        "Skip subdistrict row (no district_id or province_id):",
+        "Skip subdistrict row (no districtId or provinceId):",
         row,
         { DISTRICT_ID: row.DISTRICT_ID }
       );
@@ -122,13 +140,11 @@ async function seedSubDistricts(provinceIdMap, districtIdMap) {
     }
     await db.insert(subdistricts).values({
       code: row.CODE,
-      district_id,
-      province_id,
-      name_th,
-      name_en: row.SUB_DISTRICT_ENGLISH || null,
+      districtId,
+      provinceId,
+      nameTh,
+      nameEn: row.SUB_DISTRICT_ENGLISH || null,
       zipcode: row.POSTAL_CODE || null,
-      latitude: row.LATITUDE || null,
-      longitude: row.LONGITUDE || null,
     });
     inserted++;
   }
@@ -136,9 +152,11 @@ async function seedSubDistricts(provinceIdMap, districtIdMap) {
 }
 
 async function main() {
+  assertCsvFiles();
+  console.log("Reading CSV from:", CSV_DIR);
   const provinceIdMap = await seedProvinces();
   const districtIdMap = await seedDistricts(provinceIdMap);
-  await seedSubDistricts(provinceIdMap, districtIdMap);
+  await seedSubDistricts(districtIdMap);
   console.log("All Thai address data seeded!");
   process.exit(0);
 }

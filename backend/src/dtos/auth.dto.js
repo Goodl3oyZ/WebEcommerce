@@ -3,17 +3,19 @@ import { z } from "zod";
 // Auth DTOs for validation
 export const authDto = {
   // Login - only essential fields
-  login: z.object({
-    email: z.string().email("Invalid email format"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    deviceInfo: z
-      .object({
-        userAgent: z.string().optional(),
-        deviceId: z.string().optional(),
-        ipAddress: z.string().optional(),
-      })
-      .optional(),
-  }),
+  login: z
+    .object({
+      email: z.string().email("Invalid email format"),
+      password: z.string().min(6, "Password must be at least 6 characters"),
+      deviceInfo: z
+        .object({
+          userAgent: z.string().optional(),
+          deviceId: z.string().optional(),
+          ipAddress: z.string().optional(),
+        })
+        .optional(),
+    })
+    .strict(),
 
   // Register - includes all necessary fields for user creation
   register: z
@@ -39,12 +41,15 @@ export const authDto = {
     .refine((data) => data.password === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    }),
+    })
+    .strict(),
 
   // Password reset request
-  forgotPassword: z.object({
-    email: z.string().email("Invalid email format"),
-  }),
+  forgotPassword: z
+    .object({
+      email: z.string().email("Invalid email format"),
+    })
+    .strict(),
 
   // Password reset with token
   resetPassword: z
@@ -62,7 +67,8 @@ export const authDto = {
     .refine((data) => data.newPassword === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    }),
+    })
+    .strict(),
 
   // Change password (for authenticated users)
   changePassword: z
@@ -82,15 +88,19 @@ export const authDto = {
     .refine((data) => data.newPassword === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    }),
+    })
+    .strict(),
 
   // Verify email
-  verifyEmail: z.object({
-    token: z.string(),
-  }),
+  verifyEmail: z
+    .object({
+      token: z.string(),
+    })
+    .strict(),
 
   // Refresh token
-  refreshToken: z.object({
+  refreshToken: z
+    .object({
     refreshToken: z.string(),
     deviceInfo: z
       .object({
@@ -99,10 +109,11 @@ export const authDto = {
         ipAddress: z.string().optional(),
       })
       .optional(),
-  }),
+    })
+    .strict(),
 
   // Logout
-  logout: z.object({}),
+  logout: z.object({}).strict(),
 };
 
 // Response DTOs

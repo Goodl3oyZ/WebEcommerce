@@ -8,10 +8,10 @@ import {
   products,
   users,
 } from "../models/schema.js";
+import { hashPassword } from "../utils/hashPassword.js";
 
 async function seed() {
   try {
-    // Clear existing data
     console.log("Clearing existing data...");
     await db.delete(product_variants);
     await db.delete(products);
@@ -21,14 +21,16 @@ async function seed() {
     await db.delete(users);
     console.log("Existing data cleared!");
 
-    // Insert Users
+    const adminPasswordHash = await hashPassword("admin123");
+
+    // Insert Users (login: admin@example.com / admin123)
     const [adminUser] = await db
       .insert(users)
       .values([
         {
           name: "Admin User",
           email: "admin@example.com",
-          password: "hashed_password_1",
+          password: adminPasswordHash,
           isVerified: true,
           isActive: true,
         },
@@ -59,21 +61,21 @@ async function seed() {
         {
           name: "Fashion Brand",
           description: "Trendy fashion items",
-          logo: "https://example.com/fashion-logo.jpg",
+          logo: null,
           website: "https://fashionbrand.com",
           isActive: true,
         },
         {
           name: "Luxury Brand",
           description: "High-end luxury items",
-          logo: "https://example.com/luxury-logo.jpg",
+          logo: null,
           website: "https://luxurybrand.com",
           isActive: true,
         },
         {
           name: "Tech Brand",
           description: "Latest technology",
-          logo: "https://example.com/tech-logo.jpg",
+          logo: null,
           website: "https://techbrand.com",
           isActive: true,
         },
@@ -88,7 +90,7 @@ async function seed() {
           name: "Classic T-Shirt",
           description: "Comfortable cotton t-shirt",
           price: 29.99,
-          imageUrl: ["https://example.com/tshirt.jpg"],
+          imageUrl: [],
           categoryId: clothingCategory.id,
           brandId: brand1.id,
         },
@@ -96,7 +98,7 @@ async function seed() {
           name: "Designer Watch",
           description: "Luxury timepiece",
           price: 299.99,
-          imageUrl: ["https://example.com/watch.jpg"],
+          imageUrl: [],
           categoryId: accessoriesCategory.id,
           brandId: brand2.id,
         },
@@ -104,7 +106,7 @@ async function seed() {
           name: "Smartphone",
           description: "Latest smartphone model",
           price: 999.99,
-          imageUrl: ["https://example.com/phone.jpg"],
+          imageUrl: [],
           categoryId: electronicsCategory.id,
           brandId: brand3.id,
         },

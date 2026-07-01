@@ -28,8 +28,12 @@ router.put(
 router.delete("/items/:itemId", cartController.removeItem);
 router.delete("/items", cartController.clearCart);
 
-// Cart operations
-router.post("/checkout", cartController.checkout);
+// Cart operations — prefer POST /api/orders/checkout for new clients
+router.post(
+  "/checkout",
+  validationMiddleware(cartDto.checkout),
+  cartController.checkout
+);
 router.post(
   "/merge",
   validationMiddleware(cartDto.mergeGuestCart),

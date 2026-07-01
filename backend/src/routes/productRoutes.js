@@ -7,20 +7,21 @@ import { productDto } from "../dtos/product.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all product routes
 router.use(apiRateLimiter);
 
-// Public routes
+// Public — static paths before /:id
 router.get("/", productController.getProducts);
 router.get("/search", productController.searchProducts);
 router.get("/category/:categoryId", productController.getProductsByCategory);
+router.get("/:id/reviews", productController.getProductReviews);
+router.get("/:id/variants", productController.getProductVariants);
 router.get("/:id", productController.getProductById);
 
-// Protected routes (auth required)
 router.use(authMiddleware);
 
-// User routes
+// User — reviews
 router.post(
   "/:id/review",
   validationMiddleware(productDto.createReview),
@@ -33,40 +34,48 @@ router.put(
 );
 router.delete("/:id/review/:reviewId", productController.deleteReview);
 
-// Admin only routes
+// Admin — products & variants
 router.post(
   "/",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
   validationMiddleware(productDto.createProduct),
   productController.createProduct
 );
 router.put(
   "/:id",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
   validationMiddleware(productDto.updateProduct),
   productController.updateProduct
 );
-router.delete(
+router.patch(
   "/:id",
-  requireRole(ROLES.ADMIN),
-  productController.deleteProduct
+  requireAdmin,
+  validationMiddleware(productDto.updateProduct),
+  productController.updateProduct
 );
+router.delete("/:id", requireAdmin, productController.deleteProduct);
 
 router.post(
   "/:id/variants",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
   validationMiddleware(productDto.createVariant),
   productController.createVariant
 );
 router.put(
   "/:id/variants/:variantId",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
+  validationMiddleware(productDto.updateVariant),
+  productController.updateVariant
+);
+router.patch(
+  "/:id/variants/:variantId",
+  requireAdmin,
   validationMiddleware(productDto.updateVariant),
   productController.updateVariant
 );
 router.delete(
   "/:id/variants/:variantId",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
   productController.deleteVariant
 );
 

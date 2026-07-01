@@ -144,6 +144,73 @@ export const shippingDto = {
     notes: z.string().optional(),
   }),
 
+  createShippingMethod: z.object({
+    name: z.string().min(1).max(100),
+    code: z.string().min(1).max(50),
+    description: z.string().optional(),
+    price: z.number().min(0),
+    isActive: z.boolean().default(true),
+    shippingZoneId: z.string().uuid().optional(),
+  }),
+
+  updateShippingMethod: z
+    .object({
+      name: z.string().min(1).max(100).optional(),
+      code: z.string().min(1).max(50).optional(),
+      description: z.string().optional(),
+      price: z.number().min(0).optional(),
+      isActive: z.boolean().optional(),
+      shippingZoneId: z.string().uuid().optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field must be provided for update",
+    }),
+
+  createShippingZone: CreateShippingZoneDto,
+  updateShippingZone: UpdateShippingZoneDto,
+
+  createShipment: z.object({
+    orderId: z.string().uuid(),
+    trackingNumber: z.string().optional(),
+    carrier: z.string().optional(),
+    status: z
+      .enum([
+        "pending",
+        "processing",
+        "shipped",
+        "in_transit",
+        "delivered",
+        "failed",
+        "returned",
+      ])
+      .default("pending"),
+    estimatedDelivery: z.string().datetime().optional(),
+    location: z.string().optional(),
+  }),
+
+  updateShipment: z
+    .object({
+      trackingNumber: z.string().optional(),
+      carrier: z.string().optional(),
+      status: z
+        .enum([
+          "pending",
+          "processing",
+          "shipped",
+          "in_transit",
+          "delivered",
+          "failed",
+          "returned",
+        ])
+        .optional(),
+      estimatedDelivery: z.string().datetime().optional(),
+      actualDelivery: z.string().datetime().optional(),
+      location: z.string().optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field must be provided for update",
+    }),
+
   // Request return
   requestReturn: z.object({
     reason: z.enum([

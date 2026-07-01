@@ -1,7 +1,9 @@
 // ✅ FIXED: Fully compatible with Node.js ESM and connect-redis v7+
 
 import express from "express";
+import { sql } from "drizzle-orm";
 import { ENV } from "./src/config/loadENV.js";
+import { db } from "./src/config/db.js";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -38,6 +40,10 @@ import loyaltyRoutes from "./src/routes/loyaltyRoutes.js";
 import uploadRoutes from "./src/routes/uploadRoutes.js";
 import adminRoutes from "./src/routes/adminRoutes.js";
 import settingsRoutes from "./src/routes/settingsRoutes.js";
+import reportRoutes from "./src/routes/reportRoutes.js";
+import supplierRoutes from "./src/routes/supplierRoutes.js";
+import inventoryRoutes from "./src/routes/inventoryRoutes.js";
+import notificationRoutes from "./src/routes/notificationRoutes.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -122,11 +128,46 @@ app.get("/", async (req, res) => {
   res.send("Hello World!");
 });
 
-app.get("/api/test-error", (req, res, next) => {
-  const err = new Error("🔥 This is a test error");
-  err.status = 418;
-  next(err);
+app.get("/api/health", async (req, res) => {
+  const health = {
+    status: "ok",
+    db: "unknown",
+    redis: redisClient.isReady ? "ok" : "down",
+    minio: "unknown",
+  };
+
+  try {
+    await db.execute(sql`SELECT 1`);
+    health.db = "ok";
+  } catch {
+    health.status = "degraded";
+    health.db = "down";
+  }
+
+  try {
+    const { default: minioClient } = await import("./src/config/minio.js");
+    await minioClient.listBuckets();
+    health.minio = "ok";
+  } catch {
+    health.status = "degraded";
+    health.minio = "down";
+  }
+
+  if (health.db === "down" || health.redis === "down") {
+    health.status = "error";
+  }
+
+  const code = health.status === "ok" ? 200 : 503;
+  res.status(code).json(health);
 });
+
+if (ENV.SERVER.NODE_ENV !== "production") {
+  app.get("/api/test-error", (req, res, next) => {
+    const err = new Error("🔥 This is a test error");
+    err.status = 418;
+    next(err);
+  });
+}
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -162,6 +203,12 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/addressData", addressDataRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/reports", reportRoutes);
+/** @deprecated use /api/reports — kept for existing frontend clients */
+app.use("/api/report", reportRoutes);
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // WebSocket connection handling
 io.on("connection", (socket) => {

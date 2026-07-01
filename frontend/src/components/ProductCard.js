@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { FiStar, FiEye } from "react-icons/fi";
-
-const DEFAULT_IMAGE = "/images/placeholder-product.png";
+import ProductImage from "@/components/ui/ProductImage";
+import { resolveProductImageUrl } from "@/lib/images";
 
 export default function ProductCard({ product }) {
-  const [imageError, setImageError] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  // Image logic
   const images = Array.isArray(product.imageUrl)
-    ? product.imageUrl
-    : [product.imageUrl || DEFAULT_IMAGE];
-  const displayImg = images[hovered && images[1] ? 1 : 0] || DEFAULT_IMAGE;
+    ? product.imageUrl.filter((u) => resolveProductImageUrl(u))
+    : resolveProductImageUrl(product.imageUrl)
+      ? [product.imageUrl]
+      : [];
+  const displayImageUrl =
+    images.length > 0 ? images[hovered && images[1] ? 1 : 0] : null;
 
   // Badge logic
   const isNew =
@@ -66,14 +66,12 @@ export default function ProductCard({ product }) {
     >
       {/* IMAGE */}
       <div className="relative w-full aspect-[4/5] bg-gray-100 rounded-2xl border border-gray-100 shadow overflow-hidden flex items-center justify-center max-w-xs mx-auto">
-        <Image
-          src={imageError ? DEFAULT_IMAGE : displayImg}
+        <ProductImage
+          imageUrl={displayImageUrl}
           alt={product.name}
           fill
           className="object-cover"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          onError={() => setImageError(true)}
-          priority={false}
         />
         {/* BADGES */}
         <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">

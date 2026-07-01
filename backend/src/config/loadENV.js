@@ -86,6 +86,7 @@ const requiredEnvVars = {
   JWT_REFRESH_SECRET: JWT_CONFIG.REFRESH_SECRET,
   DATABASE_URL: DB_CONFIG.URL,
   REDIS_URL: REDIS_CONFIG.URL,
+  SESSION_SECRET: process.env.SESSION_SECRET,
 };
 
 const missingEnvVars = Object.entries(requiredEnvVars)
@@ -96,6 +97,14 @@ if (missingEnvVars.length > 0) {
   throw new Error(
     `Missing required environment variables: ${missingEnvVars.join(", ")}`
   );
+}
+
+if (!JWT_CONFIG.SECRET || JWT_CONFIG.SECRET.length < 32) {
+  throw new Error("JWT_SECRET must be at least 32 characters");
+}
+
+if (!JWT_CONFIG.REFRESH_SECRET || JWT_CONFIG.REFRESH_SECRET.length < 32) {
+  throw new Error("JWT_REFRESH_SECRET must be at least 32 characters");
 }
 const facebookConfig = {
   clientID: process.env.FACEBOOK_CLIENT_ID,

@@ -3,22 +3,7 @@ import { ENV } from "../config/loadENV.js";
 import { users, userRoles } from "../models/schema.js";
 import { db } from "../config/db.js";
 import { eq } from "drizzle-orm";
-
-const ROLE_HIERARCHY = {
-  super_admin: 4,
-  admin: 3,
-  moderator: 2,
-  user: 1,
-};
-
-const getHighestRole = (rolesArr) => {
-  if (!rolesArr || rolesArr.length === 0) return "user";
-  // sort ตามลำดับ hierarchy สูงสุดอยู่หน้าสุด
-  const sorted = rolesArr
-    .map((r) => r.role)
-    .sort((a, b) => ROLE_HIERARCHY[b] - ROLE_HIERARCHY[a]);
-  return sorted[0];
-};
+import { getHighestRole } from "../utils/roles.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -153,8 +138,8 @@ export const authMiddleware = async (req, res, next) => {
 // Middleware สำหรับตรวจสอบว่าเป็นเจ้าของข้อมูลหรือไม่
 export const isOwner = async (req, res, next) => {
   try {
-    const userId = parseInt(req.params.id);
-    if (req.user.id !== userId) {
+    const userId = String(req.params.id);
+    if (String(req.user.id) !== userId) {
       return res.status(403).json({
         status: "error",
         message: "Access denied. You can only modify your own data.",

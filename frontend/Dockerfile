@@ -1,9 +1,20 @@
-# Dockerfile for frontend
-FROM node:20-alpine
+# Dockerfile for frontend (production)
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --production
+RUN npm ci
 COPY . .
 RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.mjs ./
+COPY --from=builder /app/postcss.config.js ./
+COPY --from=builder /app/tailwind.config.js ./
 EXPOSE 3000
-CMD ["npm", "run", "start"] 
+CMD ["npm", "run", "start"]

@@ -1,15 +1,13 @@
-// drizzle.config.js
 import { defineConfig } from "drizzle-kit";
 import dotenv from "dotenv";
-dotenv.config();
 
-console.log(process.env.DATABASE_URL);
+dotenv.config();
 
 export default defineConfig({
   schema: "./src/models/schema.js",
   out: "./migrations",
-  driver: "pg",
+  dialect: "postgresql",
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL || "",
+    url: process.env.DATABASE_URL || "",
   },
 });

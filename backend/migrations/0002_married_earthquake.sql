@@ -1,1 +1,0 @@
-ALTER TABLE "products" ALTER COLUMN "image_url" SET DATA TYPE varchar(3000);

@@ -9,21 +9,21 @@ export const addressDataService = {
   async getDistrictsByProvinceName(provinceName) {
     if (!provinceName) return [];
     const prov = await db.query.provinces.findFirst({
-      where: eq(provinces.name_th, provinceName),
+      where: eq(provinces.nameTh, provinceName),
     });
     if (!prov) return [];
     return db.query.districts.findMany({
-      where: eq(districts.province_id, prov.id),
+      where: eq(districts.provinceId, prov.id),
     });
   },
   async getSubdistrictsByDistrictName(districtName) {
     if (!districtName) return [];
     const dist = await db.query.districts.findFirst({
-      where: eq(districts.name_th, districtName),
+      where: eq(districts.nameTh, districtName),
     });
     if (!dist) return [];
     return db.query.subdistricts.findMany({
-      where: eq(subdistricts.district_id, dist.id),
+      where: eq(subdistricts.districtId, dist.id),
     });
   },
 };

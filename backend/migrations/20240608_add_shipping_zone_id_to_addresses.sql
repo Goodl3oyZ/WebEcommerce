@@ -1,1 +1,0 @@
-ALTER TABLE addresses ADD COLUMN shipping_zone_id UUID REFERENCES shipping_zones(id); 

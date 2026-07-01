@@ -50,25 +50,36 @@ You must provide working PostgreSQL, Redis, and MinIO endpoints in `.env`.
 ## Database Commands
 
 ```bash
-# Apply schema changes directly to DB
+# Sync schema.js → PostgreSQL (required before seed)
 npm run migrate
 
-# Generate migration artifacts
+# Generate SQL snapshot into ./migrations (optional, for version control)
 npm run generate
 
-# Seed sample data
-npm run seed
+# Apply generated SQL files
+npm run migrate:sql
 
-# Clear + seed (see package scripts)
-npm run clearSeed
+# Seed all sample data (users, shipping, Thai addresses)
+npm run seed:all
+
+# Migrate + seed in one step
+npm run db:setup
+
+npm run clearSeed   # wipe all tables
 ```
 
-For Docker environment:
+For Docker (production compose):
 
 ```bash
-docker compose -f docker-compose.dev.yml exec -T backend npm run migrate
-docker compose -f docker-compose.dev.yml exec -T backend npm run seed
+docker compose exec backend npm run migrate
+docker compose exec backend npm run seed:all
+# or
+docker compose exec backend npm run db:setup
 ```
+
+Schema source: `src/models/schema.js`. Old migration chain (0000–0014) was removed.
+
+If seed fails with `relation does not exist`, run `npm run migrate` first. For a empty DB volume, `npm run db:setup` is enough.
 
 ## Request Flow
 

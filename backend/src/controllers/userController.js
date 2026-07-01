@@ -33,11 +33,14 @@ export const userController = {
         });
       }
 
+      const { password: _, ...safeUser } = user;
+
       return res.json({
         success: true,
         data: {
           user: {
-            ...user,
+            ...safeUser,
+            role: req.user.role,
             createdAt: user.createdAt?.toISOString(),
             updatedAt: user.updatedAt?.toISOString(),
           },
@@ -88,7 +91,11 @@ export const userController = {
 
       // Handle profile image upload if provided
       if (req.file) {
-        const fileName = await FileService.uploadProfileImage(req.file, userId);
+        const fileName = await FileService.uploadByType(
+          req.file,
+          "profiles",
+          userId
+        );
         const [userWithImage] = await db
           .update(users)
           .set({ avatar: fileName })
@@ -199,6 +206,16 @@ export const userController = {
       const userData = req.body;
       const newUser = await userService.createUser(userData);
       res.status(201).json(newUser);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getUserById(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const result = await userService.getUserById(userId);
+      res.json(result);
     } catch (error) {
       next(error);
     }

@@ -27,18 +27,20 @@ export const orderDto = {
   }),
 
   // Update order status (admin only)
-  updateOrderStatus: z.object({
-    status: z.enum([
-      "pending",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
-      "refunded",
-    ]),
-    trackingNumber: z.string().optional(),
-    notes: z.string().optional(),
-  }),
+  updateOrderStatus: z
+    .object({
+      status: z.enum([
+        "pending",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "refunded",
+      ]),
+      trackingNumber: z.string().optional(),
+      notes: z.string().optional(),
+    })
+    .strict(),
 
   // Cancel order
   cancelOrder: z.object({
@@ -59,6 +61,14 @@ export const orderDto = {
     comment: z.string().min(1),
     images: z.array(z.string().url()).optional(),
   }),
+
+  refundOrder: z
+    .object({
+      amount: z.number().min(0).optional(),
+      reason: z.string().min(1),
+      notes: z.string().optional(),
+    })
+    .strict(),
 };
 
 // Response DTOs

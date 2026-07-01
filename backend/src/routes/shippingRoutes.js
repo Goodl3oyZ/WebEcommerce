@@ -7,68 +7,70 @@ import { shippingDto } from "../dtos/shipping.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all shipping routes
 router.use(apiRateLimiter);
 
-// Public routes
+// Public
 router.get("/methods", shippingController.getShippingMethods);
 router.get("/zones", shippingController.getShippingZones);
 router.post("/calculate", shippingController.calculateShipping);
 
-// Protected routes (require authentication)
 router.use(authMiddleware);
 
-// Shipment tracking
+// Static auth paths
 router.get("/tracking/:trackingNumber", shippingController.trackShipment);
 router.get("/order/:orderId", shippingController.getOrderShipment);
+router.get("/stats", requireAdmin, shippingController.getShippingStats);
 
-// Admin routes
-const requireAdmin = requireRole(ROLES.ADMIN);
-
-// Shipping methods management
+// Admin — methods & zones
 router.post(
   "/methods",
+  requireAdmin,
   validationMiddleware(shippingDto.createShippingMethod),
   shippingController.createShippingMethod
 );
 router.put(
   "/methods/:id",
+  requireAdmin,
   validationMiddleware(shippingDto.updateShippingMethod),
   shippingController.updateShippingMethod
 );
-router.delete("/methods/:id", shippingController.deleteShippingMethod);
-
-// Shipping zones management
+router.delete(
+  "/methods/:id",
+  requireAdmin,
+  shippingController.deleteShippingMethod
+);
 router.post(
   "/zones",
+  requireAdmin,
   validationMiddleware(shippingDto.createShippingZone),
   shippingController.createShippingZone
 );
 router.put(
   "/zones/:id",
+  requireAdmin,
   validationMiddleware(shippingDto.updateShippingZone),
   shippingController.updateShippingZone
 );
-router.delete("/zones/:id", shippingController.deleteShippingZone);
+router.delete("/zones/:id", requireAdmin, shippingController.deleteShippingZone);
 
-// Shipment management
+// Admin — shipments (list/stats before /:id)
+router.get("/", requireAdmin, shippingController.getAllShipments);
 router.post(
   "/",
+  requireAdmin,
   validationMiddleware(shippingDto.createShipment),
   shippingController.createShipment
 );
+router.get("/:id/label", requireAdmin, shippingController.getShippingLabel);
+router.post("/:id/label", requireAdmin, shippingController.generateShippingLabel);
+router.get("/:id", requireAdmin, shippingController.getShipmentById);
 router.put(
   "/:id",
+  requireAdmin,
   validationMiddleware(shippingDto.updateShipment),
   shippingController.updateShipment
 );
-router.get("/:id", shippingController.getShipmentById);
-router.get("/", shippingController.getAllShipments);
-router.get("/stats", shippingController.getShippingStats);
-
-// Shipping labels
-router.post("/:id/label", shippingController.generateShippingLabel);
-router.get("/:id/label", shippingController.getShippingLabel);
 
 export default router;

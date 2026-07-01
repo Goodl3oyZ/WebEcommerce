@@ -14,7 +14,7 @@ import {
   primaryKey,
   unique,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // Users
 export const users = pgTable("users", {
@@ -160,6 +160,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   collections: many(collectionProducts),
   attributes: many(productAttributes),
   inventory: many(storeInventory),
+  supplierProducts: many(supplierProducts),
 }));
 
 export const productVariants = pgTable("product_variants", {
@@ -215,7 +216,7 @@ export const productReviews = pgTable(
   (table) => ({
     ratingCheck: check(
       "product_reviews_rating_check",
-      "rating >= 1 AND rating <= 5"
+      sql`${table.rating} >= 1 AND ${table.rating} <= 5`
     ),
   })
 );
@@ -340,21 +341,21 @@ export const shippingMethodsRelations = relations(
 export const provinces = pgTable("provinces", {
   id: uuid("id").primaryKey().defaultRandom(),
   code: varchar("code", { length: 10 }).unique(),
-  name_th: varchar("name_th", { length: 100 }).notNull(),
-  name_en: varchar("name_en", { length: 100 }),
+  nameTh: varchar("name_th", { length: 100 }).notNull(),
+  nameEn: varchar("name_en", { length: 100 }),
 });
 
 export const districts = pgTable(
   "districts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    code: varchar("code", { length: 10 }), // <--- ลบ .unique()
-    province_id: uuid("province_id").references(() => provinces.id),
-    name_th: varchar("name_th", { length: 100 }).notNull(),
-    name_en: varchar("name_en", { length: 100 }),
+    code: varchar("code", { length: 10 }),
+    provinceId: uuid("province_id").references(() => provinces.id),
+    nameTh: varchar("name_th", { length: 100 }).notNull(),
+    nameEn: varchar("name_en", { length: 100 }),
   },
   (table) => ({
-    uniqueProvinceCode: unique().on(table.province_id, table.code), // <--- เพิ่มตรงนี้
+    uniqueProvinceCode: unique().on(table.provinceId, table.code),
   })
 );
 
@@ -362,15 +363,15 @@ export const subdistricts = pgTable(
   "subdistricts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    code: varchar("code", { length: 10 }), // <--- ลบ .unique() ถ้าจำเป็น
-    district_id: uuid("district_id").references(() => districts.id),
-    province_id: uuid("province_id").references(() => provinces.id),
-    name_th: varchar("name_th", { length: 100 }).notNull(),
-    name_en: varchar("name_en", { length: 100 }),
+    code: varchar("code", { length: 10 }),
+    districtId: uuid("district_id").references(() => districts.id),
+    provinceId: uuid("province_id").references(() => provinces.id),
+    nameTh: varchar("name_th", { length: 100 }).notNull(),
+    nameEn: varchar("name_en", { length: 100 }),
     zipcode: varchar("zipcode", { length: 10 }),
   },
   (table) => ({
-    uniqueDistrictCode: unique().on(table.district_id, table.code), // <--- เพิ่มถ้าต้องการ
+    uniqueDistrictCode: unique().on(table.districtId, table.code),
   })
 );
 
@@ -1401,6 +1402,86 @@ export const refundsRelations = relations(refunds, ({ one }) => ({
   }),
 }));
 
+// Suppliers
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    contactPerson: varchar("contact_person", { length: 255 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    phone: varchar("phone", { length: 50 }).notNull(),
+    address: jsonb("address").notNull(),
+    taxId: varchar("tax_id", { length: 100 }),
+    paymentTerms: varchar("payment_terms", { length: 255 }),
+    notes: text("notes"),
+    status: varchar("status", { length: 50 }).notNull().default("active"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => ({
+    statusIdx: index("suppliers_status_idx").on(table.status),
+    emailIdx: index("suppliers_email_idx").on(table.email),
+  })
+);
+
+export const suppliersRelations = relations(suppliers, ({ many }) => ({
+  products: many(supplierProducts),
+}));
+
+// Supplier Products
+export const supplierProducts = pgTable(
+  "supplier_products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    sku: varchar("sku", { length: 100 }).notNull(),
+    cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+    leadTime: integer("lead_time").notNull(),
+    minimumOrder: integer("minimum_order").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => ({
+    supplierProductUq: unique("supplier_products_supplier_product_uq").on(
+      table.supplierId,
+      table.productId
+    ),
+    supplierIdIdx: index("supplier_products_supplier_id_idx").on(
+      table.supplierId
+    ),
+    productIdIdx: index("supplier_products_product_id_idx").on(
+      table.productId
+    ),
+  })
+);
+
+export const supplierProductsRelations = relations(
+  supplierProducts,
+  ({ one }) => ({
+    supplier: one(suppliers, {
+      fields: [supplierProducts.supplierId],
+      references: [suppliers.id],
+    }),
+    product: one(products, {
+      fields: [supplierProducts.productId],
+      references: [products.id],
+    }),
+  })
+);
+
 // Export all relations
 export const allRelations = {
   users: usersRelations,
@@ -1448,4 +1529,6 @@ export const allRelations = {
   categoryDiscounts: categoryDiscountsRelations,
   notifications: notificationsRelations,
   refunds: refundsRelations,
+  suppliers: suppliersRelations,
+  supplierProducts: supplierProductsRelations,
 };

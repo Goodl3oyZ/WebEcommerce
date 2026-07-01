@@ -8,7 +8,7 @@ export const collectionDto = {
     description: z.string().optional(),
     image: z.string().url().optional(),
     isActive: z.boolean().default(true),
-    products: z.array(z.number()).optional(),
+    products: z.array(z.string().uuid()).optional(),
     startDate: z.string().datetime().optional(),
     endDate: z.string().datetime().optional(),
     discount: z
@@ -26,7 +26,7 @@ export const collectionDto = {
       description: z.string().optional(),
       image: z.string().url().optional(),
       isActive: z.boolean().optional(),
-      products: z.array(z.number()).optional(),
+      products: z.array(z.string().uuid()).optional(),
       startDate: z.string().datetime().optional(),
       endDate: z.string().datetime().optional(),
       discount: z
@@ -42,12 +42,12 @@ export const collectionDto = {
 
   // Add products to collection
   addProducts: z.object({
-    productIds: z.array(z.number()).min(1),
+    productIds: z.array(z.string().uuid()).min(1),
   }),
 
   // Remove products from collection
   removeProducts: z.object({
-    productIds: z.array(z.number()).min(1),
+    productIds: z.array(z.string().uuid()).min(1),
   }),
 };
 

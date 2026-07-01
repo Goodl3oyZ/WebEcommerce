@@ -1,110 +1,12 @@
 {
-  "version": "5",
-  "dialect": "pg",
+  "version": "7",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "5",
-      "when": 1749214627327,
-      "tag": "0000_broad_colleen_wing",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1749216196199,
-      "tag": "0001_bumpy_bug",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1749563346722,
-      "tag": "0002_married_earthquake",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1749569793174,
-      "tag": "0003_worthless_fantastic_four",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1749720965439,
-      "tag": "0004_gifted_pride",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1750186297972,
-      "tag": "0005_lovely_grim_reaper",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "5",
-      "when": 1750255971806,
-      "tag": "0006_shocking_veda",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "5",
-      "when": 1750257051593,
-      "tag": "0007_salty_maria_hill",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "5",
-      "when": 1750281458998,
-      "tag": "0008_luxuriant_micromax",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "5",
-      "when": 1750307946116,
-      "tag": "0009_workable_praxagora",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "5",
-      "when": 1750310767898,
-      "tag": "0010_aberrant_salo",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "5",
-      "when": 1751192208319,
-      "tag": "0011_thankful_anita_blake",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "5",
-      "when": 1751211190963,
-      "tag": "0012_right_dragon_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "5",
-      "when": 1751725791370,
-      "tag": "0013_youthful_baron_strucker",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "5",
-      "when": 1751805044120,
-      "tag": "0014_youthful_kronos",
+      "version": "7",
+      "when": 1780630454265,
+      "tag": "0000_schema",
       "breakpoints": true
     }
   ]

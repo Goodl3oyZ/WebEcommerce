@@ -10,7 +10,15 @@ import {
 import { eq, and, lt, gte } from "drizzle-orm";
 import { redis } from "../config/redis.js";
 import { ENV } from "../config/loadENV.js";
-// import { getMaxListeners } from "nodemailer/lib/xoauth2/index.js";
+import { getHighestRole } from "../utils/roles.js";
+
+async function getUserRole(userId) {
+  const rows = await db
+    .select({ role: userRoles.role })
+    .from(userRoles)
+    .where(eq(userRoles.userId, userId));
+  return getHighestRole(rows);
+}
 
 // Custom error classes
 class AuthError extends Error {
@@ -71,7 +79,7 @@ export const authService = {
 
       await db.insert(userRoles).values({
         userId: newUser.id,
-        role: newUser.email === "panudetzx2@gmail.com" ? "admin" : "user",
+        role: "user",
       });
 
       return newUser;
@@ -116,20 +124,13 @@ export const authService = {
         .delete(userSessions)
         .where(lt(userSessions.expiresAt, new Date()));
 
-      // 👇 ดึง role จากตาราง user_roles
-      const userRoleRecord = await db
-        .select({ role: userRoles.role })
-        .from(userRoles)
-        .where(eq(userRoles.userId, user.id))
-        .limit(1);
+      const role = await getUserRole(user.id);
 
-      const role = userRoleRecord?.[0]?.role || "user"; // fallback ถ้าไม่มี role
-      // สร้าง JWT
       const accessToken = generateToken(
         {
           id: user.id,
           email: user.email,
-          role: user.email === "panudetzx2@gmail.com" ? "admin" : role, // เอามาจาก user_roles table
+          role,
         },
         JWT_ACCESS_EXPIRATION
       );
@@ -169,7 +170,7 @@ export const authService = {
         })
         .where(eq(users.id, user.id));
 
-      return { user, accessToken, refreshToken, session };
+      return { user: { ...user, role }, accessToken, refreshToken, session, role };
     } catch (error) {
       if (error instanceof AuthError) throw error;
       throw new AuthError("Login failed", "LOGIN_FAILED");
@@ -180,14 +181,7 @@ export const authService = {
     try {
       const decoded = verifyToken(refreshToken, JWT_REFRESH_SECRET);
 
-      // ดึง role ของ user
-      const userRoleRecord = await db
-        .select({ role: userRoles.role })
-        .from(userRoles)
-        .where(eq(userRoles.userId, decoded.id))
-        .limit(1);
-
-      const role = userRoleRecord?.[0]?.role || "user";
+      const role = await getUserRole(decoded.id);
 
       const accessToken = generateToken(
         {
@@ -444,13 +438,7 @@ export const authService = {
     { userAgent = null, deviceInfo = {}, ipAddress = null } = {}
   ) {
     try {
-      const roleResult = await db
-        .select({ role: userRoles.role })
-        .from(userRoles)
-        .where(eq(userRoles.userId, user.id))
-        .limit(1);
-
-      const role = roleResult?.[0]?.role || "user";
+      const role = await getUserRole(user.id);
 
       const accessToken = generateToken(
         {
@@ -564,7 +552,7 @@ export const authService = {
 
       await db.insert(userRoles).values({
         userId: newUser.id,
-        role: newUser.email === "panudetzx2@gmail.com" ? "admin" : "user",
+        role: "user",
       });
 
       return newUser;

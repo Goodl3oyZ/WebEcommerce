@@ -56,7 +56,7 @@ export const inventoryController = {
     try {
       const item = await inventoryService.transferInventory(
         req.params.id,
-        req.body.destinationLocation,
+        req.body.toLocation || req.body.destinationLocation,
         req.body.quantity
       );
       res.json(item);

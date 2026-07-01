@@ -13,6 +13,7 @@ import {
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { authController } from "../controllers/authController.js";
 import { authDto } from "../dtos/auth.dto.js";
+import { userController } from "../controllers/userController.js";
 
 const router = express.Router();
 
@@ -52,6 +53,8 @@ router.get("/verify-email", verifyEmailRateLimiter, authController.verifyEmail);
 
 // Protected routes
 router.use(authMiddleware);
+
+router.get("/me", userController.getProfile);
 
 router.post(
   "/change-password",

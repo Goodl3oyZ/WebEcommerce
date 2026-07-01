@@ -82,7 +82,7 @@ const authController = {
         });
       }
 
-      const { user, accessToken, refreshToken } = await authService.login(
+      const { user, accessToken, refreshToken, role } = await authService.login(
         email,
         password,
         {
@@ -130,6 +130,7 @@ const authController = {
             id: user.id,
             email: user.email,
             name: user.name,
+            role: role || user.role,
           },
         },
         tokens: {

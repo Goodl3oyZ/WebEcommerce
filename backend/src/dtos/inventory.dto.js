@@ -4,7 +4,7 @@ import { z } from "zod";
 export const inventoryDto = {
   // Create inventory item
   createInventoryItem: z.object({
-    productId: z.number(),
+    productId: z.string().uuid(),
     sku: z.string().min(1),
     quantity: z.number().min(0),
     location: z.string().min(1),
@@ -31,7 +31,7 @@ export const inventoryDto = {
 
   // Adjust inventory
   adjustInventory: z.object({
-    productId: z.number(),
+    productId: z.string().uuid(),
     quantity: z.number(),
     reason: z.string().min(1),
     notes: z.string().optional(),
@@ -39,7 +39,7 @@ export const inventoryDto = {
 
   // Transfer inventory
   transferInventory: z.object({
-    productId: z.number(),
+    productId: z.string().uuid(),
     fromLocation: z.string().min(1),
     toLocation: z.string().min(1),
     quantity: z.number().min(1),

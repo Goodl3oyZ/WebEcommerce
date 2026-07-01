@@ -4,64 +4,36 @@ import { z } from "zod";
 export const reportDto = {
   // Generate sales report
   generateSalesReport: z.object({
-    startDate: z.string().datetime(),
-    endDate: z.string().datetime(),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
     groupBy: z.enum(["day", "week", "month", "year"]).optional(),
-    includeDetails: z.boolean().default(false),
-    filters: z
-      .object({
-        productIds: z.array(z.number()).optional(),
-        categoryIds: z.array(z.number()).optional(),
-        paymentMethods: z.array(z.string()).optional(),
-        orderStatus: z.array(z.string()).optional(),
-      })
-      .optional(),
+    includeDetails: z.coerce.boolean().optional(),
   }),
 
   // Generate inventory report
   generateInventoryReport: z.object({
-    includeLowStock: z.boolean().default(true),
-    includeOutOfStock: z.boolean().default(true),
-    includeOverstock: z.boolean().default(false),
+    location: z.string().optional(),
+    category: z.string().optional(),
+    lowStock: z.coerce.boolean().optional(),
+    includeLowStock: z.coerce.boolean().optional(),
+    includeOutOfStock: z.coerce.boolean().optional(),
     groupBy: z.enum(["category", "location", "supplier"]).optional(),
-    filters: z
-      .object({
-        categoryIds: z.array(z.number()).optional(),
-        locationIds: z.array(z.number()).optional(),
-        supplierIds: z.array(z.number()).optional(),
-      })
-      .optional(),
   }),
 
   // Generate customer report
   generateCustomerReport: z.object({
-    startDate: z.string().datetime(),
-    endDate: z.string().datetime(),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
     groupBy: z.enum(["day", "week", "month", "year"]).optional(),
-    includeDetails: z.boolean().default(false),
-    filters: z
-      .object({
-        customerGroups: z.array(z.string()).optional(),
-        orderStatus: z.array(z.string()).optional(),
-        minOrderValue: z.number().optional(),
-        maxOrderValue: z.number().optional(),
-      })
-      .optional(),
+    includeDetails: z.coerce.boolean().optional(),
   }),
 
   // Generate supplier report
   generateSupplierReport: z.object({
-    startDate: z.string().datetime(),
-    endDate: z.string().datetime(),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
     groupBy: z.enum(["day", "week", "month", "year"]).optional(),
-    includeDetails: z.boolean().default(false),
-    filters: z
-      .object({
-        supplierIds: z.array(z.number()).optional(),
-        productIds: z.array(z.number()).optional(),
-        orderStatus: z.array(z.string()).optional(),
-      })
-      .optional(),
+    includeDetails: z.coerce.boolean().optional(),
   }),
 };
 

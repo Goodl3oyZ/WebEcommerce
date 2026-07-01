@@ -7,19 +7,19 @@ import { storeDto } from "../dtos/store.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all store routes
 router.use(apiRateLimiter);
 
-// Public Store Routes
-router.get("/", storeController.getStoreProducts);
+// Public
+router.get("/", storeController.getAllStores);
 router.get("/:id", storeController.getStoreById);
 router.get("/:id/products", storeController.getStoreProducts);
 router.get("/:id/reviews", storeController.getStoreReviews);
 
-// Admin Store Routes
+// Admin
 router.use(authMiddleware);
-router.use(requireRole(ROLES.ADMIN));
+router.use(requireAdmin);
 
 router.post(
   "/",
@@ -27,6 +27,11 @@ router.post(
   storeController.createStore
 );
 router.put(
+  "/:id",
+  validationMiddleware(storeDto.updateStore),
+  storeController.updateStore
+);
+router.patch(
   "/:id",
   validationMiddleware(storeDto.updateStore),
   storeController.updateStore

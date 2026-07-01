@@ -16,30 +16,14 @@ router.use(authMiddleware);
 
 // Admin routes
 router.get("/", requireRole(ROLES.ADMIN), supplierController.getAllSuppliers);
-router.get(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  supplierController.getSupplierById
-);
 router.post(
   "/",
   requireRole(ROLES.ADMIN),
   validationMiddleware(supplierDto.createSupplier),
   supplierController.createSupplier
 );
-router.put(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(supplierDto.updateSupplier),
-  supplierController.updateSupplier
-);
-router.delete(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  supplierController.deleteSupplier
-);
 
-// Supplier products
+// Supplier products (before /:id)
 router.get(
   "/:id/products",
   requireRole(ROLES.ADMIN),
@@ -61,6 +45,23 @@ router.delete(
   "/:id/products/:productId",
   requireRole(ROLES.ADMIN),
   supplierController.removeSupplierProduct
+);
+
+router.get(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  supplierController.getSupplierById
+);
+router.put(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(supplierDto.updateSupplier),
+  supplierController.updateSupplier
+);
+router.delete(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  supplierController.deleteSupplier
 );
 
 export default router;
