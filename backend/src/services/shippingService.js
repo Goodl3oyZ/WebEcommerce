@@ -55,6 +55,11 @@ export const shippingService = {
   },
 
   async getShippingMethods(addressId) {
+    if (!addressId) {
+      // If no addressId is provided (e.g., from Admin Panel), return all shipping methods
+      return db.query.shippingMethods.findMany();
+    }
+
     const address = await db.query.addresses.findFirst({
       where: eq(addresses.id, addressId),
     });
@@ -256,10 +261,7 @@ export const shippingService = {
   },
 
   async getShippingZones() {
-    const zones = await db.query.shippingZones.findMany({
-      where: eq(shippingZones.isActive, true),
-    });
-
+    const zones = await db.query.shippingZones.findMany();
     return zones;
   },
 

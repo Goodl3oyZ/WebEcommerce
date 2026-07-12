@@ -274,9 +274,14 @@ export default function ProductsPage() {
                   >
                     <Image
                       src={
-                        Array.isArray(item.imageUrl)
-                          ? item.imageUrl[0]
-                          : item.imageUrl || "/images/placeholder.svg"
+                        (() => {
+                          const url = Array.isArray(item.imageUrl)
+                            ? item.imageUrl.find((u) => u && u.trim() !== "")
+                            : item.imageUrl;
+                          return url && url.trim() !== ""
+                            ? url
+                            : "/images/placeholder.svg";
+                        })()
                       }
                       alt={item.name}
                       width={32}

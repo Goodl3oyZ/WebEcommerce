@@ -8,8 +8,8 @@ export const settingsDto = {
       theme: z.enum(["light", "dark"]).optional(),
       currency: z.string().length(3).optional(),
     })
+    .strict()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
-    })
-    .strict(),
+    }),
 };

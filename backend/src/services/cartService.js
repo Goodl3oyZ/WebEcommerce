@@ -72,31 +72,38 @@ export const cartService = {
           });
         }
 
-        // Generate presigned URLs for product images
+        // Generate URLs for product images
+        // Handle both full URLs (already stored with http prefix) and relative file paths
         let productImages = [];
         if (product && product.imageUrl) {
+          const resolveUrl = (img) => {
+            if (!img) return null;
+            // If already a full URL, use directly
+            if (img.startsWith('http://') || img.startsWith('https://')) return img;
+            // Otherwise build from bucket + path
+            return FileService.getFileUrl(BUCKETS.PRODUCTS, img);
+          };
           if (Array.isArray(product.imageUrl)) {
-            productImages = product.imageUrl.map((img) =>
-              img ? FileService.getFileUrl(BUCKETS.PRODUCTS, img) : null
-            );
+            productImages = product.imageUrl.map(resolveUrl).filter(Boolean);
           } else if (typeof product.imageUrl === "string") {
-            productImages = [
-              FileService.getFileUrl(BUCKETS.PRODUCTS, product.imageUrl),
-            ];
+            const resolved = resolveUrl(product.imageUrl);
+            if (resolved) productImages = [resolved];
           }
         }
 
-        // Generate presigned URLs for variant images (if any)
+        // Generate URLs for variant images (if any)
         let variantImages = [];
         if (variant && variant.imageUrl) {
+          const resolveUrl = (img) => {
+            if (!img) return null;
+            if (img.startsWith('http://') || img.startsWith('https://')) return img;
+            return FileService.getFileUrl(BUCKETS.PRODUCTS, img);
+          };
           if (Array.isArray(variant.imageUrl)) {
-            variantImages = variant.imageUrl.map((img) =>
-              img ? FileService.getFileUrl(BUCKETS.PRODUCTS, img) : null
-            );
+            variantImages = variant.imageUrl.map(resolveUrl).filter(Boolean);
           } else if (typeof variant.imageUrl === "string") {
-            variantImages = [
-              FileService.getFileUrl(BUCKETS.PRODUCTS, variant.imageUrl),
-            ];
+            const resolved = resolveUrl(variant.imageUrl);
+            if (resolved) variantImages = [resolved];
           }
         }
 

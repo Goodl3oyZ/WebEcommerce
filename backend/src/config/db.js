@@ -10,7 +10,7 @@ const pool = new Pool({
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   ssl:
-    ENV.SERVER.NODE_ENV === "production"
+    ENV.SERVER.NODE_ENV === "production" && process.env.DB_SSL !== "false"
       ? {
           rejectUnauthorized:
             process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
@@ -19,7 +19,7 @@ const pool = new Pool({
 });
 
 export const db = drizzle(pool, {
-  schema: { ...schema, ...schema.allRelations },
+  schema,
 });
 
 const MAX_RETRIES = 5;

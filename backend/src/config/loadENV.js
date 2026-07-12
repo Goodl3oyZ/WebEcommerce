@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+﻿import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -105,6 +105,9 @@ if (!JWT_CONFIG.SECRET || JWT_CONFIG.SECRET.length < 32) {
 
 if (!JWT_CONFIG.REFRESH_SECRET || JWT_CONFIG.REFRESH_SECRET.length < 32) {
   throw new Error("JWT_REFRESH_SECRET must be at least 32 characters");
+}
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+  throw new Error("SESSION_SECRET must be at least 32 characters");
 }
 const facebookConfig = {
   clientID: process.env.FACEBOOK_CLIENT_ID,

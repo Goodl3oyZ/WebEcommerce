@@ -38,11 +38,11 @@ export const authDto = {
         })
         .optional(),
     })
+    .strict()
     .refine((data) => data.password === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    })
-    .strict(),
+    }),
 
   // Password reset request
   forgotPassword: z
@@ -64,11 +64,11 @@ export const authDto = {
         ),
       confirmPassword: z.string(),
     })
+    .strict()
     .refine((data) => data.newPassword === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    })
-    .strict(),
+    }),
 
   // Change password (for authenticated users)
   changePassword: z
@@ -85,11 +85,11 @@ export const authDto = {
         ),
       confirmPassword: z.string(),
     })
+    .strict()
     .refine((data) => data.newPassword === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    })
-    .strict(),
+    }),
 
   // Verify email
   verifyEmail: z

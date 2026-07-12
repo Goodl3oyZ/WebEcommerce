@@ -66,6 +66,13 @@ export const deleteFile = async (bucket, fileName) => {
 };
 
 export const getFileUrl = (bucket, fileName) => {
+  // If fileName is already a full URL, return it directly to avoid double-prefix
+  if (
+    typeof fileName === "string" &&
+    (fileName.startsWith("http://") || fileName.startsWith("https://"))
+  ) {
+    return fileName;
+  }
   // สร้าง public URL ตรงๆ (ไม่ใช้ presigned)
   const protocol = MINIO_CONFIG.USE_SSL ? "https" : "http";
   let host;
@@ -77,5 +84,6 @@ export const getFileUrl = (bucket, fileName) => {
   const port = MINIO_CONFIG.API_PORT || 9000;
   return `${protocol}://${host}:${port}/${bucket}/${fileName}`;
 };
+
 
 export default minioClient;

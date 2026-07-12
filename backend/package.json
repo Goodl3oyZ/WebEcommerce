@@ -21,9 +21,9 @@
     "seed:all": "node src/seed/seed.js && node src/seed/seed-shipping-payment.js && node src/seed/seed-address-thai.js",
     "clearSeed": "node src/seed/clear.js",
     "db:reset": "npm run migrate && npm run clearSeed && npm run seed:all",
-    "docker:dev": "docker-compose -f docker-compose.dev.yml up --build",
-    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
-    "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f"
+    "docker:dev": "docker-compose -f docker-compose.yaml up --build",
+    "docker:dev:down": "docker-compose -f docker-compose.yaml down",
+    "docker:dev:logs": "docker-compose -f docker-compose.yaml logs -f"
   },
   "keywords": [],
   "author": "",

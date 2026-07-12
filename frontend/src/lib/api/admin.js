@@ -32,6 +32,8 @@ export const adminAPI = {
     axiosInstance.delete(`/categories/${categoryId}`).then((r) => r.data),
 
   // --- Coupons ---
+  getCoupons: async () =>
+    axiosInstance.get("/coupons").then((r) => r.data),
   createCoupon: async (couponsData) =>
     axiosInstance.post(`/coupons`, couponsData).then((r) => r.data),
   updateCoupon: async (couponId, couponData) =>
@@ -82,6 +84,8 @@ export const adminAPI = {
     axiosInstance.delete(`/shipping/zones/${id}`).then((r) => r.data),
 
   // --- Payments (admin only) ---
+  getAllTransactions: async (params = {}) =>
+    axiosInstance.get("/payments/admin/transactions", { params }).then((r) => r.data),
   updatePaymentStatus: async (paymentId, status, transactionId) =>
     axiosInstance
       .put(`/payments/${paymentId}/status`, { status, transactionId })
@@ -98,19 +102,23 @@ export const adminAPI = {
     axiosInstance.get("/report/sales", { params }).then((r) => r.data),
   getProductReport: async (params = {}) =>
     axiosInstance.get("/report/inventory", { params }).then((r) => r.data),
+  getCustomerReport: async (params = {}) =>
+    axiosInstance.get("/report/customer", { params }).then((r) => r.data),
+  getSupplierReport: async (params = {}) =>
+    axiosInstance.get("/report/supplier", { params }).then((r) => r.data),
 
   // --- Notifications (admin only) ---
-  // getNotifications: async (params = {}) =>
-  //   axiosInstance.get("/notifications", { params }).then((r) => r.data),
-  // sendNotification: async (data) =>
-  //   axiosInstance.post("/notifications", data).then((r) => r.data),
-  // deleteNotification: async (id) =>
-  //   axiosInstance.delete(`/notifications/${id}`).then((r) => r.data),
+  getNotifications: async (params = {}) =>
+    axiosInstance.get("/notifications/admin/all", { params }).then((r) => r.data),
+  sendNotification: async (data) =>
+    axiosInstance.post("/notifications", data).then((r) => r.data),
+  deleteNotification: async (id) =>
+    axiosInstance.delete(`/notifications/admin/${id}`).then((r) => r.data),
 
   // --- Settings (admin only) ---
-  // getSettings: async () => axiosInstance.get("/settings").then((r) => r.data),
-  // updateSettings: async (data) =>
-  //   axiosInstance.put("/settings", data).then((r) => r.data),
+  getSettings: async () => axiosInstance.get("/settings").then((r) => r.data),
+  updateSettings: async (data) =>
+    axiosInstance.put("/settings", data).then((r) => r.data),
   getDashboard: async () =>
     axiosInstance.get("/admin/dashboard").then((r) => r.data),
 };

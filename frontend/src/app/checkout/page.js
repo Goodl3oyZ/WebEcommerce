@@ -10,7 +10,6 @@ import {
   paymentsAPI,
   orderAPI,
   shippingAPI,
-  checkoutAPI,
 } from "@/lib/api";
 import useCartStore from "@/store/cartStore";
 import { FiPhone } from "react-icons/fi";
@@ -78,6 +77,18 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
 
   const formatPrice = (price) => new Intl.NumberFormat("th-TH").format(price);
+
+  // Fix double-URL prefix from malformed Minio uploads
+  const getCleanImageUrl = (url) => {
+    if (!url) return "/images/placeholder.svg";
+    try {
+      const match = url.match(/(https?:\/\/.+)(https?:\/\/)/);
+      if (match) return url.slice(match[1].length);
+      return url;
+    } catch {
+      return "/images/placeholder.svg";
+    }
+  };
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -801,10 +812,8 @@ export default function CheckoutPage() {
                   >
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                       <Image
-                        src={
-                          item.product.imageUrl[0] || "/images/placeholder.svg"
-                        }
-                        alt={item.product.name}
+                        src={getCleanImageUrl(item.product?.imageUrl?.[0])}
+                        alt={item.product?.name || "สินค้า"}
                         width={64}
                         height={64}
                         style={{ objectFit: "cover" }}

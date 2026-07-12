@@ -444,7 +444,7 @@ export const userService = {
 
     if (search) {
       whereClause = or(
-        like(users.username, `%${search}%`),
+        like(users.name, `%${search}%`),
         like(users.email, `%${search}%`)
       );
     }
@@ -454,11 +454,18 @@ export const userService = {
         where: whereClause,
         columns: {
           id: true,
-          username: true,
+          name: true,
           email: true,
-          role: true,
+          isActive: true,
+          isVerified: true,
           createdAt: true,
           updatedAt: true,
+        },
+        with: {
+          roles: {
+            columns: { role: true },
+            limit: 1,
+          },
         },
         orderBy: [desc(users.createdAt)],
         limit,
@@ -470,8 +477,15 @@ export const userService = {
         .where(whereClause),
     ]);
 
+    // Flatten role from roles relation
+    const usersWithRole = usersList.map((u) => ({
+      ...u,
+      role: u.roles?.[0]?.role || "user",
+      roles: undefined,
+    }));
+
     return {
-      users: usersList,
+      users: usersWithRole,
       pagination: {
         total: Number(total[0].count),
         page,

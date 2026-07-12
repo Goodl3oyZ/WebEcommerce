@@ -20,6 +20,11 @@
   }
 }
 
+/* Force light color scheme for all native form controls (fixes dark-mode dropdown issue) */
+:root {
+  color-scheme: light;
+}
+
 /* Custom utilities */
 @layer utilities {
   .animate-fade-in {

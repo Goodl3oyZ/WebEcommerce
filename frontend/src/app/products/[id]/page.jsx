@@ -33,11 +33,12 @@ export default function ProductDetailPage() {
   const [recentlyViewed, setRecentlyViewed] = useState([]);
   const searchInputRef = useRef();
   const addToCart = useCartStore((state) => state.addItem);
-  // แปลงให้ imageUrl เป็น array เสมอ
+  // แปลงให้ imageUrl เป็น array และกรอง empty string ออก
   const imageUrls = product?.imageUrl
-    ? Array.isArray(product.imageUrl)
-      ? product.imageUrl
-      : [product.imageUrl]
+    ? (Array.isArray(product.imageUrl)
+        ? product.imageUrl
+        : [product.imageUrl]
+      ).filter((u) => u && typeof u === "string" && u.trim() !== "")
     : [];
 
   // Rating summary
@@ -134,8 +135,8 @@ export default function ProductDetailPage() {
       id: product.id,
       name: product.name,
       imageUrl: Array.isArray(product.imageUrl)
-        ? product.imageUrl[0]
-        : product.imageUrl,
+        ? product.imageUrl.find((u) => u && u.trim() !== "") || null
+        : product.imageUrl || null,
       price: product.price,
       brand: product.brand,
       category: product.category,

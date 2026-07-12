@@ -49,6 +49,22 @@ export default function CartPage() {
     });
   };
 
+  // Fix double-URL prefix from malformed Minio uploads
+  const getCleanImageUrl = (url) => {
+    if (!url) return "/images/placeholder.svg";
+    try {
+      // If URL contains two protocol parts, keep only the last one
+      const httpIndex = url.indexOf('http');
+      const second = url.indexOf('http', httpIndex + 4);
+      if (second !== -1) {
+        return url.slice(second);
+      }
+      return url;
+    } catch {
+      return "/images/placeholder.svg";
+    }
+  };
+
   const syncCartData = useCallback(async () => {
     try {
       const currentLocalItems = useCartStore.getState().items;
@@ -385,12 +401,11 @@ export default function CartPage() {
                         {/* Product Image */}
                         <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow">
                           <Image
-                            src={
+                            src={getCleanImageUrl(
                               user
-                                ? item.product?.imageUrl[0] ||
-                                  "/images/placeholder.svg"
-                                : item.imageUrl || "/images/placeholder.svg"
-                            }
+                                ? item.product?.imageUrl?.[0]
+                                : item.imageUrl
+                            )}
                             alt={user ? item.product?.name : item.name}
                             fill
                             style={{ objectFit: "cover" }}

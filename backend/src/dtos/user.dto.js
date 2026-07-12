@@ -109,11 +109,11 @@ export const userDto = {
         ),
       confirmPassword: z.string(),
     })
+    .strict()
     .refine((data) => data.password === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
-    })
-    .strict(),
+    }),
 
   // Update profile - excludes sensitive fields
   updateProfile: z
@@ -127,10 +127,10 @@ export const userDto = {
         .optional(),
       bio: z.string().optional(),
     })
+    .strict()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
-    })
-    .strict(),
+    }),
 
   // Update address - separate from profile for better organization
   updateAddress: z
@@ -141,10 +141,10 @@ export const userDto = {
       country: z.string().max(100).optional(),
       postalCode: z.string().max(20).optional(),
     })
+    .strict()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
-    })
-    .strict(),
+    }),
 
   // Update social links
   updateSocialLinks: z.object({
@@ -183,10 +183,10 @@ export const userDto = {
       showPhone: z.boolean().optional(),
       showAddress: z.boolean().optional(),
     })
+    .strict()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
-    })
-    .strict(),
+    }),
 
   // Change password
   changePassword: z

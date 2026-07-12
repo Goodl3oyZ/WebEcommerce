@@ -7,12 +7,26 @@ import {
   productVariants as product_variants,
   products,
   users,
+  stores,
+  storeInventory,
+  suppliers,
+  supplierProducts,
+  coupons,
+  discounts,
+  productDiscounts,
 } from "../models/schema.js";
 import { hashPassword } from "../utils/hashPassword.js";
 
 async function seed() {
   try {
     console.log("Clearing existing data...");
+    await db.delete(productDiscounts);
+    await db.delete(discounts);
+    await db.delete(coupons);
+    await db.delete(supplierProducts);
+    await db.delete(suppliers);
+    await db.delete(storeInventory);
+    await db.delete(stores);
     await db.delete(product_variants);
     await db.delete(products);
     await db.delete(categories);
@@ -39,6 +53,25 @@ async function seed() {
 
     // Assign Admin Role
     await db.insert(userRoles).values([{ userId: adminUser.id, role: "admin" }]);
+
+    // Insert Store
+    const [store] = await db
+      .insert(stores)
+      .values([
+        {
+          name: "Main Warehouse & Store",
+          description: "Our primary warehouse located in Bangkok",
+          address: "123 Rama IX Rd, Huai Khwang",
+          city: "Bangkok",
+          state: "Bangkok",
+          country: "Thailand",
+          postalCode: "10310",
+          phone: "02-123-4567",
+          email: "warehouse@webecommerce.com",
+          isActive: true,
+        },
+      ])
+      .returning();
 
     // Insert Categories
     const [clothingCategory, accessoriesCategory, electronicsCategory] =
@@ -114,7 +147,7 @@ async function seed() {
       .returning();
 
     // Insert Product Variants
-    await db.insert(product_variants).values([
+    const variants = await db.insert(product_variants).values([
       {
         productId: product1.id,
         color: "Black",
@@ -146,6 +179,96 @@ async function seed() {
         sku: "PH-SGR-128",
         stock: 10,
         price: 999.99,
+      },
+    ]).returning();
+
+    // Insert Store Inventory matching the variant stock
+    await db.insert(storeInventory).values(
+      variants.map((v) => ({
+        storeId: store.id,
+        productId: v.productId,
+        variantId: v.id,
+        quantity: v.stock,
+      }))
+    );
+
+    // Insert Supplier
+    const [supplier] = await db
+      .insert(suppliers)
+      .values([
+        {
+          name: "Global Apparel Supply Co.",
+          contactPerson: "John Doe",
+          email: "john@apparelsupply.com",
+          phone: "+66812345678",
+          address: {
+            street: "456 Sukhumvit Rd",
+            city: "Bangkok",
+            country: "Thailand",
+          },
+          taxId: "1234567890123",
+          paymentTerms: "Net 30",
+          status: "active",
+        },
+      ])
+      .returning();
+
+    // Map Supplier to Products
+    await db.insert(supplierProducts).values([
+      {
+        supplierId: supplier.id,
+        productId: product1.id,
+        sku: "SUP-TS-001",
+        cost: 15.00,
+        leadTime: 7,
+        minimumOrder: 100,
+      },
+    ]);
+
+    // Insert Coupons
+    await db.insert(coupons).values([
+      {
+        code: "WELCOME10",
+        type: "percentage",
+        value: 10.00,
+        minPurchase: 100.00,
+        maxDiscount: 50.00,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        isActive: true,
+      },
+      {
+        code: "DISCOUNT50",
+        type: "fixed_amount",
+        value: 50.00,
+        minPurchase: 500.00,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        isActive: true,
+      },
+    ]);
+
+    // Insert Discounts
+    const [discount] = await db
+      .insert(discounts)
+      .values([
+        {
+          name: "Summer Sale 15%",
+          description: "15% off selected products for summer",
+          discountType: "percentage",
+          value: 15.00,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days from now
+          isActive: true,
+        },
+      ])
+      .returning();
+
+    // Link discount to Classic T-Shirt product
+    await db.insert(productDiscounts).values([
+      {
+        discountId: discount.id,
+        productId: product1.id,
       },
     ]);
 

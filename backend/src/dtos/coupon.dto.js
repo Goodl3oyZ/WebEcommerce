@@ -48,10 +48,10 @@ export const couponDto = {
         })
         .optional(),
     })
+    .strict()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
-    })
-    .strict(),
+    }),
 
   // Apply coupon
   applyCoupon: z.object({

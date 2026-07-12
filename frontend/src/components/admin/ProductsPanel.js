@@ -177,8 +177,6 @@ export function ProductsPanel() {
       setProducts(productsRes.products || []);
       setBrands(brandsRes.brands || []);
       setCategories(categoriesRes.categories || []);
-
-      toast.success("โหลดข้อมูลสำเร็จ");
     } catch (error) {
       console.error("Error loading initial data:", error);
       toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณาลองใหม่อีกครั้ง");

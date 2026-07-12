@@ -7,39 +7,45 @@ const nextConfig = {
     // appDir: true,
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "http",
         hostname: "localhost",
         port: "9000",
-        pathname: "/profiles/**", // For profile images
+        pathname: "/profiles/**",
       },
       {
         protocol: "http",
         hostname: "localhost",
         port: "9000",
-        pathname: "/products/**", // <-- ADD THIS LINE for product images
+        pathname: "/products/**",
+      },
+      {
+        protocol: "http",
+        hostname: "**",
+        port: "9000",
+        pathname: "/**",
       },
       {
         protocol: "https",
-        hostname: "example.com",
+        hostname: "**",
         pathname: "/**",
       },
     ],
 
     domains: [
-      "avatars.githubusercontent.com", // GitHub
-      "lh3.googleusercontent.com", // Google (Gmail)
-      "platform-lookaside.fbsbx.com", // Facebook
-      "graph.facebook.com", // Facebook (บางกรณีเก่า)
+      "avatars.githubusercontent.com",
+      "lh3.googleusercontent.com",
+      "platform-lookaside.fbsbx.com",
+      "graph.facebook.com",
       "minio",
+      "localhost",
     ],
   },
+
   async rewrites() {
-    const isDev = process.env.NODE_ENV === "development";
-    const backendUrl = isDev
-      ? "http://backend-dev:5000"
-      : "http://localhost:5000";
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
 
     return [
       {

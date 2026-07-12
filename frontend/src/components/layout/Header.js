@@ -17,10 +17,15 @@ import {
   FiHome, // Added for potential home link in mobile menu
   FiClipboard, // For orders
   FiSettings, // For profile/settings
+  FiShield, // For Admin
 } from "react-icons/fi"; // Grouped for readability
-
 export default function Header() {
   const { user, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  console.log("Header rendering user:", user?.email, "role:", user?.role);
   const cartItems = useCartStore((state) => state.totalItems);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -106,8 +111,17 @@ export default function Header() {
                 )}
                 <span>ตะกร้า</span>
               </Link>
+              {mounted && (user?.role === "admin" || user?.role === "super_admin") && (
+                <Link
+                  href="/admin"
+                  className="text-sm font-medium text-red-600 hover:text-red-700 flex items-center space-x-1 group transition duration-200"
+                >
+                  <FiShield className="w-5 h-5 text-red-500 group-hover:text-red-600 animate-pulse" />
+                  <span className="font-bold">จัดการระบบ (Admin)</span>
+                </Link>
+              )}
               {/* Conditional User Section */}
-              {user ? (
+              {mounted && user ? (
                 <div className="relative profile-dropdown-container">
                   <button
                     onClick={toggleProfileDropdown}
@@ -146,6 +160,17 @@ export default function Header() {
                         <FiSettings className="w-4 h-4 text-blue-500" />
                         <span>โปรไฟล์</span>
                       </Link>
+                      {mounted && (user?.role === "admin" || user?.role === "super_admin") && (
+                        <Link
+                          href="/admin"
+                          className="flex items-center space-x-3 px-5 py-3 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          role="menuitem"
+                        >
+                          <FiShield className="w-4 h-4 text-blue-500" />
+                          <span>จัดการระบบ (Admin)</span>
+                        </Link>
+                      )}
                       <Link
                         href="/orders"
                         className="flex items-center space-x-3 px-5 py-3 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition"
@@ -285,7 +310,7 @@ export default function Header() {
               )}
             </Link>
 
-            {user && (
+            {mounted && user && (
               <>
                 <Link
                   href="/profile"
@@ -295,6 +320,16 @@ export default function Header() {
                   <FiSettings className="w-5 h-5 text-blue-500" />
                   <span className="text-gray-800 text-base">โปรไฟล์</span>
                 </Link>
+                {mounted && (user?.role === "admin" || user?.role === "super_admin") && (
+                  <Link
+                    href="/admin"
+                    className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition"
+                    onClick={closeMobileMenu}
+                  >
+                    <FiShield className="w-5 h-5 text-blue-500" />
+                    <span className="text-gray-800 text-base font-semibold">จัดการระบบ (Admin)</span>
+                  </Link>
+                )}
                 <Link
                   href="/orders"
                   className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition"

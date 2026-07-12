@@ -324,7 +324,7 @@ export default function Profile() {
       }
       if (name === "subdistrict") {
         // หา object subdistrict ที่ตรงกับ value
-        const sub = subdistricts.find((s) => s.name_th === value);
+        const sub = subdistricts.find((s) => s.nameTh === value);
         return { ...prev, subdistrict: value, postalCode: sub?.zipcode || "" };
       }
       return { ...prev, [name]: value };
@@ -744,12 +744,12 @@ export default function Profile() {
                       value={addressData.state}
                       onChange={handleAddressChange}
                       required
-                      className="w-full border rounded px-3 py-2"
+                      className="w-full border rounded px-3 py-2 text-gray-800 bg-white"
                     >
-                      <option value="">เลือกจังหวัด</option>
+                      <option value="" className="text-gray-800 bg-white">เลือกจังหวัด</option>
                       {provinces.map((prov) => (
-                        <option key={prov.id} value={prov.name_th}>
-                          {prov.name_th}
+                        <option key={prov.id} value={prov.nameTh} className="text-gray-800 bg-white">
+                          {prov.nameTh}
                         </option>
                       ))}
                     </select>
@@ -763,13 +763,13 @@ export default function Profile() {
                       value={addressData.city}
                       onChange={handleAddressChange}
                       required
-                      className="w-full border rounded px-3 py-2"
+                      className="w-full border rounded px-3 py-2 text-gray-800 bg-white"
                       disabled={!addressData.state}
                     >
-                      <option value="">เลือกอำเภอ</option>
+                      <option value="" className="text-gray-800 bg-white">เลือกอำเภอ</option>
                       {districts.map((dist) => (
-                        <option key={dist.id} value={dist.name_th}>
-                          {dist.name_th}
+                        <option key={dist.id} value={dist.nameTh} className="text-gray-800 bg-white">
+                          {dist.nameTh}
                         </option>
                       ))}
                     </select>
@@ -781,13 +781,13 @@ export default function Profile() {
                       value={addressData.subdistrict}
                       onChange={handleAddressChange}
                       required
-                      className="w-full border rounded px-3 py-2"
+                      className="w-full border rounded px-3 py-2 text-gray-800 bg-white"
                       disabled={!addressData.city}
                     >
-                      <option value="">เลือกตำบล</option>
+                      <option value="" className="text-gray-800 bg-white">เลือกตำบล</option>
                       {subdistricts.map((sub) => (
-                        <option key={sub.id} value={sub.name_th}>
-                          {sub.name_th}
+                        <option key={sub.id} value={sub.nameTh} className="text-gray-800 bg-white">
+                          {sub.nameTh}
                         </option>
                       ))}
                     </select>
