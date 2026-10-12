@@ -48,13 +48,12 @@ export const addressAPI = {
     return response.json();
   },
 
-  // Get subdistricts by district name
-  getSubdistricts: async (districtName) => {
-    const response = await fetch(
-      `/api/addressData/subdistricts?district=${encodeURIComponent(
-        districtName
-      )}`
-    );
+  // Get subdistricts by district name. District names repeat across
+  // provinces, so pass the province to get the right ones.
+  getSubdistricts: async (districtName, provinceName) => {
+    const params = new URLSearchParams({ district: districtName });
+    if (provinceName) params.set("province", provinceName);
+    const response = await fetch(`/api/addressData/subdistricts?${params}`);
     return response.json();
   },
 };

@@ -1,34 +1,20 @@
 import { addressDataService } from "../services/addressDataService.js";
 
+// Reference data that rarely changes: let browsers and the proxy cache it.
+const cacheFor = (res) => res.set("Cache-Control", "public, max-age=86400");
+
 export const addressDataController = {
   async getProvinces(req, res) {
-    try {
-      const data = await addressDataService.getProvinces();
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: "Failed to fetch provinces" });
-    }
+    cacheFor(res).json(await addressDataService.getProvinces());
   },
+
   async getDistricts(req, res) {
-    try {
-      const { province } = req.query;
-      const data = await addressDataService.getDistrictsByProvinceName(
-        province
-      );
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: "Failed to fetch districts" });
-    }
+    cacheFor(res).json(await addressDataService.getDistrictsByProvinceName(req.query.province));
   },
+
   async getSubdistricts(req, res) {
-    try {
-      const { district } = req.query;
-      const data = await addressDataService.getSubdistrictsByDistrictName(
-        district
-      );
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: "Failed to fetch subdistricts" });
-    }
+    cacheFor(res).json(
+      await addressDataService.getSubdistrictsByDistrictName(req.query.district, req.query.province)
+    );
   },
 };

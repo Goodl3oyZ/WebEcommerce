@@ -3,11 +3,11 @@ import axiosInstance from "./axiosInstance";
 export const adminAPI = {
   // --- Address ---
   getAllAddresses: async () =>
-    axiosInstance.get("/address/admin/all").then((r) => r.data),
+    axiosInstance.get("/addresses/admin/all").then((r) => r.data),
   getUserAddresses: async (userId) =>
-    axiosInstance.get(`/address/admin/user/${userId}`).then((r) => r.data),
+    axiosInstance.get(`/addresses/admin/user/${userId}`).then((r) => r.data),
   getAddressById: async (addrId) =>
-    axiosInstance.get(`/address/admin/${addrId}`).then((r) => r.data),
+    axiosInstance.get(`/addresses/admin/${addrId}`).then((r) => r.data),
 
   // --- Auth ---
   logoutAllSessions: async () =>

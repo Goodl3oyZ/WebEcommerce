@@ -6,7 +6,7 @@ import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
 import ErrorState from "@/components/ErrorState";
 import EmptyState from "@/components/EmptyState";
 
-const emptyMethod = { name: "", code: "", price: "", description: "" };
+const emptyMethod = { name: "", code: "", price: "", description: "", shippingZoneId: "" };
 const emptyZone = { name: "", baseCost: "", description: "" };
 
 export function ShippingPanel() {
@@ -54,6 +54,8 @@ export function ShippingPanel() {
         code: methodForm.code.trim().toUpperCase(),
         price: Number(methodForm.price),
         description: methodForm.description || undefined,
+        // A method is only offered to addresses in its zone.
+        shippingZoneId: methodForm.shippingZoneId,
       };
       if (editingMethod) {
         await adminAPI.updateShippingMethod(editingMethod.id, payload);
@@ -144,6 +146,7 @@ export function ShippingPanel() {
                 code: m.code || "",
                 price: m.price || "",
                 description: m.description || "",
+                shippingZoneId: m.shippingZoneId || "",
               });
             }}
           >
@@ -242,6 +245,22 @@ export function ShippingPanel() {
               setMethodForm((f) => ({ ...f, price: e.target.value }))
             }
           />
+          <select
+            required
+            className="rounded-xl border border-border px-3 py-2"
+            value={methodForm.shippingZoneId}
+            onChange={(e) =>
+              setMethodForm((f) => ({ ...f, shippingZoneId: e.target.value }))
+            }
+          >
+            <option value="">เลือกโซนจัดส่ง</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name}
+                {z.isActive === false ? " (ปิดใช้งาน)" : ""}
+              </option>
+            ))}
+          </select>
           <input
             className="rounded-xl border border-border px-3 py-2"
             placeholder="คำอธิบาย"

@@ -23,11 +23,13 @@ export async function getApp() {
   return wrapped;
 }
 
+// Each test file gets its own random 10.x.y.0/24-ish range, so the Redis-backed
+// per-IP rate limiters never carry counts between files.
+const ipBase = `10.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
 let ipCounter = 0;
 const nextIp = () => {
   ipCounter += 1;
-  const workerId = Number(process.env.JEST_WORKER_ID ?? 1);
-  return `10.${workerId}.${Math.floor(ipCounter / 250)}.${(ipCounter % 250) + 1}`;
+  return `${ipBase}.${(ipCounter % 254) + 1}`;
 };
 
 /**

@@ -5,45 +5,31 @@ import { addressController } from "../controllers/addressController.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { addressDto } from "../dtos/address.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("id", uuidParam("Address not found"));
+router.param("userId", uuidParam("User not found"));
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all address routes
 router.use(apiRateLimiter);
-
-// Protected routes (auth required)
 router.use(authMiddleware);
 
-// User routes
+// Own addresses
 router.get("/", addressController.getUserAddresses);
-router.post(
-  "/",
-  validationMiddleware(addressDto.createAddress),
-  addressController.createAddress
-);
-router.put(
-  "/:id",
-  validationMiddleware(addressDto.updateAddress),
-  addressController.updateAddress
-);
+router.post("/", validationMiddleware(addressDto.createAddress), addressController.createAddress);
+router.put("/:id", validationMiddleware(addressDto.updateAddress), addressController.updateAddress);
 router.put("/:id/default", addressController.setDefaultAddress);
 router.delete("/:id", addressController.deleteAddress);
 
-// Admin routes
+// Admin
 router.get(
   "/admin/all",
-  requireRole(ROLES.ADMIN),
+  requireAdmin,
+  validationMiddleware(addressDto.adminListQuery, "query"),
   addressController.getAllAddresses
 );
-router.get(
-  "/admin/user/:userId",
-  requireRole(ROLES.ADMIN),
-  addressController.getUserAddresses
-);
-router.get(
-  "/admin/:id",
-  requireRole(ROLES.ADMIN),
-  addressController.getAddressById
-);
+router.get("/admin/user/:userId", requireAdmin, addressController.getUserAddressesAdmin);
+router.get("/admin/:id", requireAdmin, addressController.getAddressByIdAdmin);
 
 export default router;

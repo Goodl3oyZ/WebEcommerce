@@ -34,6 +34,13 @@ export default async function globalSetup() {
   await client.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;");
   await client.end();
   run("npx drizzle-kit push --force");
+
+  // Rate-limit counters, lockouts and sessions from earlier runs.
+  const { createClient } = await import("redis");
+  const redis = createClient({ url: testEnv.REDIS_URL });
+  await redis.connect();
+  await redis.flushDb();
+  await redis.quit();
   run("node scripts/init-buckets.mjs");
 
   // Clear per-worker route-hit files from the previous run.

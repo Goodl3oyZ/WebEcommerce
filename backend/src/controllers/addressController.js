@@ -1,158 +1,40 @@
 import { addressService } from "../services/addressService.js";
-import { ApiError } from "../utils/ApiError.js";
+import { userService } from "../services/userService.js";
+import { parsePagination } from "../utils/pagination.js";
 
 export const addressController = {
-  // Get user's addresses
-  async getUserAddresses(req, res, next) {
-    try {
-      const result = await addressService.getUserAddresses(req.user.id);
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
+  async getUserAddresses(req, res) {
+    res.json(await addressService.getUserAddresses(req.user.id));
   },
 
-  // Create new address
-  async createAddress(req, res, next) {
-    try {
-      const address = await addressService.createAddress({
-        ...req.body,
-        userId: req.user.id,
-      });
-      res.status(201).json(address);
-    } catch (error) {
-      next(error);
-    }
+  async createAddress(req, res) {
+    res.status(201).json(await addressService.createAddress(req.user.id, req.body));
   },
 
-  // Update address
-  async updateAddress(req, res, next) {
-    try {
-      const address = await addressService.updateAddress(
-        req.params.id,
-        req.user.id,
-        req.body
-      );
-      res.json(address);
-    } catch (error) {
-      next(error);
-    }
+  async updateAddress(req, res) {
+    res.json(await addressService.updateAddress(req.params.id, req.user.id, req.body));
   },
 
-  // Set default address
-  async setDefaultAddress(req, res, next) {
-    try {
-      const result = await addressService.setDefaultAddress(
-        req.params.id,
-        req.user.id
-      );
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
+  async setDefaultAddress(req, res) {
+    res.json(await addressService.setDefaultAddress(req.params.id, req.user.id));
   },
 
-  // Delete address
-  async deleteAddress(req, res, next) {
-    try {
-      const result = await addressService.deleteAddress(
-        req.params.id,
-        req.user.id
-      );
-
-      // 204 No Content สำหรับการลบสำเร็จ
-      res.status(204).send();
-    } catch (error) {
-      // กรณีลบ default address ที่มี address อื่นเหลืออยู่
-      if (error instanceof ApiError && error.data?.alternativeAddresses) {
-        return res.status(error.statusCode).json({
-          message: error.message,
-          alternativeAddresses: error.data.alternativeAddresses,
-        });
-      }
-      next(error);
-    }
+  async deleteAddress(req, res) {
+    await addressService.deleteAddress(req.params.id, req.user.id);
+    res.status(204).send();
   },
 
-  // Admin: Get all addresses
-  async getAllAddresses(req, res, next) {
-    try {
-      // ควรเพิ่มการตรวจสอบบทบาท admin ก่อน
-      if (!req.user.isAdmin) {
-        throw new ApiError("Unauthorized", 403);
-      }
-
-      const addresses = await addressService.getAllAddresses();
-      res.json(addresses);
-    } catch (error) {
-      next(error);
-    }
+  // --- Admin ---------------------------------------------------------------
+  async getAllAddresses(req, res) {
+    res.json(await addressService.getAllAddresses({ search: req.query.search }, parsePagination(req.query)));
   },
 
-  // Admin: Get user's addresses
-  async getUserAddressesAdmin(req, res, next) {
-    try {
-      // ตรวจสอบบทบาท admin
-      if (!req.user.isAdmin) {
-        throw new ApiError("Unauthorized", 403);
-      }
-
-      const addresses = await addressService.getUserAddresses(
-        req.params.userId
-      );
-      res.json(addresses);
-    } catch (error) {
-      next(error);
-    }
+  async getUserAddressesAdmin(req, res) {
+    await userService.getUserById(req.params.userId); // 404 for unknown users
+    res.json(await addressService.getUserAddresses(req.params.userId));
   },
 
-  // Get address by ID (for current user)
-  async getAddressById(req, res, next) {
-    try {
-      const address = await addressService.getAddressById(
-        req.params.id,
-        req.user.id
-      );
-      res.json(address);
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  // Admin: Get any address by ID
-  async getAddressByIdAdmin(req, res, next) {
-    try {
-      // ตรวจสอบบทบาท admin
-      if (!req.user.isAdmin) {
-        throw new ApiError("Unauthorized", 403);
-      }
-
-      const address = await addressService.getAddressById(
-        req.params.id,
-        req.params.userId // อนุญาตให้ admin เข้าถึง address ของ user อื่น
-      );
-      res.json(address);
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  // Reorder addresses
-  async reorderAddresses(req, res, next) {
-    try {
-      const { newPosition } = req.body;
-      if (typeof newPosition !== "number" || newPosition < 0) {
-        throw new ApiError("Invalid position value", 400);
-      }
-
-      const result = await addressService.reorderAddresses(
-        req.params.id,
-        req.user.id,
-        newPosition
-      );
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
+  async getAddressByIdAdmin(req, res) {
+    res.json(await addressService.getAddressByIdAdmin(req.params.id));
   },
 };

@@ -1,203 +1,55 @@
 import { storeService } from "../services/storeService.js";
+import { parsePagination } from "../utils/pagination.js";
+import { isAdminRole } from "../utils/roles.js";
+
+/** Inactive branches are visible to admins only. */
+const adminView = (req) => isAdminRole(req.user?.role);
 
 export const storeController = {
   async getAllStores(req, res) {
-    try {
-      const { page = 1, limit = 20 } = req.query;
-      const result = await storeService.getAllStores({
-        page,
-        limit,
-      });
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({
-        message: "Error fetching stores",
-        error: error.message,
-      });
-    }
-  },
-
-  async createStore(req, res) {
-    try {
-      const userId = req.user.id;
-      const storeData = req.body;
-      const store = await storeService.createStore(userId, storeData);
-      res.status(201).json(store);
-    } catch (error) {
-      if (error.message === "User already has a store") {
-        return res.status(400).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error creating store", error: error.message });
-    }
+    res.json(
+      await storeService.getAllStores(
+        { search: req.query.search, includeInactive: adminView(req) },
+        parsePagination(req.query, { defaultLimit: 20 })
+      )
+    );
   },
 
   async getStoreById(req, res) {
-    try {
-      const { id } = req.params;
-      const store = await storeService.getStoreById(id);
-      res.json(store);
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error fetching store", error: error.message });
-    }
-  },
-
-  async updateStore(req, res) {
-    try {
-      const userId = req.user.id;
-      const { id } = req.params;
-      const storeData = req.body;
-      const store = await storeService.updateStore(userId, id, storeData);
-      res.json(store);
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Not authorized to update store") {
-        return res.status(403).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error updating store", error: error.message });
-    }
-  },
-
-  async deleteStore(req, res) {
-    try {
-      const userId = req.user.id;
-      const { id } = req.params;
-      await storeService.deleteStore(userId, id);
-      res.json({ message: "Store deleted successfully" });
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Not authorized to delete store") {
-        return res.status(403).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error deleting store", error: error.message });
-    }
+    res.json(await storeService.getStoreById(req.params.id, { includeInactive: adminView(req) }));
   },
 
   async getStoreProducts(req, res) {
-    try {
-      const { id } = req.params;
-      const { page = 1, limit = 10 } = req.query;
-      const products = await storeService.getStoreProducts(id, { page, limit });
-      res.json(products);
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({
-          message: "Error fetching store products",
-          error: error.message,
-        });
-    }
-  },
-
-  async getStoreOrders(req, res) {
-    try {
-      const userId = req.user.id;
-      const { id } = req.params;
-      const { page = 1, limit = 10 } = req.query;
-      const orders = await storeService.getStoreOrders(userId, id, {
-        page,
-        limit,
-      });
-      res.json(orders);
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Not authorized to view store orders") {
-        return res.status(403).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error fetching store orders", error: error.message });
-    }
-  },
-
-  async getStoreAnalytics(req, res) {
-    try {
-      const userId = req.user.id;
-      const { id } = req.params;
-      const { startDate, endDate } = req.query;
-      const analytics = await storeService.getStoreAnalytics(userId, id, {
-        startDate,
-        endDate,
-      });
-      res.json(analytics);
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Not authorized to view store analytics") {
-        return res.status(403).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({
-          message: "Error fetching store analytics",
-          error: error.message,
-        });
-    }
-  },
-
-  async updateStoreSettings(req, res) {
-    try {
-      const userId = req.user.id;
-      const { id } = req.params;
-      const settings = req.body;
-      const updatedSettings = await storeService.updateStoreSettings(
-        userId,
-        id,
-        settings
-      );
-      res.json(updatedSettings);
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Not authorized to update store settings") {
-        return res.status(403).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({
-          message: "Error updating store settings",
-          error: error.message,
-        });
-    }
+    res.json(await storeService.getStoreProducts(req.params.id, parsePagination(req.query)));
   },
 
   async getStoreReviews(req, res) {
-    try {
-      const { id } = req.params;
-      const { page = 1, limit = 10 } = req.query;
-      const reviews = await storeService.getStoreReviews(id, { page, limit });
-      res.json(reviews);
-    } catch (error) {
-      if (error.message === "Store not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({
-          message: "Error fetching store reviews",
-          error: error.message,
-        });
-    }
+    res.json(await storeService.getStoreReviews(req.params.id, parsePagination(req.query)));
+  },
+
+  // --- Admin ---------------------------------------------------------------
+  async createStore(req, res) {
+    res.status(201).json(await storeService.createStore(req.body));
+  },
+
+  async updateStore(req, res) {
+    res.json(await storeService.updateStore(req.params.id, req.body));
+  },
+
+  async deleteStore(req, res) {
+    const store = await storeService.deleteStore(req.params.id);
+    res.json({ success: true, data: store, message: "Store deactivated" });
+  },
+
+  async getStoreOrders(req, res) {
+    res.json(await storeService.getStoreOrders(req.params.id, { status: req.query.status }, parsePagination(req.query)));
+  },
+
+  async getStoreAnalytics(req, res) {
+    res.json(await storeService.getStoreAnalytics(req.params.id, req.query));
+  },
+
+  async updateStoreSettings(req, res) {
+    res.json(await storeService.updateStoreSettings(req.params.id, req.body));
   },
 };

@@ -190,7 +190,7 @@ export default function Profile() {
       return;
     }
     const fetchSubdistricts = async () => {
-      const data = await addressAPI.getSubdistricts(addressData.city);
+      const data = await addressAPI.getSubdistricts(addressData.city, addressData.state);
       setSubdistricts(data);
     };
     fetchSubdistricts();
