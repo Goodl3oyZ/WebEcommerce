@@ -17,6 +17,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { paymentsAPI } from "@/lib/api/payment";
+import useCartStore from "@/store/cartStore";
 import Image from "next/image";
 
 const ORDER_STATUS = {
@@ -381,6 +382,8 @@ export default function OrderDetailsPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("credit_card");
   const [isPaying, setIsPaying] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+  const addToCart = useCartStore((state) => state.addItem);
   const [cardInfo, setCardInfo] = useState({
     name: "",
     number: "",
@@ -450,6 +453,36 @@ export default function OrderDetailsPage() {
     }
   };
 
+  // Cancelled orders cannot be paid; put the same items back in the cart instead.
+  const handleReorder = async () => {
+    setIsReordering(true);
+    let failed = 0;
+    for (const item of order.items) {
+      try {
+        await addToCart({
+          id: item.productId ?? item.product?.id,
+          name: item.product?.name,
+          price: item.price,
+          imageUrl: item.product?.imageUrl?.[0] || "/images/placeholder.svg",
+          quantity: item.quantity,
+          variantId: item.variantId ?? item.variant?.id,
+          variant: item.variant,
+          variantName: item.variant ? [item.variant.color, item.variant.size].filter(Boolean).join(" - ") : null,
+        });
+      } catch {
+        failed += 1; // e.g. out of stock or no longer sold
+      }
+    }
+    setIsReordering(false);
+    if (failed === order.items.length) {
+      toast.error("เพิ่มสินค้าลงตะกร้าไม่ได้ (สินค้าอาจหมดหรือเลิกขายแล้ว)");
+      return;
+    }
+    if (failed > 0) toast(`เพิ่มลงตะกร้าแล้ว ยกเว้น ${failed} รายการที่สินค้าหมดหรือเลิกขาย`);
+    else toast.success("เพิ่มสินค้าลงตะกร้าแล้ว");
+    router.push("/cart");
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 to-white animate-fade-in">
@@ -507,6 +540,37 @@ export default function OrderDetailsPage() {
           )}
         </div>
       </div>
+      {/* Pay again / order again */}
+      {order.status === "pending" &&
+        !["completed", "refunded", "partially_refunded"].includes(order.paymentStatus) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-sm text-amber-800">
+              {order.paymentStatus === "failed"
+                ? "การชำระเงินไม่สำเร็จ ลองชำระอีกครั้งได้"
+                : "คำสั่งซื้อนี้ยังไม่ได้ชำระเงิน"}
+            </div>
+            <button
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-semibold shadow"
+              onClick={() => setShowPaymentModal(true)}
+            >
+              ชำระเงิน
+            </button>
+          </div>
+        )}
+      {order.status === "cancelled" && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-gray-700">
+            คำสั่งซื้อนี้ถูกยกเลิกแล้ว ชำระเงินไม่ได้ สั่งซื้อสินค้าชุดเดิมใหม่ได้
+          </div>
+          <button
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-semibold shadow disabled:opacity-60"
+            onClick={handleReorder}
+            disabled={isReordering}
+          >
+            {isReordering ? "กำลังเพิ่มลงตะกร้า..." : "สั่งซื้ออีกครั้ง"}
+          </button>
+        </div>
+      )}
       {/* Order Items */}
       <div className="bg-white rounded-xl shadow p-6 border">
         <div className="flex items-center gap-2 mb-4 text-lg font-bold text-gray-800">

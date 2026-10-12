@@ -50,6 +50,17 @@ async function paidOrder() {
 }
 
 describe("POST /api/payments (pay or retry an order)", () => {
+  test("paying again with PromptPay returns the open QR instead of a second charge", async () => {
+    const { agent, order, payment } = await pendingPromptPayOrder();
+    jest.clearAllMocks();
+
+    const res = await agent.post("/api/payments").send({ orderId: order.id, method: "promptpay" });
+    expect(res.status).toBe(200);
+    expect(res.body.data.payment.id).toBe(payment.id);
+    expect(res.body.data.charge.qrCodeUrl).toBe("https://qr.test/x.png");
+    expect(omiseService.createCharge).not.toHaveBeenCalled();
+  });
+
   test("charges the server-side order total, ignoring the client amount", async () => {
     const { agent, user } = await loginAs("user");
     const order = await createOrder(user.id, { total: "1234.50" });
@@ -74,13 +85,19 @@ describe("POST /api/payments (pay or retry an order)", () => {
     expect(omiseService.createCharge).toHaveBeenCalledTimes(1);
   });
 
-  test("retrying replaces the previous pending attempt", async () => {
+  test("switching method replaces the previous pending attempt", async () => {
     const { agent, order, payment } = await pendingPromptPayOrder();
-    omiseService.createCharge.mockImplementationOnce(pendingCharge());
+    omiseService.createCharge.mockImplementationOnce(async ({ amount }) => ({
+      id: "chrg_test_card_retry",
+      status: "successful",
+      amount,
+    }));
 
-    const res = await agent.post("/api/payments").send({ orderId: order.id, method: "promptpay" });
+    const res = await agent
+      .post("/api/payments")
+      .send({ orderId: order.id, method: "credit_card", cardToken: "tokn_test_x" });
     expect(res.status).toBe(201);
-    expect(res.body.data.charge.qrCodeUrl).toBe("https://qr.test/x.png");
+    expect(res.body.data.payment.status).toBe("completed");
     expect((await getPaymentRow(payment.id)).status).toBe("superseded");
   });
 

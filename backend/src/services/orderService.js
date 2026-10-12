@@ -261,8 +261,9 @@ export const orderService = {
       return { order, payment, paymentCode };
     });
 
-    // Charge after the order is committed: a failure then leaves a pending,
-    // retryable order instead of money taken for an order that rolled back.
+    // Charge after the order is committed, so money is never taken for an order
+    // that rolled back. If the charge cannot start or is declined, the order is
+    // cancelled to release the reserved stock (the customer can order again).
     let charge = null;
     if (ONLINE_PAYMENT_CODES[paymentCode]) {
       try {

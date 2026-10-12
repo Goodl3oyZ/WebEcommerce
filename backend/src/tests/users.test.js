@@ -23,6 +23,17 @@ describe("own profile", () => {
     expect(res.body.data.stats).toMatchObject({ totalOrders: 0, addressCount: 0 });
   });
 
+  test("profile totalSpent counts only paid orders", async () => {
+    const { createOrder } = await import("./helpers/fixtures.js");
+    const { agent, user } = await loginAs("user");
+    await createOrder(user.id, { total: "100.00", status: "paid", paymentStatus: "completed" });
+    await createOrder(user.id, { total: "40.00", status: "cancelled", paymentStatus: "failed" });
+    await createOrder(user.id, { total: "25.00" }); // pending, not paid yet
+
+    const res = await agent.get("/api/users/profile");
+    expect(res.body.data.stats).toMatchObject({ totalOrders: 3, totalSpent: 100 });
+  });
+
   test("PUT /api/users/profile updates name and phone, ignores email", async () => {
     const { agent, user } = await loginAs("user");
     const res = await agent

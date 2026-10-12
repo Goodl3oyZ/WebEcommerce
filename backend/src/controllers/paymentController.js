@@ -8,6 +8,18 @@ export const paymentController = {
   async createPayment(req, res) {
     const { orderId, method, cardToken, paymentDetails } = req.body;
     const token = cardToken || paymentDetails?.token || paymentDetails?.cardToken;
+    if (method === "promptpay") {
+      const open = await paymentService.findOpenPromptPay(req.user.id, orderId);
+      if (open) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            payment: open,
+            charge: { id: open.transactionId, status: "pending", qrCodeUrl: open.paymentDetails.qrCodeUrl },
+          },
+        });
+      }
+    }
     const payment = await paymentService.createPayment(req.user.id, orderId, method);
     const result = await paymentService.chargePayment(payment, {
       method,

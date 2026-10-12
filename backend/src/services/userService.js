@@ -163,7 +163,8 @@ export const userService = {
       db
         .select({
           totalOrders: sql`count(*)::int`,
-          totalSpent: sql`coalesce(sum(${ordersTable.total}), 0)`,
+          // Only money actually received: not cancelled, unpaid or refunded orders.
+          totalSpent: sql`coalesce(sum(${ordersTable.total}) filter (where ${ordersTable.paymentStatus} in ('completed', 'partially_refunded')), 0)`,
         })
         .from(ordersTable)
         .where(eq(ordersTable.userId, userId)),

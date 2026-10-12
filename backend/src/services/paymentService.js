@@ -163,6 +163,21 @@ export const paymentService = {
     return payment;
   },
 
+  /**
+   * The order's open PromptPay charge, if its QR can still be paid. Paying
+   * again returns this QR instead of a second one, so a customer cannot pay
+   * the same order twice by scanning both.
+   */
+  async findOpenPromptPay(userId, orderId) {
+    const latest = await db.query.paymentTransactions.findFirst({
+      where: and(eq(paymentTransactions.orderId, orderId), eq(paymentTransactions.userId, userId)),
+      orderBy: desc(paymentTransactions.timestamp),
+    });
+    const details = latest?.paymentDetails ?? {};
+    if (latest?.status !== "pending" || details.method !== "promptpay" || !details.qrCodeUrl) return null;
+    return latest;
+  },
+
   /** Charge the payment through Omise and apply the result. */
   async chargePayment(payment, { method, cardToken, description }, txOrDb = db) {
     const amount = toSatang(payment.amount);
@@ -237,7 +252,7 @@ export const paymentService = {
     }
     return db.query.paymentTransactions.findMany({
       where: eq(paymentTransactions.orderId, orderId),
-      orderBy: [desc(paymentTransactions.createdAt)],
+      orderBy: [desc(paymentTransactions.timestamp)],
     });
   },
 
