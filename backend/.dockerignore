@@ -15,3 +15,8 @@ coverage
 logs
 .vscode
 .idea 
+# Not needed in the production image
+Dockerfile*
+docker-compose*.y*ml
+nodemon.json
+docs

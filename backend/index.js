@@ -47,11 +47,24 @@ import notificationRoutes from "./src/routes/notificationRoutes.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./src/config/swagger.js";
 
+const isProduction = ENV.SERVER.NODE_ENV === "production";
+
+// In production only the configured origins may make credentialed requests;
+// in development any origin is reflected for convenience.
+const corsOrigin = isProduction ? ENV.SERVER.ALLOWED_ORIGINS : true;
+
 const app = express();
+app.disable("x-powered-by");
+if (ENV.SERVER.TRUST_PROXY > 0) {
+  // Required behind a reverse proxy so req.secure / req.ip are correct
+  // (secure session cookies and per-IP rate limiting depend on it).
+  app.set("trust proxy", ENV.SERVER.TRUST_PROXY);
+}
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: true, // allow all origins for dev
+    origin: corsOrigin,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -102,7 +115,7 @@ app.use(passport.session());
 
 app.use(
   cors({
-    origin: true,
+    origin: corsOrigin,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
@@ -180,39 +193,51 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.use(morgan("dev"));
+app.use(morgan(isProduction ? "combined" : "dev"));
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(compression());
 
-// Swagger API Documentation UI (with security check for production)
-if (process.env.NODE_ENV === "production" && process.env.SWAGGER_PROTECTED === "true") {
-  app.use("/api-docs", (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Basic ")) {
+// Swagger API Documentation UI.
+// In production it is disabled unless SWAGGER_ENABLED=true, and then requires
+// SWAGGER_USER / SWAGGER_PASS basic auth (no default credentials).
+const swaggerEnabled = !isProduction || process.env.SWAGGER_ENABLED === "true";
+if (swaggerEnabled) {
+  if (isProduction) {
+    const swaggerUser = process.env.SWAGGER_USER;
+    const swaggerPass = process.env.SWAGGER_PASS;
+    if (!swaggerUser || !swaggerPass) {
+      throw new Error(
+        "SWAGGER_USER and SWAGGER_PASS are required when SWAGGER_ENABLED=true in production"
+      );
+    }
+    app.use("/api-docs", (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Basic ")) {
+        const credentials = Buffer.from(authHeader.split(" ")[1], "base64").toString("utf-8");
+        const separator = credentials.indexOf(":");
+        const user = credentials.slice(0, separator);
+        const pass = credentials.slice(separator + 1);
+        if (separator !== -1 && user === swaggerUser && pass === swaggerPass) {
+          return next();
+        }
+      }
       res.setHeader("WWW-Authenticate", 'Basic realm="Swagger Docs"');
       return res.status(401).send("Authentication required");
-    }
-    const credentials = Buffer.from(authHeader.split(" ")[1], "base64").toString("utf-8");
-    const [user, pass] = credentials.split(":");
-    if (user === (process.env.SWAGGER_USER || "admin") && pass === (process.env.SWAGGER_PASS || "admin")) {
-      return next();
-    }
-    res.setHeader("WWW-Authenticate", 'Basic realm="Swagger Docs"');
-    return res.status(401).send("Access denied");
-  });
-}
+    });
+  }
 
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: "WebEcommerce API Documentation",
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  })
-);
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customSiteTitle: "WebEcommerce API Documentation",
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    })
+  );
+}
 
 app.use("/api/auth", authRoutes);
 app.use("/oauth", oauthRoutes);
@@ -298,6 +323,33 @@ if (process.env.NODE_ENV !== "test") {
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+
+  // Graceful shutdown so in-flight requests finish during deploys/restarts.
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`${signal} received, shutting down gracefully...`);
+
+    const forceExit = setTimeout(() => {
+      console.error("Forced shutdown after timeout");
+      process.exit(1);
+    }, 10_000);
+    forceExit.unref();
+
+    // Closes socket connections and the underlying HTTP server.
+    io.close(async () => {
+      try {
+        await redisClient.quit();
+      } catch (err) {
+        console.error("Error closing Redis connection:", err);
+      }
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 export { app };

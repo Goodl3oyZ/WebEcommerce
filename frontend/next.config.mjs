@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   devIndicators: false,
+  // Self-contained server bundle for the production Docker image
+  output: "standalone",
+  poweredByHeader: false,
   // Disable Pages Router
   pageExtensions: ["jsx", "js", "ts", "tsx"],
   experimental: {

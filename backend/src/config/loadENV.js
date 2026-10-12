@@ -35,6 +35,8 @@ export const MINIO_CONFIG = {
   API_PORT: parseInt(process.env.MINIO_API_PORT) || 9000,
   CONSOLE_PORT: parseInt(process.env.MINIO_CONSOLE_PORT) || 9001,
   USE_SSL: process.env.MINIO_USE_SSL === "true",
+  // Browser-facing base URL for objects, e.g. https://shop.example.com/media
+  PUBLIC_URL: process.env.MINIO_PUBLIC_URL?.replace(/\/+$/, "") || "",
 };
 
 // PgAdmin Configuration
@@ -48,7 +50,12 @@ export const PGADMIN_CONFIG = {
 export const SERVER_CONFIG = {
   PORT: parseInt(process.env.BACKEND_PORT) || 5000,
   NODE_ENV: process.env.NODE_ENV || "",
-  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS?.split(",") || [],
+  ALLOWED_ORIGINS:
+    process.env.ALLOWED_ORIGINS?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean) || [],
+  // Number of reverse proxies in front of the app (Caddy/nginx/load balancer).
+  TRUST_PROXY: parseInt(process.env.TRUST_PROXY, 10) || 0,
   API_URL: process.env.API_URL || "",
   HOST: process.env.BACKEND_HOST || "localhost",
   FRONTEND_URL: process.env.FRONTEND_URL || "",
@@ -128,8 +135,35 @@ const githubConfig = {
   clientSecret: process.env.GITHUB_CLIENT_SECRET,
 };
 const sessionSecret = process.env.SESSION_SECRET;
-const omisePublicKey = process.env.OMISE_PUBLIC_KEY || "pkey_test_5u15668b556f8f53703";
-const omiseSecretKey = process.env.OMISE_SECRET_KEY || "skey_test_REMOVED";
+const isProduction = SERVER_CONFIG.NODE_ENV === "production";
+
+// Test keys are only acceptable outside production.
+const omisePublicKey =
+  process.env.OMISE_PUBLIC_KEY ||
+  (isProduction ? undefined : "pkey_test_5u15668b556f8f53703");
+const omiseSecretKey =
+  process.env.OMISE_SECRET_KEY ||
+  (isProduction ? undefined : "skey_test_REMOVED");
+
+if (isProduction) {
+  const missingProdVars = Object.entries({
+    OMISE_PUBLIC_KEY: omisePublicKey,
+    OMISE_SECRET_KEY: omiseSecretKey,
+    FRONTEND_URL: SERVER_CONFIG.FRONTEND_URL,
+    ALLOWED_ORIGINS: SERVER_CONFIG.ALLOWED_ORIGINS.length ? "set" : "",
+    MINIO_ROOT_USER: MINIO_CONFIG.ROOT_USER,
+    MINIO_ROOT_PASSWORD: MINIO_CONFIG.ROOT_PASSWORD,
+    MINIO_PUBLIC_URL: MINIO_CONFIG.PUBLIC_URL,
+  })
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingProdVars.length > 0) {
+    throw new Error(
+      `Missing required production environment variables: ${missingProdVars.join(", ")}`
+    );
+  }
+}
 // Export all configurations
 const callbackURL = {
   github: process.env.GITHUB_CALLBACK_URL,

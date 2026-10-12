@@ -25,10 +25,12 @@ export const ChatProvider = ({ children }) => {
     if (!user) return;
 
     // Initialize socket connection
+    // In production the reverse proxy serves Socket.IO on the same origin.
     const wsUrl =
-      typeof window !== "undefined" && window.location.hostname === "localhost"
+      process.env.NEXT_PUBLIC_WS_URL ||
+      (window.location.hostname === "localhost"
         ? "ws://localhost:5000"
-        : process.env.NEXT_PUBLIC_WS_URL || "ws://backend-dev:5000";
+        : window.location.origin);
 
     const socketInstance = io(wsUrl, {
       withCredentials: true,

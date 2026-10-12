@@ -73,7 +73,7 @@ export const oauthController = {
             .status(500)
             .json({ status: "error", message: "Failed to logout" });
         }
-        res.redirect(ENV.FRONTEND_URL || "http://localhost:3000");
+        res.redirect(ENV.SERVER.FRONTEND_URL ||"http://localhost:3000");
       });
     } catch (error) {
       res.status(500).json({ status: "error", message: "Logout failed" });

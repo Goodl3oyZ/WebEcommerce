@@ -74,6 +74,9 @@ export const getFileUrl = (bucket, fileName) => {
     return fileName;
   }
   // สร้าง public URL ตรงๆ (ไม่ใช้ presigned)
+  if (MINIO_CONFIG.PUBLIC_URL) {
+    return `${MINIO_CONFIG.PUBLIC_URL}/${bucket}/${fileName}`;
+  }
   const protocol = MINIO_CONFIG.USE_SSL ? "https" : "http";
   let host;
   if (ENV.SERVER.NODE_ENV === "production") {
