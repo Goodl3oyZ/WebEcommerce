@@ -101,6 +101,14 @@ documentRoutes("Suppliers", [
 documentRoutes("Admin", [
   { method: "get", path: "/api/admin/dashboard", summary: "Dashboard figures (paid orders only) and alerts", auth: "admin", responses: { 200: "Dashboard" } },
   {
+    method: "get",
+    path: "/api/admin/seed/preview",
+    summary: "What each seed would delete and create",
+    description: "Live counts of the rows each seed deletes, the records it creates (from src/seed/data.js), notes, and `blocked` when it cannot run (e.g. orders reference the data).",
+    auth: "super_admin",
+    responses: { 200: "{ address, shipping, main, all }" },
+  },
+  {
     method: "post",
     path: "/api/admin/seed",
     summary: "Load seed data",

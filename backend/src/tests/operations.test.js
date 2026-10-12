@@ -202,6 +202,26 @@ describe("admin dashboard and seeding", () => {
     expect(chartToday).toBeLessThanOrEqual(after);
   });
 
+  test("seed preview: live deletion counts, the data to create, and blockers", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const { agent: superAdmin, user } = await loginAs("super_admin");
+    await createOrder(user.id);
+    expect((await admin.get("/api/admin/seed/preview")).status).toBe(403);
+
+    const res = await superAdmin.get("/api/admin/seed/preview");
+    expect(res.status).toBe(200);
+    const { main, shipping, address, all } = res.body;
+    expect(main.deletes.find((d) => d.label.startsWith("ผู้ใช้")).count).toBeGreaterThan(0);
+    expect(main.creates.find((c) => c.label === "บัญชีแอดมิน").items[0]).toMatch(/admin@example\.com/);
+    expect(main.creates.find((c) => c.label === "สินค้า").items).toHaveLength(3);
+    expect(shipping.creates.find((c) => c.label === "วิธีชำระเงิน").items).toEqual(["Credit Card", "PromptPay"]);
+    expect(address.creates.find((c) => c.label === "จังหวัด").count).toBe(77);
+    // An order exists, so seeds that delete what orders reference are blocked.
+    expect(main.blocked).toMatch(/ออเดอร์/);
+    expect(all.blocked).toBe(main.blocked);
+    expect(address.blocked).toBeNull();
+  });
+
   test("seeding is super-admin only, needs confirmation and is off in production", async () => {
     const { agent: admin } = await loginAs("admin");
     const { agent: superAdmin } = await loginAs("super_admin");

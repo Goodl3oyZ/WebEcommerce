@@ -1,6 +1,9 @@
 import { db } from "../config/db.js";
 import { orders, users, products, productVariants, orderItems, coupons } from "../models/schema.js";
 import { and, eq, ne, gte, lte, desc, sql, inArray, isNotNull } from "drizzle-orm";
+import fs from "node:fs";
+import path from "node:path";
+import * as seedData from "../seed/data.js";
 
 const PAID = ["completed", "partially_refunded", "refunded"];
 const LOW_STOCK = 5;
@@ -155,5 +158,114 @@ export const adminService = {
       recentActivities: [],
       notifications,
     };
+  },
+
+  /**
+   * What each seed would delete (live counts) and create (the seed data
+   * itself), and whether it can run: orders reference products, addresses
+   * and shipping/payment methods, so those seeds fail while orders exist.
+   */
+  async getSeedPreview() {
+    const tables = {
+      users: "ผู้ใช้ (รวมแอดมินทุกคน)",
+      user_roles: "สิทธิ์ผู้ใช้",
+      addresses: "ที่อยู่ของผู้ใช้",
+      carts: "ตะกร้าสินค้า",
+      products: "สินค้า",
+      product_variants: "ตัวเลือกสินค้า (SKU)",
+      categories: "หมวดหมู่",
+      brands: "แบรนด์",
+      coupons: "คูปอง",
+      discounts: "โปรโมชันส่วนลด",
+      stores: "สาขา/คลังสินค้า",
+      store_inventory: "สต็อกในสาขา",
+      suppliers: "ซัพพลายเออร์",
+      shipping_zones: "โซนจัดส่ง",
+      shipping_methods: "วิธีจัดส่ง",
+      payment_methods: "วิธีชำระเงิน",
+      provinces: "จังหวัด",
+      districts: "อำเภอ/เขต",
+      subdistricts: "ตำบล/แขวง",
+      orders: "ออเดอร์",
+    };
+    const counts = {};
+    for (const table of Object.keys(tables)) {
+      const res = await db.execute(sql.raw(`select count(*)::int as n from "${table}"`));
+      counts[table] = (res.rows ?? res)[0].n;
+    }
+    const del = (names) => names.map((t) => ({ label: tables[t], count: counts[t] })).filter((d) => d.count > 0);
+    const blockedByOrders =
+      counts.orders > 0
+        ? `มีออเดอร์ ${counts.orders} รายการที่อ้างอิงสินค้า ที่อยู่ และวิธีจัดส่ง/ชำระเงินอยู่ จึงลบข้อมูลเหล่านี้ไม่ได้ (seed จะล้มเหลว) ใช้ได้กับฐานข้อมูลใหม่หรือฐานข้อมูลทดสอบเท่านั้น`
+        : null;
+
+    const csvRows = (file) => {
+      try {
+        const text = fs.readFileSync(path.join(process.cwd(), "src/seed/csv", file), "utf8");
+        // Data rows = non-empty lines minus the header.
+        return Math.max(0, text.split(/\r?\n/).filter((l) => l.trim()).length - 1);
+      } catch {
+        return null;
+      }
+    };
+    const { DEMO_ADMIN, DEMO_CATEGORIES, DEMO_BRANDS, DEMO_PRODUCTS, DEMO_COUPONS, DEMO_DISCOUNT, DEMO_STORE, DEMO_SUPPLIER } = seedData;
+    const baht = (n) => `฿${Number(n).toLocaleString("th-TH")}`;
+
+    const address = {
+      deletes: del(["provinces", "districts", "subdistricts"]),
+      creates: [
+        { label: "จังหวัด", count: csvRows("provinces.csv") },
+        { label: "อำเภอ/เขต", count: csvRows("districts.csv") },
+        { label: "ตำบล/แขวง พร้อมรหัสไปรษณีย์", count: csvRows("sub_districts.csv") },
+      ],
+      notes: ["ที่อยู่ที่ลูกค้าบันทึกไว้ไม่ได้รับผลกระทบ (เก็บชื่อจังหวัด/อำเภอเป็นข้อความ)"],
+      blocked: null,
+    };
+    const shipping = {
+      deletes: del(["shipping_zones", "shipping_methods", "payment_methods"]),
+      creates: [
+        {
+          label: "โซนและวิธีจัดส่ง",
+          count: seedData.SHIPPING_ZONES.reduce((n, z) => n + z.methods.length, 0),
+          items: seedData.SHIPPING_ZONES.flatMap((z) => z.methods.map((m) => `${z.name}: ${m.name} ${baht(m.price)}`)),
+        },
+        { label: "วิธีชำระเงิน", count: seedData.PAYMENT_METHODS.length, items: seedData.PAYMENT_METHODS.map((m) => m.name) },
+      ],
+      notes: [],
+      blocked: blockedByOrders,
+    };
+    const main = {
+      deletes: del(["users", "user_roles", "addresses", "carts", "products", "product_variants", "categories", "brands", "coupons", "discounts", "stores", "store_inventory", "suppliers"]),
+      creates: [
+        { label: "บัญชีแอดมิน", count: 1, items: [`${DEMO_ADMIN.email} / ${DEMO_ADMIN.password}`] },
+        { label: "หมวดหมู่", count: DEMO_CATEGORIES.length, items: DEMO_CATEGORIES.map((c) => c.name) },
+        { label: "แบรนด์", count: DEMO_BRANDS.length, items: DEMO_BRANDS.map((b) => b.name) },
+        {
+          label: "สินค้า",
+          count: DEMO_PRODUCTS.length,
+          items: DEMO_PRODUCTS.map(
+            (p) => `${p.name} ${baht(p.price)} · ${p.variants.map((v) => `${v.color}/${v.size} ×${v.stock}`).join(", ")}`
+          ),
+        },
+        {
+          label: "คูปอง (อายุ " + seedData.COUPON_VALID_DAYS + " วัน)",
+          count: DEMO_COUPONS.length,
+          items: DEMO_COUPONS.map((c) =>
+            `${c.code}: ${c.type === "percentage" ? `ลด ${c.value}%` : `ลด ${baht(c.value)}`}${c.minPurchase ? ` ขั้นต่ำ ${baht(c.minPurchase)}` : ""}`
+          ),
+        },
+        { label: "โปรโมชัน", count: 1, items: [DEMO_DISCOUNT.name] },
+        { label: "สาขา/คลัง และซัพพลายเออร์", count: 2, items: [DEMO_STORE.name, DEMO_SUPPLIER.name] },
+      ],
+      notes: ["ผู้ใช้ทุกคนจะถูกลบ รวมถึงบัญชีที่คุณใช้อยู่ตอนนี้ ต้องเข้าสู่ระบบใหม่ด้วยบัญชีแอดมินตัวอย่าง"],
+      blocked: blockedByOrders,
+    };
+    const all = {
+      deletes: [...main.deletes, ...shipping.deletes, ...address.deletes],
+      creates: [...main.creates, ...shipping.creates, ...address.creates],
+      notes: [...main.notes, ...address.notes],
+      blocked: blockedByOrders,
+    };
+    return { address, shipping, main, all };
   },
 };

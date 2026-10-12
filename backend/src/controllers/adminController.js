@@ -19,6 +19,10 @@ const SEEDS = {
 export const SEED_CONFIRMATION = "DELETE EXISTING DATA";
 
 export const adminController = {
+  async getSeedPreview(req, res) {
+    res.json(await adminService.getSeedPreview());
+  },
+
   async getDashboard(req, res) {
     res.json(await adminService.getDashboardData());
   },

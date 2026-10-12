@@ -21,6 +21,7 @@ router.use(requireRole(ROLES.ADMIN));
 
 router.get("/dashboard", adminController.getDashboard);
 // Can wipe data: super admins only (and disabled in production by default).
+router.get("/seed/preview", requireRole(ROLES.SUPER_ADMIN), adminController.getSeedPreview);
 router.post("/seed", requireRole(ROLES.SUPER_ADMIN), validationMiddleware(seedDto), adminController.runSeed);
 
 export default router;

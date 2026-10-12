@@ -130,6 +130,7 @@ export const adminAPI = {
     axiosInstance.put("/settings", data).then((r) => r.data?.data ?? r.data),
   getDashboard: async () =>
     axiosInstance.get("/admin/dashboard").then((r) => r.data),
+  getSeedPreview: async () => axiosInstance.get("/admin/seed/preview").then((r) => r.data),
   runSeed: async (seedType, confirm) =>
     axiosInstance.post("/admin/seed", { seedType, confirm }).then((r) => r.data),
 };

@@ -16,6 +16,18 @@ import {
   productDiscounts,
 } from "../models/schema.js";
 import { hashPassword } from "../utils/hashPassword.js";
+import {
+  COUPON_VALID_DAYS,
+  DEMO_ADMIN,
+  DEMO_BRANDS,
+  DEMO_CATEGORIES,
+  DEMO_COUPONS,
+  DEMO_DISCOUNT,
+  DEMO_PRODUCTS,
+  DEMO_STORE,
+  DEMO_SUPPLIER,
+  DISCOUNT_VALID_DAYS,
+} from "./data.js";
 
 async function seed() {
   try {
@@ -35,242 +47,90 @@ async function seed() {
     await db.delete(users);
     console.log("Existing data cleared!");
 
-    const adminPasswordHash = await hashPassword("admin123");
+    const DAY = 24 * 60 * 60 * 1000;
 
-    // Insert Users (login: admin@example.com / admin123)
+    // Admin account (login: admin@example.com / admin123)
     const [adminUser] = await db
       .insert(users)
       .values([
         {
-          name: "Admin User",
-          email: "admin@example.com",
-          password: adminPasswordHash,
+          name: DEMO_ADMIN.name,
+          email: DEMO_ADMIN.email,
+          password: await hashPassword(DEMO_ADMIN.password),
           isVerified: true,
           isActive: true,
         },
       ])
       .returning();
-
-    // Assign Admin Role
     await db.insert(userRoles).values([{ userId: adminUser.id, role: "admin" }]);
 
-    // Insert Store
-    const [store] = await db
-      .insert(stores)
-      .values([
-        {
-          name: "Main Warehouse & Store",
-          description: "Our primary warehouse located in Bangkok",
-          address: "123 Rama IX Rd, Huai Khwang",
-          city: "Bangkok",
-          state: "Bangkok",
-          country: "Thailand",
-          postalCode: "10310",
-          phone: "02-123-4567",
-          email: "warehouse@webecommerce.com",
-          isActive: true,
-        },
-      ])
+    const [store] = await db.insert(stores).values([DEMO_STORE]).returning();
+
+    const categoryRows = await db
+      .insert(categories)
+      .values(DEMO_CATEGORIES.map(({ name, description }) => ({ name, description })))
       .returning();
+    const categoryId = Object.fromEntries(DEMO_CATEGORIES.map((c, i) => [c.key, categoryRows[i].id]));
 
-    // Insert Categories
-    const [clothingCategory, accessoriesCategory, electronicsCategory] =
-      await db
-        .insert(categories)
-        .values([
-          { name: "Clothing", description: "All types of clothing items" },
-          { name: "Accessories", description: "Fashion accessories" },
-          {
-            name: "Electronics",
-            description: "Electronic devices and gadgets",
-          },
-        ])
-        .returning();
-
-    // Insert Brands
-    const [brand1, brand2, brand3] = await db
+    const brandRows = await db
       .insert(brands)
-      .values([
-        {
-          name: "Fashion Brand",
-          description: "Trendy fashion items",
-          logo: null,
-          website: "https://fashionbrand.com",
-          isActive: true,
-        },
-        {
-          name: "Luxury Brand",
-          description: "High-end luxury items",
-          logo: null,
-          website: "https://luxurybrand.com",
-          isActive: true,
-        },
-        {
-          name: "Tech Brand",
-          description: "Latest technology",
-          logo: null,
-          website: "https://techbrand.com",
-          isActive: true,
-        },
-      ])
+      .values(DEMO_BRANDS.map(({ key: _key, ...b }) => ({ ...b, logo: null, isActive: true })))
       .returning();
+    const brandId = Object.fromEntries(DEMO_BRANDS.map((b, i) => [b.key, brandRows[i].id]));
 
-    // Insert Products
-    const [product1, product2, product3] = await db
+    const productRows = await db
       .insert(products)
-      .values([
-        {
-          name: "Classic T-Shirt",
-          description: "Comfortable cotton t-shirt",
-          price: 29.99,
+      .values(
+        DEMO_PRODUCTS.map((p) => ({
+          name: p.name,
+          description: p.description,
+          price: p.price,
           imageUrl: [],
-          categoryId: clothingCategory.id,
-          brandId: brand1.id,
-        },
-        {
-          name: "Designer Watch",
-          description: "Luxury timepiece",
-          price: 299.99,
-          imageUrl: [],
-          categoryId: accessoriesCategory.id,
-          brandId: brand2.id,
-        },
-        {
-          name: "Smartphone",
-          description: "Latest smartphone model",
-          price: 999.99,
-          imageUrl: [],
-          categoryId: electronicsCategory.id,
-          brandId: brand3.id,
-        },
-      ])
+          categoryId: categoryId[p.category],
+          brandId: brandId[p.brand],
+        }))
+      )
+      .returning();
+    const productId = Object.fromEntries(DEMO_PRODUCTS.map((p, i) => [p.key, productRows[i].id]));
+
+    const variants = await db
+      .insert(product_variants)
+      .values(DEMO_PRODUCTS.flatMap((p) => p.variants.map((v) => ({ ...v, productId: productId[p.key] }))))
       .returning();
 
-    // Insert Product Variants
-    const variants = await db.insert(product_variants).values([
-      {
-        productId: product1.id,
-        color: "Black",
-        size: "M",
-        sku: "TS-BLK-M-001",
-        stock: 30,
-        price: 29.99,
-      },
-      {
-        productId: product1.id,
-        color: "White",
-        size: "L",
-        sku: "TS-WHT-L-001",
-        stock: 25,
-        price: 29.99,
-      },
-      {
-        productId: product2.id,
-        color: "Silver",
-        size: "One Size",
-        sku: "WT-SLV-001",
-        stock: 15,
-        price: 299.99,
-      },
-      {
-        productId: product3.id,
-        color: "Space Gray",
-        size: "128GB",
-        sku: "PH-SGR-128",
-        stock: 10,
-        price: 999.99,
-      },
-    ]).returning();
-
-    // Insert Store Inventory matching the variant stock
+    // Store inventory matches the variant stock
     await db.insert(storeInventory).values(
-      variants.map((v) => ({
-        storeId: store.id,
-        productId: v.productId,
-        variantId: v.id,
-        quantity: v.stock,
+      variants.map((v) => ({ storeId: store.id, productId: v.productId, variantId: v.id, quantity: v.stock }))
+    );
+
+    const { products: supplied, ...supplierFields } = DEMO_SUPPLIER;
+    const [supplier] = await db.insert(suppliers).values([supplierFields]).returning();
+    await db
+      .insert(supplierProducts)
+      .values(supplied.map(({ product, ...rest }) => ({ ...rest, supplierId: supplier.id, productId: productId[product] })));
+
+    await db.insert(coupons).values(
+      DEMO_COUPONS.map((c) => ({
+        ...c,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + COUPON_VALID_DAYS * DAY),
+        isActive: true,
       }))
     );
 
-    // Insert Supplier
-    const [supplier] = await db
-      .insert(suppliers)
-      .values([
-        {
-          name: "Global Apparel Supply Co.",
-          contactPerson: "John Doe",
-          email: "john@apparelsupply.com",
-          phone: "+66812345678",
-          address: {
-            street: "456 Sukhumvit Rd",
-            city: "Bangkok",
-            country: "Thailand",
-          },
-          taxId: "1234567890123",
-          paymentTerms: "Net 30",
-          status: "active",
-        },
-      ])
-      .returning();
-
-    // Map Supplier to Products
-    await db.insert(supplierProducts).values([
-      {
-        supplierId: supplier.id,
-        productId: product1.id,
-        sku: "SUP-TS-001",
-        cost: 15.00,
-        leadTime: 7,
-        minimumOrder: 100,
-      },
-    ]);
-
-    // Insert Coupons
-    await db.insert(coupons).values([
-      {
-        code: "WELCOME10",
-        type: "percentage",
-        value: 10.00,
-        minPurchase: 100.00,
-        maxDiscount: 50.00,
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        isActive: true,
-      },
-      {
-        code: "DISCOUNT50",
-        type: "fixed_amount",
-        value: 50.00,
-        minPurchase: 500.00,
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        isActive: true,
-      },
-    ]);
-
-    // Insert Discounts
+    const { products: discounted, ...discountFields } = DEMO_DISCOUNT;
     const [discount] = await db
       .insert(discounts)
       .values([
         {
-          name: "Summer Sale 15%",
-          description: "15% off selected products for summer",
-          discountType: "percentage",
-          value: 15.00,
+          ...discountFields,
           startDate: new Date(),
-          endDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days from now
+          endDate: new Date(Date.now() + DISCOUNT_VALID_DAYS * DAY),
           isActive: true,
         },
       ])
       .returning();
-
-    // Link discount to Classic T-Shirt product
-    await db.insert(productDiscounts).values([
-      {
-        discountId: discount.id,
-        productId: product1.id,
-      },
-    ]);
+    await db.insert(productDiscounts).values(discounted.map((key) => ({ discountId: discount.id, productId: productId[key] })));
 
     console.log("Seed data inserted successfully!");
   } catch (error) {
