@@ -15,9 +15,11 @@ import {
   FaCog,
   FaChartLine,
   FaDatabase,
+  FaHeadset,
 } from "react-icons/fa";
 import { TabsList, TabsTrigger } from "@/components/ui/Tabs";
-import { ADMIN_NAV } from "@/components/admin/adminNav";
+import { navFor } from "@/components/admin/adminNav";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ICONS = {
   "product-dashboard": FaChartLine,
@@ -33,16 +35,18 @@ const ICONS = {
   notifications: FaBell,
   reports: FaChartBar,
   settings: FaCog,
+  support: FaHeadset,
   seed: FaDatabase,
 };
 
 export function AdminSidebar({ onNavigate }) {
+  const { user } = useAuth();
   let lastGroup = "";
 
   return (
     <nav aria-label="เมนูแอดมิน" className="h-full">
       <TabsList className="flex w-full flex-col items-stretch gap-1 overflow-visible bg-transparent pb-0">
-        {ADMIN_NAV.map((item) => {
+        {navFor(user).map((item) => {
           const Icon = ICONS[item.value];
           const showGroup = item.group !== lastGroup;
           lastGroup = item.group;

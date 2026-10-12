@@ -16,6 +16,7 @@ import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { SeedDataPanel } from "@/components/admin/SeedDataPanel";
+import { SupportPanel } from "@/components/admin/SupportPanel";
 import { adminAPI } from "@/lib/api/admin";
 import DashboardSummary from "@/components/admin/DashboardSummary";
 import { isAdmin } from "@/lib/auth";
@@ -28,6 +29,12 @@ export default function AdminPage() {
   const [dashLoading, setDashLoading] = useState(true);
   const [dashError, setDashError] = useState(null);
   const [tab, setTab] = useState("product-dashboard");
+  const staffOnly = user?.role === "moderator";
+
+  // Chat agents (moderators) only have the support inbox.
+  useEffect(() => {
+    if (staffOnly) setTab("support");
+  }, [staffOnly]);
 
   const loadDashboard = () => {
     setDashLoading(true);
@@ -57,7 +64,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!user || !isAdmin(user)) {
+  if (!user || (!isAdmin(user) && !staffOnly)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
         <div className="text-center">
@@ -124,6 +131,9 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="seed" className="mt-0">
             <SeedDataPanel />
+          </TabsContent>
+          <TabsContent value="support" className="mt-0">
+            <SupportPanel />
           </TabsContent>
         </div>
       </AdminShell>

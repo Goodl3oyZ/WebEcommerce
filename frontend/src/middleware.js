@@ -26,9 +26,10 @@ export async function middleware(req) {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
 
+    // /admin: admins, plus moderators (chat agents, who only get the support inbox)
     if (
       route.role === "admin" &&
-      !["admin", "super_admin"].includes(payload.role)
+      !["admin", "super_admin", "moderator"].includes(payload.role)
     ) {
       return NextResponse.redirect(new URL("/403", req.url));
     }

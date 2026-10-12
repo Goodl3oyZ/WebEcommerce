@@ -1500,6 +1500,76 @@ export const supplierProductsRelations = relations(
   })
 );
 
+// Customer support chat: one conversation per request, handled by staff agents.
+export const supportConversations = pgTable(
+  "support_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    topic: varchar("topic", { length: 50 }).notNull(),
+    // waiting (in the queue) -> active (an agent has it) -> closed
+    status: varchar("status", { length: 20 }).notNull().default("waiting"),
+    assignedAgentId: uuid("assigned_agent_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+    closedAt: timestamp("closed_at"),
+  },
+  (table) => ({
+    statusIdx: index("support_conversations_status_idx").on(table.status),
+    agentIdx: index("support_conversations_agent_idx").on(table.assignedAgentId),
+    userIdx: index("support_conversations_user_idx").on(table.userId),
+  })
+);
+
+export const supportMessages = pgTable(
+  "support_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => supportConversations.id, { onDelete: "cascade" }),
+    senderId: uuid("sender_id").references(() => users.id, { onDelete: "set null" }),
+    // customer | agent | system
+    senderRole: varchar("sender_role", { length: 20 }).notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    conversationIdx: index("support_messages_conversation_idx").on(table.conversationId, table.createdAt),
+  })
+);
+
+// Staff who answer chats. maxActive overrides the global per-agent limit.
+export const supportAgents = pgTable("support_agents", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  accepting: boolean("accepting").notNull().default(true),
+  maxActive: integer("max_active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const supportConversationsRelations = relations(supportConversations, ({ one, many }) => ({
+  user: one(users, { fields: [supportConversations.userId], references: [users.id], relationName: "supportCustomer" }),
+  agent: one(users, { fields: [supportConversations.assignedAgentId], references: [users.id], relationName: "supportAgent" }),
+  messages: many(supportMessages),
+}));
+
+export const supportMessagesRelations = relations(supportMessages, ({ one }) => ({
+  conversation: one(supportConversations, {
+    fields: [supportMessages.conversationId],
+    references: [supportConversations.id],
+  }),
+  sender: one(users, { fields: [supportMessages.senderId], references: [users.id] }),
+}));
+
+export const supportAgentsRelations = relations(supportAgents, ({ one }) => ({
+  user: one(users, { fields: [supportAgents.userId], references: [users.id] }),
+}));
+
 // Export all relations
 export const allRelations = {
   users: usersRelations,

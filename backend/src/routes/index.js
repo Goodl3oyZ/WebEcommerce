@@ -22,6 +22,7 @@ import reportRoutes from "./reportRoutes.js";
 import supplierRoutes from "./supplierRoutes.js";
 import inventoryRoutes from "./inventoryRoutes.js";
 import notificationRoutes from "./notificationRoutes.js";
+import supportRoutes from "./supportRoutes.js";
 
 // Every API router and its mount path. This table is the single source of
 // truth used to mount routes, audit them (scripts/audit-routes.js) and check
@@ -53,6 +54,7 @@ export const routeModules = [
   ["/api/suppliers", supplierRoutes],
   ["/api/inventory", inventoryRoutes],
   ["/api/notifications", notificationRoutes],
+  ["/api/support", supportRoutes],
 ];
 
 // Aliases kept only for backward compatibility; excluded from coverage checks.

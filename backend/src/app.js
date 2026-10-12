@@ -16,6 +16,7 @@ import cookieParser from "cookie-parser";
 // import { initializeBuckets } from "./config/minio.js";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import { setupRealtime } from "./realtime/index.js";
 
 import swaggerUi from "swagger-ui-express";
 import { routeModules } from "./routes/index.js";
@@ -220,55 +221,8 @@ for (const [mountPath, router] of routeModules) {
   app.use(mountPath, router);
 }
 
-// WebSocket connection handling
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
-  // Join public chat
-  socket.on("join_public", () => {
-    socket.join("public");
-  });
-
-  // Join private chat
-  socket.on("join_private", (roomId) => {
-    socket.join(roomId);
-  });
-
-  // Handle public messages
-  socket.on("public_message", (message) => {
-    io.to("public").emit("new_message", {
-      id: Date.now(),
-      userId: message.userId,
-      username: message.username,
-      content: message.content,
-      timestamp: new Date(),
-    });
-  });
-
-  // Handle private messages
-  socket.on("private_message", (message) => {
-    io.to(message.roomId).emit("new_message", {
-      id: Date.now(),
-      userId: message.userId,
-      username: message.username,
-      content: message.content,
-      timestamp: new Date(),
-    });
-  });
-
-  // Handle typing status
-  socket.on("typing", (data) => {
-    socket.to(data.roomId).emit("user_typing", {
-      userId: data.userId,
-      username: data.username,
-    });
-  });
-
-  // Handle user disconnection
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-  });
-});
+// WebSockets: authenticated, used to push support-chat updates.
+setupRealtime(io);
 
 app.use(errorHandler);
 

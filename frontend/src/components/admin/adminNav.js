@@ -42,6 +42,13 @@ export const ADMIN_NAV = [
     keywords: "users customers",
   },
   {
+    value: "support",
+    label: "แชทลูกค้า",
+    group: "ขาย",
+    keywords: "chat support customer help",
+    staff: true, // moderators (chat agents) see only items marked staff
+  },
+  {
     value: "coupons",
     label: "คูปอง",
     group: "ขาย",
@@ -84,6 +91,12 @@ export const ADMIN_NAV = [
     keywords: "seed data address shipping mock test",
   },
 ];
+
+/** Menu items this user may open (moderators: support chat only). */
+export function navFor(user) {
+  const admin = user?.role === "admin" || user?.role === "super_admin";
+  return admin ? ADMIN_NAV : ADMIN_NAV.filter((item) => item.staff);
+}
 
 export function getAdminNavItem(value) {
   return ADMIN_NAV.find((item) => item.value === value) || ADMIN_NAV[0];

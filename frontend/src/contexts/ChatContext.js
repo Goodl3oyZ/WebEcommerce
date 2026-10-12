@@ -4,122 +4,42 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
-const ChatContext = createContext();
+const ChatContext = createContext({ socket: null, connected: false });
 
-export const useChat = () => {
-  const context = useContext(ChatContext);
-  if (!context) {
-    throw new Error("useChat must be used within a ChatProvider");
-  }
-  return context;
-};
-
+/** One authenticated Socket.IO connection per signed-in browser tab. */
 export const ChatProvider = ({ children }) => {
   const { user } = useAuth();
   const [socket, setSocket] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [typingUsers, setTypingUsers] = useState([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-
-    // Initialize socket connection
+    if (!user) return undefined;
     // In production the reverse proxy serves Socket.IO on the same origin.
-    const wsUrl =
+    const url =
       process.env.NEXT_PUBLIC_WS_URL ||
-      (window.location.hostname === "localhost"
-        ? "ws://localhost:5000"
-        : window.location.origin);
-
-    const socketInstance = io(wsUrl, {
-      withCredentials: true,
-      transports: ["websocket"],
-    });
-
-    socketInstance.on("connect", () => {
-      console.log("Connected to chat server");
-      setIsConnected(true);
-      socketInstance.emit("join_public");
-    });
-
-    socketInstance.on("disconnect", () => {
-      console.log("Disconnected from chat server");
-      setIsConnected(false);
-    });
-
-    socketInstance.on("new_message", (message) => {
-      setMessages((prev) => [...prev, message]);
-    });
-
-    socketInstance.on("user_typing", (data) => {
-      setTypingUsers((prev) => {
-        if (prev.find((u) => u.userId === data.userId)) return prev;
-        return [...prev, data];
-      });
-
-      // Remove typing status after 3 seconds
-      setTimeout(() => {
-        setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId));
-      }, 3000);
-    });
-
-    setSocket(socketInstance);
-
+      (window.location.hostname === "localhost" ? "http://localhost:5000" : window.location.origin);
+    const s = io(url, { withCredentials: true, transports: ["websocket"] });
+    s.on("connect", () => setConnected(true));
+    s.on("disconnect", () => setConnected(false));
+    setSocket(s);
     return () => {
-      socketInstance.disconnect();
+      s.disconnect();
+      setSocket(null);
+      setConnected(false);
     };
-  }, [user]);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sendMessage = (content) => {
-    if (!socket || !user) return;
-
-    const message = {
-      userId: user.id,
-      username: user.name || user.email,
-      content,
-    };
-
-    socket.emit("public_message", message);
-  };
-
-  const sendPrivateMessage = (roomId, content) => {
-    if (!socket || !user) return;
-
-    const message = {
-      roomId,
-      userId: user.id,
-      username: user.name || user.email,
-      content,
-    };
-
-    socket.emit("private_message", message);
-  };
-
-  const joinPrivateRoom = (roomId) => {
-    if (!socket) return;
-    socket.emit("join_private", roomId);
-  };
-
-  const sendTypingStatus = (roomId = "public") => {
-    if (!socket || !user) return;
-
-    socket.emit("typing", {
-      roomId,
-      userId: user.id,
-      username: user.name || user.email,
-    });
-  };
-
-  const value = {
-    messages,
-    typingUsers,
-    isConnected,
-    sendMessage,
-    sendPrivateMessage,
-    joinPrivateRoom,
-    sendTypingStatus,
-  };
-
-  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+  return <ChatContext.Provider value={{ socket, connected }}>{children}</ChatContext.Provider>;
 };
+
+export const useChat = () => useContext(ChatContext);
+
+/** Subscribe to a socket event for the lifetime of a component. */
+export function useSocketEvent(event, handler) {
+  const { socket } = useChat();
+  useEffect(() => {
+    if (!socket) return undefined;
+    socket.on(event, handler);
+    return () => socket.off(event, handler);
+  }, [socket, event, handler]);
+}

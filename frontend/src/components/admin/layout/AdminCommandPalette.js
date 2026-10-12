@@ -2,24 +2,27 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaSearch } from "react-icons/fa";
-import { ADMIN_NAV } from "@/components/admin/adminNav";
+import { navFor } from "@/components/admin/adminNav";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTabs } from "@/components/ui/Tabs";
 
 export function AdminCommandPalette({ open, onClose }) {
+  const { user } = useAuth();
+  const items = navFor(user);
   const { setValue } = useTabs();
   const [query, setQuery] = useState("");
   const inputRef = useRef(null);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return ADMIN_NAV;
-    return ADMIN_NAV.filter(
+    if (!q) return items;
+    return items.filter(
       (item) =>
         item.label.toLowerCase().includes(q) ||
         item.keywords.toLowerCase().includes(q) ||
         item.value.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, items]);
 
   useEffect(() => {
     if (open) {

@@ -26,6 +26,15 @@ describe("avatar uploads", () => {
     expect((await agent.delete("/api/uploads/avatar")).status).toBe(404);
   });
 
+  test("accepts WebP", async () => {
+    const { agent } = await loginAs("admin");
+    // Minimal RIFF/WEBP header: enough for the content sniffing.
+    const webp = Buffer.concat([Buffer.from("RIFF"), Buffer.from([26, 0, 0, 0]), Buffer.from("WEBPVP8 "), Buffer.alloc(18)]);
+    const res = await agent.post("/api/uploads/category").attach("image", webp, { filename: "cover.webp", contentType: "image/webp" });
+    expect(res.status).toBe(201);
+    expect(res.body.fileName).toMatch(/cover\.webp$/);
+  });
+
   test("rejects files that are not really images, SVG and missing files", async () => {
     const { agent } = await loginAs("user");
     const fake = await agent

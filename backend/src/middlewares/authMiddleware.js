@@ -14,7 +14,7 @@ const unauthorized = (res, message, code) =>
  * that logout, logout-all, password changes and deactivation revoke.
  * Returns { user, sessionId } or { error: { message, code } }.
  */
-async function resolveCaller(req) {
+export async function resolveCaller(req) {
   const authHeader = req.headers.authorization;
   const accessToken = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)

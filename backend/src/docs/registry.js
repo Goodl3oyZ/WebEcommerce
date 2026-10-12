@@ -7,7 +7,7 @@
  *       auth: "public", body: authDto.login, responses: { 200: "Logged in" } },
  *   ]);
  *
- * auth: "public" | "user" | "admin" | "super_admin"  (adds security + 401/403)
+ * auth: "public" | "user" | "moderator" | "admin" | "super_admin"  (adds security + 401/403)
  * body: zod schema (JSON) — bodyType: "multipart" for file uploads
  * query: zod object of query parameters
  * responses: { status: "description" | { description, schema } }

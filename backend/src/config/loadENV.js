@@ -85,10 +85,11 @@ export const SECURITY_CONFIG = {
 // File Upload Configuration
 export const UPLOAD_CONFIG = {
   MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB
-  ALLOWED_FILE_TYPES: process.env.ALLOWED_FILE_TYPES?.split(",") || [
+  ALLOWED_FILE_TYPES: process.env.ALLOWED_FILE_TYPES?.split(",").map((t) => t.trim()) || [
     "image/jpeg",
     "image/png",
     "image/gif",
+    "image/webp",
   ],
   UPLOAD_DIR: process.env.UPLOAD_DIR || "uploads",
 };

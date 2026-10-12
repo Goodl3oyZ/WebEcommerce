@@ -246,15 +246,16 @@ describe("settings", () => {
     const name = `Shop ${randomUUID().slice(0, 6)}`;
 
     expect((await admin.put("/api/settings").send({ siteName: name, currency: "thb" })).body.data).toMatchObject({ siteName: name, currency: "THB" });
-    expect((await admin.patch("/api/settings").send({ maintenance: true })).body.data).toMatchObject({ siteName: name, maintenance: true });
+    // maintenance stays false: it now blocks checkout, and other test files share the database.
+    expect((await admin.patch("/api/settings").send({ maintenance: false })).body.data).toMatchObject({ siteName: name, maintenance: false });
+    expect((await admin.patch("/api/settings").send({ maintenance: "yes" })).status).toBe(400);
     expect((await admin.get("/api/settings")).body.data.siteName).toBe(name);
-    expect((await anon.get("/api/settings/public")).body.data).toMatchObject({ siteName: name, maintenance: true });
+    expect((await anon.get("/api/settings/public")).body.data).toMatchObject({ siteName: name, maintenance: false });
 
     // Stored in the database, not process memory.
     const rows = await db.select().from(schema.appSettings);
     expect(rows.find((r) => r.key === "siteName").value).toBe(name);
 
-    await admin.patch("/api/settings").send({ maintenance: false });
     expect((await admin.put("/api/settings").send({ unknown: 1 })).status).toBe(400);
     expect((await (await loginAs("user")).agent.get("/api/settings")).status).toBe(403);
   });
