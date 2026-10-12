@@ -7,8 +7,9 @@ export const paymentDto = {
     .object({
       orderId: z.string().uuid(),
       method: z.enum(["credit_card", "promptpay", "cash_on_delivery"]),
-      amount: z.number().min(0),
-      currency: z.enum(["THB", "USD", "EUR"]),
+      // Accepted for backward compatibility but ignored: the server charges order.total.
+      amount: z.number().min(0).optional(),
+      currency: z.enum(["THB", "USD", "EUR"]).optional(),
       paymentDetails: z.record(z.any()).optional(),
     })
     .refine(

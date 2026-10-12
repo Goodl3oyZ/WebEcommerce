@@ -31,7 +31,10 @@ export const paymentService = {
       console.log("[createPayment] order query result", order);
       if (!order) {
         console.error("[createPayment] Order not found", { userId, orderId });
-        throw new Error("Order not found");
+        throw ApiError.notFound("Order not found");
+      }
+      if (["completed", "refunded"].includes(order.paymentStatus)) {
+        throw new ApiError("Order has already been paid", 409);
       }
       const existingPayment = await txOrDb.query.paymentTransactions.findFirst({
         where: and(
@@ -45,7 +48,7 @@ export const paymentService = {
       );
       if (existingPayment) {
         console.error("[createPayment] Payment already exists", { orderId });
-        throw new Error("Payment already exists");
+        throw new ApiError("Payment already exists", 409);
       }
       const [payment] = await txOrDb
         .insert(paymentTransactions)

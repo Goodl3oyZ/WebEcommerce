@@ -6,19 +6,19 @@ import asyncHandler from "express-async-handler";
 export const paymentController = {
   createPayment: asyncHandler(async (req, res) => {
     const userId = req.user.id;
-    const { orderId, method, amount, currency, cardToken, paymentDetails } =
-      req.body;
+    // amount/currency from the client are ignored: the charge is always the
+    // order total stored on the server.
+    const { orderId, method, cardToken, paymentDetails } = req.body;
     const token = cardToken || (paymentDetails && paymentDetails.token);
     const payment = await paymentService.createPayment(
       userId,
       orderId,
       method,
-      paymentDetails,
-      amount,
-      currency
+      paymentDetails
     );
 
-    const amountInt = Math.round(Number(amount) * 100);
+    const amountInt = Math.round(Number(payment.amount) * 100);
+    const currency = "thb";
 
     let charge;
     if (method === "credit_card") {
