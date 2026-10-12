@@ -6,7 +6,7 @@ import classNames from "classnames";
 export function Card({ className, ...props }) {
   return (
     <div
-      className={classNames("bg-white rounded-xl shadow-md", className)}
+      className={classNames("bg-surface rounded-xl shadow-md", className)}
       {...props}
     />
   );
@@ -15,7 +15,7 @@ export function Card({ className, ...props }) {
 export function CardHeader({ className, ...props }) {
   return (
     <div
-      className={classNames("p-4 border-b border-gray-200", className)}
+      className={classNames("p-4 border-b border-border", className)}
       {...props}
     />
   );

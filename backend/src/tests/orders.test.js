@@ -15,7 +15,18 @@ const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
 const { eq } = await import("drizzle-orm");
 
+const { settingsService } = await import("../services/settingsService.js");
+
 beforeEach(() => jest.clearAllMocks());
+
+/** Next charge stays pending (PromptPay QR shown, not paid yet). */
+const unpaidPromptPay = () =>
+  omiseService.createCharge.mockImplementationOnce(async ({ amount, source }) => ({
+    id: `chrg_test_${randomUUID().slice(0, 8)}`,
+    status: "pending",
+    amount,
+    source: { id: source, scannable_code: { image: { download_uri: "https://qr.test/x.png" } } },
+  }));
 
 const setStatus = (orderId, values) =>
   db.update(schema.orders).set(values).where(eq(schema.orders.id, orderId));
@@ -158,13 +169,26 @@ describe("POST /api/orders/checkout", () => {
     expect(res.body.data.charge.qrCodeUrl).toBe("https://qr.test/1.png");
   });
 
-  test("cash on delivery creates a pending order without charging", async () => {
+  test("cash on delivery is not offered", async () => {
     const { agent, user } = await loginAs("user");
     const setup = await checkoutSetup(user, { paymentCode: "cod" });
     const res = await agent.post("/api/orders/checkout").send(setup.body());
-    expect(res.status).toBe(201);
-    expect(res.body.data).toMatchObject({ status: "pending", paymentStatus: "pending" });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/not available/);
     expect(omiseService.createCharge).not.toHaveBeenCalled();
+    const methods = (await agent.get("/api/payments/methods")).body.map((m) => m.code.toLowerCase());
+    expect(methods).not.toContain("cod");
+  });
+
+  test("maintenance mode refuses new orders", async () => {
+    const { agent, user } = await loginAs("user");
+    const setup = await checkoutSetup(user);
+    // Mocked rather than saved: other test files share the database.
+    const spy = jest.spyOn(settingsService, "getSettings").mockResolvedValueOnce({ maintenance: true });
+    const res = await agent.post("/api/orders/checkout").send(setup.body());
+    spy.mockRestore();
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe("MAINTENANCE");
   });
 
   test("removes the purchased items from the cart", async () => {
@@ -224,7 +248,8 @@ describe("reading orders", () => {
 describe("customer actions", () => {
   test("cancel: unpaid pending orders only; stock is released", async () => {
     const { agent, user } = await loginAs("user");
-    const setup = await checkoutSetup(user, { paymentCode: "cod", stock: 3 });
+    const setup = await checkoutSetup(user, { paymentCode: "promptpay", stock: 3 });
+    unpaidPromptPay();
     const { body } = await agent.post("/api/orders/checkout").send(setup.body());
     expect(await getVariantStock(setup.variant.id)).toBe(2);
 
@@ -326,7 +351,8 @@ describe("admin order management", () => {
   test("cancelling an unpaid order releases its stock", async () => {
     const { agent: admin } = await loginAs("admin");
     const { agent, user } = await loginAs("user");
-    const setup = await checkoutSetup(user, { paymentCode: "cod", stock: 4 });
+    const setup = await checkoutSetup(user, { paymentCode: "promptpay", stock: 4 });
+    unpaidPromptPay();
     const { body } = await agent.post("/api/orders/checkout").send(setup.body());
 
     const res = await admin.put(`/api/orders/admin/${body.data.id}/status`).send({ status: "cancelled", notes: "Out of area" });

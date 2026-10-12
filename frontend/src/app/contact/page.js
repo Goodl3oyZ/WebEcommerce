@@ -5,7 +5,7 @@ export default function ContactPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
           <h2 className="text-xl font-semibold mb-4">Get in Touch</h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-fg-muted mb-4">
             Have questions or need assistance? We&apos;re here to help!
           </p>
           <div className="space-y-3">
@@ -27,7 +27,7 @@ export default function ContactPage() {
               <label className="block text-sm font-medium mb-1">Name</label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Your name"
               />
             </div>
@@ -35,7 +35,7 @@ export default function ContactPage() {
               <label className="block text-sm font-medium mb-1">Email</label>
               <input
                 type="email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="your@email.com"
               />
             </div>
@@ -43,7 +43,7 @@ export default function ContactPage() {
               <label className="block text-sm font-medium mb-1">Message</label>
               <textarea
                 rows="4"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Your message"
               ></textarea>
             </div>

@@ -3,7 +3,7 @@ import { appSettings } from "../models/schema.js";
 import { sql } from "drizzle-orm";
 
 export const DEFAULT_SETTINGS = {
-  siteName: "My Shop",
+  siteName: "CHALLENGE",
   maintenance: false,
   theme: "light",
   currency: "THB",

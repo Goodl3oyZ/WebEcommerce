@@ -8,7 +8,7 @@ export const paymentDto = {
   createPayment: z
     .object({
       orderId: z.string().uuid(),
-      method: z.enum(["credit_card", "promptpay", "cash_on_delivery"]),
+      method: z.enum(["credit_card", "promptpay"]),
       cardToken: z.string().optional().describe("Omise.js card token (credit_card)"),
       paymentDetails: z
         .object({ token: z.string().optional(), cardToken: z.string().optional() })

@@ -20,6 +20,7 @@ import { ORDER_STATUSES } from "../utils/orderStatus.js";
 import { writeAuditLog } from "./auditService.js";
 import { shippingService } from "./shippingService.js";
 import { paymentService } from "./paymentService.js";
+import { settingsService } from "./settingsService.js";
 import { couponService } from "./couponService.js";
 import { setOrderStatus, cancelOrder } from "./orderLifecycle.js";
 import { getFileUrl, BUCKETS } from "../config/minio.js";
@@ -114,6 +115,9 @@ export const orderService = {
    * from the database; anything the client sends for them is ignored.
    */
   async createOrder(userId, orderData) {
+    if ((await settingsService.getSettings()).maintenance) {
+      throw new ApiError(503, "The store is temporarily closed for maintenance", null, "MAINTENANCE");
+    }
     const items = mergeItems(orderData.items ?? []);
     if (items.length === 0) {
       throw ApiError.badRequest("Order must contain at least one item");
@@ -145,6 +149,10 @@ export const orderService = {
       });
       if (!paymentMethod?.isActive) {
         throw ApiError.badRequest("Invalid payment method");
+      }
+      // Only online payments are offered (no cash on delivery).
+      if (!ONLINE_PAYMENT_CODES[paymentMethod.code?.toLowerCase()]) {
+        throw ApiError.badRequest("This payment method is not available");
       }
 
       // Reserve stock atomically: the update only succeeds if enough is left.

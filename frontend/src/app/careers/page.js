@@ -5,23 +5,23 @@ export default function CareersPage() {
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-semibold mb-4">Join Our Team</h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-fg-muted mb-4">
             We&apos;re always looking for talented individuals who are
             passionate about innovation and customer service.
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-surface rounded-lg shadow-md p-6">
           <h3 className="text-xl font-semibold mb-2">Current Openings</h3>
-          <p className="text-gray-600">
+          <p className="text-fg-muted">
             We currently don&apos;t have any open positions, but we&apos;re
             always accepting applications for future opportunities.
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-surface rounded-lg shadow-md p-6">
           <h3 className="text-xl font-semibold mb-2">Why Work With Us?</h3>
-          <ul className="list-disc list-inside space-y-2 text-gray-600">
+          <ul className="list-disc list-inside space-y-2 text-fg-muted">
             <li>Competitive salary and benefits</li>
             <li>Flexible work environment</li>
             <li>Opportunities for growth and development</li>
@@ -30,9 +30,9 @@ export default function CareersPage() {
           </ul>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-surface rounded-lg shadow-md p-6">
           <h3 className="text-xl font-semibold mb-2">Contact HR</h3>
-          <p className="text-gray-600">
+          <p className="text-fg-muted">
             If you&apos;re interested in joining our team, please send your
             resume to: careers@challenge.com
           </p>

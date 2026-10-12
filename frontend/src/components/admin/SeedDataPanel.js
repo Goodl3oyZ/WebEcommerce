@@ -88,7 +88,7 @@ export function SeedDataPanel() {
     {
       id: "shipping",
       title: "Seed ข้อมูลการจัดส่งและชำระเงิน",
-      description: "นำเข้าช่องทางจัดส่ง (Flash, Kerry, EMS), พื้นที่จัดส่ง และช่องทางชำระเงิน (PromptPay, Credit Card, COD)",
+      description: "นำเข้าช่องทางจัดส่ง (Flash, Kerry, EMS), พื้นที่จัดส่ง และช่องทางชำระเงิน (บัตรเครดิต, PromptPay)",
       icon: FaShippingFast,
       badge: "seed-shipping-payment.js",
       color: "bg-indigo-600 hover:bg-indigo-700",

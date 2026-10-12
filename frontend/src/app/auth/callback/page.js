@@ -56,9 +56,9 @@ export default function AuthCallbackPage() {
   }, [handleCallback]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="min-h-screen flex items-center justify-center bg-surface">
       <div className="text-center">
-        <p className="text-gray-700 text-sm mb-2">Authenticating...</p>
+        <p className="text-fg text-sm mb-2">Authenticating...</p>
         <LoadingSpinner size="large" />
       </div>
     </div>

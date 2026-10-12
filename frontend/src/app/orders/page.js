@@ -67,7 +67,7 @@ export default function Orders() {
       shipped: { color: "bg-purple-100 text-purple-800", icon: Package },
       delivered: { color: "bg-green-100 text-green-800", icon: Package },
       cancelled: { color: "bg-red-100 text-red-800", icon: AlertCircle },
-      refunded: { color: "bg-gray-100 text-gray-800", icon: AlertCircle },
+      refunded: { color: "bg-surface-muted text-fg", icon: AlertCircle },
     };
     const key = status?.toLowerCase();
     const badge = map[key] || map["pending"];
@@ -104,7 +104,7 @@ export default function Orders() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="animate-spin h-10 w-10 text-gray-500" />
+        <Loader2 className="animate-spin h-10 w-10 text-fg-muted" />
       </div>
     );
   }
@@ -119,7 +119,7 @@ export default function Orders() {
 
   if (!orders.length) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-gray-400">
+      <div className="flex flex-col items-center justify-center min-h-screen text-fg-subtle">
         <p>ยังไม่มีประวัติคำสั่งซื้อ</p>
       </div>
     );
@@ -140,10 +140,10 @@ export default function Orders() {
       <div className="flex items-center gap-3 mb-8 animate-fade-in-down">
         <Package className="w-8 h-8 text-fg-muted animate-bounce" />
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-800">
+          <h1 className="text-3xl font-extrabold text-fg">
             คำสั่งซื้อของฉัน
           </h1>
-          <p className="text-gray-500 text-sm">
+          <p className="text-fg-muted text-sm">
             ดูประวัติการสั่งซื้อและสถานะล่าสุด
           </p>
         </div>
@@ -152,13 +152,13 @@ export default function Orders() {
         {orders.map((order) => (
           <div
             key={order.id}
-            className="bg-white rounded-xl shadow p-6 border border-gray-100"
+            className="bg-surface rounded-xl shadow p-6 border border-border"
           >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
               <div className="font-bold text-lg text-fg">
                 #{order.orderNumber || order.id}
               </div>
-              <div className="text-gray-500 text-sm">
+              <div className="text-fg-muted text-sm">
                 {new Date(order.createdAt).toLocaleString()}
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function Orders() {
             <div className="flex gap-2 mt-2">
               <Link
                 href={`/orders/${order.id}`}
-                className="bg-fg text-white px-4 py-2 rounded font-bold"
+                className="bg-fg text-canvas px-4 py-2 rounded font-bold"
               >
                 ดูรายละเอียด
               </Link>
@@ -198,7 +198,7 @@ export default function Orders() {
                   href={`https://track.thailandpost.co.th/?trackNumber=${order.trackingNumber}`}
                   target="_blank"
                   rel="noopener"
-                  className="bg-fg text-white px-4 py-2 rounded font-bold"
+                  className="bg-fg text-canvas px-4 py-2 rounded font-bold"
                 >
                   ติดตามพัสดุ
                 </a>
@@ -227,11 +227,11 @@ export default function Orders() {
           <button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            className="flex items-center gap-1 px-4 py-2 border rounded-lg bg-white shadow-sm disabled:opacity-50"
+            className="flex items-center gap-1 px-4 py-2 border rounded-lg bg-surface shadow-sm disabled:opacity-50"
           >
             <ChevronLeft className="w-4 h-4" /> ก่อนหน้า
           </button>
-          <span className="px-4 py-2 text-gray-700 font-medium">
+          <span className="px-4 py-2 text-fg font-medium">
             หน้า {currentPage} / {totalPages}
           </span>
           <button
@@ -239,7 +239,7 @@ export default function Orders() {
               setCurrentPage((prev) => Math.min(prev + 1, totalPages))
             }
             disabled={currentPage === totalPages}
-            className="flex items-center gap-1 px-4 py-2 border rounded-lg bg-white shadow-sm disabled:opacity-50"
+            className="flex items-center gap-1 px-4 py-2 border rounded-lg bg-surface shadow-sm disabled:opacity-50"
           >
             ถัดไป <ChevronRight className="w-4 h-4" />
           </button>

@@ -141,9 +141,9 @@ async function seedShippingAndPayment() {
       {
         name: "Credit Card",
         code: "CARD",
-        description: "Pay with Visa, MasterCard or AMEX",
+        description: "Pay with Visa, Mastercard or JCB (Omise)",
         isActive: true,
-        settings: { provider: "Stripe" },
+        settings: { provider: "Omise" },
       },
       {
         name: "PromptPay",
@@ -151,13 +151,6 @@ async function seedShippingAndPayment() {
         description: "Pay using PromptPay QR Code",
         isActive: true,
         settings: { qrTemplate: "default" },
-      },
-      {
-        name: "Cash on Delivery",
-        code: "COD",
-        description: "Pay with cash upon delivery",
-        isActive: true,
-        settings: null,
       },
     ]);
     console.log("Payment methods seeded!");

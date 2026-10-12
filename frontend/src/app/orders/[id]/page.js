@@ -50,7 +50,7 @@ function getOrderProgressStatus(order, tracking) {
   if (order.paymentStatus === "pending") {
     return {
       label: "รอการชำระเงิน",
-      color: "bg-gray-100 text-gray-700",
+      color: "bg-surface-muted text-fg",
       icon: AlertCircle,
     };
   }
@@ -104,7 +104,7 @@ function getOrderProgressStatus(order, tracking) {
       return (
         TRACKING_STATUS[tracking.status?.toUpperCase()] || {
           label: tracking.status,
-          color: "bg-gray-100 text-gray-700",
+          color: "bg-surface-muted text-fg",
           icon: Truck,
         }
       );
@@ -119,7 +119,7 @@ function getOrderProgressStatus(order, tracking) {
   // fallback
   return {
     label: "สถานะไม่ทราบ",
-    color: "bg-gray-100 text-gray-700",
+    color: "bg-surface-muted text-fg",
     icon: AlertCircle,
   };
 }
@@ -144,12 +144,12 @@ function OrderItem({ item }) {
         <ProductImage imageUrl={item.product?.imageUrl} alt={item.product?.name} fill className="object-cover" sizes="80px" />
       </div>
       <div className="flex-1">
-        <div className="font-medium text-gray-900">{item.product.name}</div>
-        <div className="text-xs text-gray-500 mb-1">
+        <div className="font-medium text-fg">{item.product.name}</div>
+        <div className="text-xs text-fg-muted mb-1">
           {item.variant?.size}{" "}
           {item.variant?.color && `| ${item.variant.color}`}
         </div>
-        <div className="text-sm text-gray-700">
+        <div className="text-sm text-fg">
           จำนวน: <span className="font-semibold">{item.quantity}</span>
         </div>
       </div>
@@ -164,7 +164,7 @@ function OrderItem({ item }) {
 
 function OrderSummary({ order }) {
   return (
-    <div className="bg-gray-50 rounded-xl p-5 mt-4 border">
+    <div className="bg-surface-muted rounded-xl p-5 mt-4 border">
       <div className="flex justify-between text-sm mb-1">
         <span>ราคาสินค้า</span>
         <span>฿{Number(order.subtotal).toLocaleString()}</span>
@@ -196,11 +196,11 @@ function OrderSummary({ order }) {
 
 function ShippingInfo({ order, tracking }) {
   return (
-    <div className="bg-white rounded-xl shadow p-5 border flex flex-col gap-2">
-      <div className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
+    <div className="bg-surface rounded-xl shadow p-5 border flex flex-col gap-2">
+      <div className="font-semibold text-fg mb-1 flex items-center gap-2">
         <Truck className="w-5 h-5 text-fg-subtle" /> ข้อมูลการจัดส่ง
       </div>
-      <div className="text-sm text-gray-700">
+      <div className="text-sm text-fg">
         <MapPin className="w-4 h-4 inline-block mr-1 text-fg-subtle" />
         {order.shippingAddress
           ? `${order.shippingAddress.fullName} | ${
@@ -212,23 +212,23 @@ function ShippingInfo({ order, tracking }) {
             }`
           : "-"}
       </div>
-      <div className="text-sm text-gray-700">
+      <div className="text-sm text-fg">
         เบอร์โทร: {order.shippingAddress?.phoneNumber || "-"}
       </div>
       {tracking && (
         <>
-          <div className="text-sm text-gray-700">
+          <div className="text-sm text-fg">
             เลขพัสดุ: {tracking.trackingNumber}
           </div>
-          <div className="text-sm text-gray-700 flex items-center gap-1">
+          <div className="text-sm text-fg flex items-center gap-1">
             สถานะ:{" "}
-            <span className="inline-block px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-semibold">
+            <span className="inline-block px-2 py-1 rounded bg-surface-muted text-fg text-xs font-semibold">
               {TRACKING_STATUS[tracking.status?.toUpperCase()] ||
                 tracking.status}
             </span>
           </div>
           {tracking.estimatedDelivery && (
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-fg">
               ประมาณวันถึง:{" "}
               {new Date(tracking.estimatedDelivery).toLocaleDateString()}
             </div>
@@ -241,14 +241,14 @@ function ShippingInfo({ order, tracking }) {
 
 function PaymentInfo({ order }) {
   return (
-    <div className="bg-white rounded-xl shadow p-5 border flex flex-col gap-2">
-      <div className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
+    <div className="bg-surface rounded-xl shadow p-5 border flex flex-col gap-2">
+      <div className="font-semibold text-fg mb-1 flex items-center gap-2">
         <CreditCard className="w-5 h-5 text-fg-subtle" /> ข้อมูลการชำระเงิน
       </div>
-      <div className="text-sm text-gray-700">
+      <div className="text-sm text-fg">
         วิธีชำระเงิน: {order.paymentMethod && order.paymentMethod.name}
       </div>
-      <div className="text-sm text-gray-700 flex items-center gap-1">
+      <div className="text-sm text-fg flex items-center gap-1">
         สถานะ:{" "}
         <span
           className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
@@ -256,13 +256,13 @@ function PaymentInfo({ order }) {
               ? "bg-green-100 text-green-700"
               : order.paymentStatus === "failed"
               ? "bg-red-100 text-red-700"
-              : "bg-gray-100 text-gray-700"
+              : "bg-surface-muted text-fg"
           }`}
         >
           {PAYMENT_STATUS[order.paymentStatus] || order.paymentStatus}
         </span>
       </div>
-      <div className="text-sm text-gray-700">
+      <div className="text-sm text-fg">
         ชำระเงินเมื่อ:{" "}
         {order.paidAt ? new Date(order.paidAt).toLocaleString() : "-"}
       </div>
@@ -283,15 +283,15 @@ function PaymentModal({
   if (!show) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md relative">
+      <div className="bg-surface p-8 rounded-2xl shadow-2xl w-full max-w-md relative">
         <button
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+          className="absolute top-3 right-3 text-fg-subtle hover:text-fg text-xl font-bold"
           onClick={onClose}
           aria-label="ปิด"
         >
           ×
         </button>
-        <h2 className="text-xl font-bold mb-6 text-center text-gray-800">
+        <h2 className="text-xl font-bold mb-6 text-center text-fg">
           เลือกวิธีชำระเงิน
         </h2>
         <select
@@ -344,20 +344,20 @@ function PaymentModal({
           </div>
         )}
         {paymentMethod === "promptpay" && (
-          <div className="mb-6 text-center text-gray-600">
+          <div className="mb-6 text-center text-fg-muted">
             <p>เมื่อกดยืนยัน จะสร้าง QR PromptPay สำหรับชำระเงิน</p>
           </div>
         )}
         <div className="flex gap-3 mt-4">
           <button
-            className="flex-1 bg-fg hover:bg-fg/85 text-white px-4 py-3 rounded-lg font-bold shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 bg-fg hover:bg-fg/85 text-canvas px-4 py-3 rounded-lg font-bold shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             onClick={onPay}
             disabled={isPaying}
           >
             {isPaying ? "กำลังชำระเงิน..." : "ยืนยันชำระเงิน"}
           </button>
           <button
-            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-3 rounded-lg font-semibold shadow transition-all"
+            className="flex-1 bg-border hover:bg-border text-fg px-4 py-3 rounded-lg font-semibold shadow transition-all"
             onClick={onClose}
           >
             ยกเลิก
@@ -483,19 +483,19 @@ export default function OrderDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-canvas to-white animate-fade-in">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-canvas to-surface animate-fade-in">
         <Loader2 className="w-14 h-14 text-fg-muted animate-spin mb-6" />
-        <div className="w-40 h-6 bg-gray-200 rounded mb-2 animate-pulse" />
-        <div className="w-24 h-4 bg-gray-100 rounded animate-pulse" />
+        <div className="w-40 h-6 bg-border rounded mb-2 animate-pulse" />
+        <div className="w-24 h-4 bg-surface-muted rounded animate-pulse" />
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-white animate-fade-in-up">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-surface animate-fade-in-up">
         <XCircle className="w-14 h-14 text-red-400 mb-6 animate-bounce" />
-        <div className="text-xl text-gray-600 font-semibold">
+        <div className="text-xl text-fg-muted font-semibold">
           ไม่พบคำสั่งซื้อ
         </div>
       </div>
@@ -511,19 +511,19 @@ export default function OrderDetailsPage() {
         </div>
       )}
       {/* Header */}
-      <div className="bg-white rounded-xl shadow p-6 border flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="bg-surface rounded-xl shadow p-6 border flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Package className="w-8 h-8 text-fg-muted" />
-            <span className="text-xl md:text-2xl font-extrabold text-gray-900">
+            <span className="text-xl md:text-2xl font-extrabold text-fg">
               คำสั่งซื้อ #{order.orderNumber || order.id}
             </span>
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-fg-muted">
             สร้างเมื่อ: {new Date(order.createdAt).toLocaleString()}
           </div>
           {order.notes && (
-            <div className="text-xs text-gray-400 mt-1">
+            <div className="text-xs text-fg-subtle mt-1">
               หมายเหตุ: {order.notes}
             </div>
           )}
@@ -531,7 +531,7 @@ export default function OrderDetailsPage() {
         <div className="flex flex-col items-end gap-2">
           <OrderStatusBadge status={order} tracking={tracking} />
           {order.paidAt && (
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <div className="flex items-center gap-1 text-xs text-fg-muted">
               <Calendar className="w-4 h-4" /> ชำระเงินเมื่อ:{" "}
               {new Date(order.paidAt).toLocaleString()}
             </div>
@@ -548,7 +548,7 @@ export default function OrderDetailsPage() {
                 : "คำสั่งซื้อนี้ยังไม่ได้ชำระเงิน"}
             </div>
             <button
-              className="bg-fg hover:bg-fg/85 text-white px-5 py-2 rounded-lg font-semibold shadow"
+              className="bg-fg hover:bg-fg/85 text-canvas px-5 py-2 rounded-lg font-semibold shadow"
               onClick={() => setShowPaymentModal(true)}
             >
               ชำระเงิน
@@ -556,12 +556,12 @@ export default function OrderDetailsPage() {
           </div>
         )}
       {order.status === "cancelled" && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-sm text-gray-700">
+        <div className="bg-surface-muted border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-fg">
             คำสั่งซื้อนี้ถูกยกเลิกแล้ว ชำระเงินไม่ได้ สั่งซื้อสินค้าชุดเดิมใหม่ได้
           </div>
           <button
-            className="bg-fg hover:bg-fg/85 text-white px-5 py-2 rounded-lg font-semibold shadow disabled:opacity-60"
+            className="bg-fg hover:bg-fg/85 text-canvas px-5 py-2 rounded-lg font-semibold shadow disabled:opacity-60"
             onClick={handleReorder}
             disabled={isReordering}
           >
@@ -570,8 +570,8 @@ export default function OrderDetailsPage() {
         </div>
       )}
       {/* Order Items */}
-      <div className="bg-white rounded-xl shadow p-6 border">
-        <div className="flex items-center gap-2 mb-4 text-lg font-bold text-gray-800">
+      <div className="bg-surface rounded-xl shadow p-6 border">
+        <div className="flex items-center gap-2 mb-4 text-lg font-bold text-fg">
           <Package className="w-5 h-5 text-fg-muted" /> สินค้าในคำสั่งซื้อ
         </div>
         {order.items.map((item) => (

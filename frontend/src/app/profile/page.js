@@ -409,11 +409,11 @@ export default function Profile() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-canvas to-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-canvas to-surface">
       {/* Sidebar open button for mobile (user icon) - only when sidebar is closed */}
       {!sidebarOpen && (
         <button
-          className="fixed top-20 right-4 z-50 md:hidden bg-white rounded-full p-2 shadow focus:outline-none focus:ring-2 focus:ring-fg"
+          className="fixed top-20 right-4 z-50 md:hidden bg-surface rounded-full p-2 shadow focus:outline-none focus:ring-2 focus:ring-fg"
           aria-label="เปิดเมนูโปรไฟล์"
           onClick={() => setSidebarOpen(true)}
         >
@@ -422,7 +422,7 @@ export default function Profile() {
       )}
 
       {/* Sidebar for desktop */}
-      <aside className="hidden md:flex w-72 p-6 border-r bg-white shadow-lg flex-col justify-between min-h-screen">
+      <aside className="hidden md:flex w-72 p-6 border-r bg-surface shadow-lg flex-col justify-between min-h-screen">
         <div>
           <div className="flex flex-col items-center mb-8">
             <div className="relative w-20 h-20 mb-2">
@@ -433,10 +433,10 @@ export default function Profile() {
                 fill
               />
             </div>
-            <div className="text-lg font-semibold text-gray-800">
+            <div className="text-lg font-semibold text-fg">
               {formData.name || "-"}
             </div>
-            <div className="text-xs text-gray-500">{user?.email || "-"}</div>
+            <div className="text-xs text-fg-muted">{user?.email || "-"}</div>
             <div className="mt-2 px-3 py-1 bg-surface-muted text-fg rounded-full text-xs font-medium flex items-center gap-1">
               <Star className="w-4 h-4 text-yellow-500" />
               {points} แต้มสะสม
@@ -450,8 +450,8 @@ export default function Profile() {
                 className={classNames(
                   "flex items-center gap-3 px-4 py-2 rounded-lg transition text-base font-medium",
                   activeTab === tab.id
-                    ? "bg-fg text-white shadow"
-                    : "hover:bg-fg/5 text-gray-700"
+                    ? "bg-fg text-canvas shadow"
+                    : "hover:bg-fg/5 text-fg"
                 )}
               >
                 <tab.icon className="w-5 h-5" />
@@ -477,10 +477,10 @@ export default function Profile() {
             tabIndex={-1}
           />
           {/* Drawer */}
-          <aside className="relative w-64 max-w-full bg-white p-6 shadow-lg h-full flex flex-col justify-start animate-slide-in-left">
+          <aside className="relative w-64 max-w-full bg-surface p-6 shadow-lg h-full flex flex-col justify-start animate-slide-in-left">
             {/* Close button (X) above profile */}
             <button
-              className="absolute top-4 left-4 bg-gray-100 rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-fg"
+              className="absolute top-4 left-4 bg-surface-muted rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-fg"
               aria-label="ปิดเมนูโปรไฟล์"
               onClick={() => setSidebarOpen(false)}
             >
@@ -495,10 +495,10 @@ export default function Profile() {
                   fill
                 />
               </div>
-              <div className="text-lg font-semibold text-gray-800">
+              <div className="text-lg font-semibold text-fg">
                 {formData.name || "-"}
               </div>
-              <div className="text-xs text-gray-500">{user?.email || "-"}</div>
+              <div className="text-xs text-fg-muted">{user?.email || "-"}</div>
               <div className="mt-2 px-3 py-1 bg-surface-muted text-fg rounded-full text-xs font-medium flex items-center gap-1">
                 <Star className="w-4 h-4 text-yellow-500" />
                 {points} แต้มสะสม
@@ -515,8 +515,8 @@ export default function Profile() {
                   className={classNames(
                     "flex items-center gap-3 px-4 py-2 rounded-lg transition text-base font-medium",
                     activeTab === tab.id
-                      ? "bg-fg text-white shadow"
-                      : "hover:bg-fg/5 text-gray-700"
+                      ? "bg-fg text-canvas shadow"
+                      : "hover:bg-fg/5 text-fg"
                   )}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -530,7 +530,7 @@ export default function Profile() {
 
       {/* Main content */}
       <main className="flex-1 p-4 sm:p-8 md:p-12 max-w-4xl mx-auto w-full">
-        <h1 className="text-4xl font-extrabold text-gray-800 mb-8 tracking-tight">
+        <h1 className="text-4xl font-extrabold text-fg mb-8 tracking-tight">
           บัญชีผู้ใช้
         </h1>
 
@@ -550,11 +550,11 @@ export default function Profile() {
         {activeTab === "personal" && (
           <div className="space-y-6 animate-fade-in mb-8">
             {/* Profile Hero Card */}
-            <Card className="overflow-hidden border-0 shadow-lg bg-white">
+            <Card className="overflow-hidden border-0 shadow-lg bg-surface">
               {/* Top Banner Gradient */}
               <div className="h-32 bg-gradient-to-r from-[#0f0f0f] via-[#1c1c1c] to-[#0f0f0f] relative">
                 <div className="absolute top-4 right-4 flex gap-2">
-                  <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white rounded-full text-xs font-medium flex items-center gap-1.5 shadow-sm">
+                  <span className="px-3 py-1 bg-surface/20 backdrop-blur-md text-white rounded-full text-xs font-medium flex items-center gap-1.5 shadow-sm">
                     <ShieldCheck className="w-4 h-4 text-emerald-300" />
                     {profile?.isVerified !== false ? "บัญชีได้รับการยืนยันแล้ว" : "ยังไม่ได้ยืนยันบัญชี"}
                   </span>
@@ -568,13 +568,13 @@ export default function Profile() {
                       <Image
                         src={imagePreview || "/default-avatar.png"}
                         alt="Avatar"
-                        className="rounded-full object-cover border-4 border-white shadow-xl bg-white"
+                        className="rounded-full object-cover border-4 border-surface shadow-xl bg-surface"
                         fill
                       />
                       <button
                         type="button"
                         onClick={() => setEditMode(!editMode)}
-                        className="absolute bottom-1 right-1 p-2 bg-fg hover:bg-fg/85 text-white rounded-full shadow-md transition-transform hover:scale-105"
+                        className="absolute bottom-1 right-1 p-2 bg-fg hover:bg-fg/85 text-canvas rounded-full shadow-md transition-transform hover:scale-105"
                         title="เปลี่ยนรูปโปรไฟล์"
                       >
                         <Edit3 className="w-4 h-4" />
@@ -582,7 +582,7 @@ export default function Profile() {
                     </div>
                     <div className="mt-2 sm:mt-0">
                       <div className="flex items-center gap-2 justify-center sm:justify-start">
-                        <h2 className="text-2xl font-bold text-gray-900">
+                        <h2 className="text-2xl font-bold text-fg">
                           {profile?.name || formData.name || "ผู้ใช้งาน"}
                         </h2>
                         {userStats.roles?.includes("admin") && (
@@ -591,8 +591,8 @@ export default function Profile() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 flex items-center gap-1.5 justify-center sm:justify-start mt-1">
-                        <Mail className="w-4 h-4 text-gray-400" />
+                      <p className="text-sm text-fg-muted flex items-center gap-1.5 justify-center sm:justify-start mt-1">
+                        <Mail className="w-4 h-4 text-fg-subtle" />
                         {profile?.email || user?.email || "-"}
                       </p>
                     </div>
@@ -611,13 +611,13 @@ export default function Profile() {
                 {/* Edit Form */}
                 {editMode && (
                   <form onSubmit={handleSubmit} className="space-y-6 pt-2 border-b pb-6 mb-4">
-                    <h3 className="text-base font-bold text-gray-800 border-b pb-2">
+                    <h3 className="text-base font-bold text-fg border-b pb-2">
                       แก้ไขข้อมูลส่วนตัว
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        <label className="block text-xs font-semibold text-fg-muted mb-1.5">
                           เปลี่ยนรูปโปรไฟล์
                         </label>
                         <div className="flex items-center gap-4">
@@ -639,7 +639,7 @@ export default function Profile() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        <label className="block text-xs font-semibold text-fg-muted mb-1.5">
                           ชื่อ-นามสกุล <span className="text-red-500">*</span>
                         </label>
                         <Input
@@ -652,18 +652,18 @@ export default function Profile() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        <label className="block text-xs font-semibold text-fg-muted mb-1.5">
                           อีเมล (ไม่สามารถแก้ไขได้)
                         </label>
                         <Input
                           value={profile?.email || user?.email || ""}
                           disabled
-                          className="bg-gray-100 text-gray-500 cursor-not-allowed"
+                          className="bg-surface-muted text-fg-muted cursor-not-allowed"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                        <label className="block text-xs font-semibold text-fg-muted mb-1.5">
                           เบอร์โทรศัพท์
                         </label>
                         <Input
@@ -683,7 +683,7 @@ export default function Profile() {
                     )}
 
                     <div className="flex gap-3 pt-2">
-                      <Button type="submit" disabled={isSubmitting} className="bg-fg hover:bg-fg/85 text-white">
+                      <Button type="submit" disabled={isSubmitting} className="bg-fg hover:bg-fg/85 text-canvas">
                         {isSubmitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
                       </Button>
                       <Button
@@ -704,35 +704,35 @@ export default function Profile() {
               {/* Total Orders Card */}
               <button
                 onClick={() => setActiveTab("orders")}
-                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left group"
+                className="bg-surface p-5 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all text-left group"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="p-2.5 bg-surface-muted text-fg rounded-xl group-hover:scale-110 transition-transform">
                     <ShoppingBag className="w-5 h-5" />
                   </span>
-                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                  <ChevronRight className="w-4 h-4 text-fg-subtle group-hover:text-blue-500 transition-colors" />
                 </div>
-                <div className="text-2xl font-bold text-gray-900 mb-0.5">
+                <div className="text-2xl font-bold text-fg mb-0.5">
                   {userStats.totalOrders || 0}
                 </div>
-                <div className="text-xs text-gray-500 font-medium">คำสั่งซื้อทั้งหมด</div>
+                <div className="text-xs text-fg-muted font-medium">คำสั่งซื้อทั้งหมด</div>
               </button>
 
               {/* Total Spent Card */}
-              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-left">
+              <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm text-left">
                 <div className="flex items-center justify-between mb-3">
                   <span className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
                     <CreditCard className="w-5 h-5" />
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-gray-900 mb-0.5">
+                <div className="text-2xl font-bold text-fg mb-0.5">
                   ฿{Number(userStats.totalSpent || 0).toLocaleString()}
                 </div>
-                <div className="text-xs text-gray-500 font-medium">ยอดชำระสะสม</div>
+                <div className="text-xs text-fg-muted font-medium">ยอดชำระสะสม</div>
               </div>
 
               {/* Points Card */}
-              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-left">
+              <div className="bg-surface p-5 rounded-2xl border border-border shadow-sm text-left">
                 <div className="flex items-center justify-between mb-3">
                   <span className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
                     <Star className="w-5 h-5" />
@@ -744,73 +744,73 @@ export default function Profile() {
                 <div className="text-2xl font-bold text-amber-600 mb-0.5">
                   {points || profile?.points || 0}
                 </div>
-                <div className="text-xs text-gray-500 font-medium">แต้มสะสมทั้งหมด</div>
+                <div className="text-xs text-fg-muted font-medium">แต้มสะสมทั้งหมด</div>
               </div>
 
               {/* Saved Addresses Card */}
               <button
                 onClick={() => setActiveTab("shipping")}
-                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left group"
+                className="bg-surface p-5 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all text-left group"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="p-2.5 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform">
                     <MapPin className="w-5 h-5" />
                   </span>
-                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
+                  <ChevronRight className="w-4 h-4 text-fg-subtle group-hover:text-purple-500 transition-colors" />
                 </div>
-                <div className="text-2xl font-bold text-gray-900 mb-0.5">
+                <div className="text-2xl font-bold text-fg mb-0.5">
                   {addresses.length || userStats.addressCount || 0}
                 </div>
-                <div className="text-xs text-gray-500 font-medium">ที่อยู่จัดส่งที่บันทึก</div>
+                <div className="text-xs text-fg-muted font-medium">ที่อยู่จัดส่งที่บันทึก</div>
               </button>
             </div>
 
             {/* Detail Info Cards Grid (2 Columns) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Account Info Details */}
-              <Card className="border border-gray-100 shadow-sm">
+              <Card className="border border-border shadow-sm">
                 <CardHeader className="border-b pb-4">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                  <h3 className="font-bold text-fg flex items-center gap-2">
                     <User className="w-4 h-4 text-fg" />
                     ข้อมูลรายละเอียดบัญชี
                   </h3>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                    <span className="text-xs font-medium text-gray-500">ชื่อ-นามสกุล</span>
-                    <span className="text-sm font-semibold text-gray-800">
+                  <div className="flex justify-between items-center py-2 border-b border-border">
+                    <span className="text-xs font-medium text-fg-muted">ชื่อ-นามสกุล</span>
+                    <span className="text-sm font-semibold text-fg">
                       {profile?.name || formData.name || "-"}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                    <span className="text-xs font-medium text-gray-500">อีเมล</span>
+                  <div className="flex justify-between items-center py-2 border-b border-border">
+                    <span className="text-xs font-medium text-fg-muted">อีเมล</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-800">
+                      <span className="text-sm font-semibold text-fg">
                         {profile?.email || user?.email || "-"}
                       </span>
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" title="อีเมลได้รับการยืนยัน" />
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                    <span className="text-xs font-medium text-gray-500">เบอร์โทรศัพท์</span>
-                    <span className="text-sm font-semibold text-gray-800">
+                  <div className="flex justify-between items-center py-2 border-b border-border">
+                    <span className="text-xs font-medium text-fg-muted">เบอร์โทรศัพท์</span>
+                    <span className="text-sm font-semibold text-fg">
                       {formData.phone || profile?.phone || "ไม่ได้ระบุ"}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                    <span className="text-xs font-medium text-gray-500">วิธีเข้าสู่ระบบ</span>
-                    <span className="text-sm font-semibold text-gray-800 capitalize">
+                  <div className="flex justify-between items-center py-2 border-b border-border">
+                    <span className="text-xs font-medium text-fg-muted">วิธีเข้าสู่ระบบ</span>
+                    <span className="text-sm font-semibold text-fg capitalize">
                       {profile?.provider === "google" ? "Google Account" : "Email & Password"}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                    <span className="text-xs font-medium text-gray-500">วันที่สมัครสมาชิก</span>
-                    <span className="text-sm font-semibold text-gray-800 flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                  <div className="flex justify-between items-center py-2 border-b border-border">
+                    <span className="text-xs font-medium text-fg-muted">วันที่สมัครสมาชิก</span>
+                    <span className="text-sm font-semibold text-fg flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-fg-subtle" />
                       {profile?.createdAt
                         ? new Date(profile.createdAt).toLocaleDateString("th-TH", {
                             year: "numeric",
@@ -822,9 +822,9 @@ export default function Profile() {
                   </div>
 
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-xs font-medium text-gray-500">เข้าใช้งานล่าสุด</span>
-                    <span className="text-sm font-semibold text-gray-800 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs font-medium text-fg-muted">เข้าใช้งานล่าสุด</span>
+                    <span className="text-sm font-semibold text-fg flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-fg-subtle" />
                       {profile?.lastLoginAt
                         ? new Date(profile.lastLoginAt).toLocaleDateString("th-TH", {
                             year: "numeric",
@@ -840,19 +840,19 @@ export default function Profile() {
               </Card>
 
               {/* Quick Summary & Perks Card */}
-              <Card className="border border-gray-100 shadow-sm flex flex-col justify-between">
+              <Card className="border border-border shadow-sm flex flex-col justify-between">
                 <div>
                   <CardHeader className="border-b pb-4">
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <h3 className="font-bold text-fg flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-amber-500" />
                       ที่อยู่หลัก & สิทธิประโยชน์
                     </h3>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-4">
                     {/* Default Shipping Address Overview */}
-                    <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+                    <div className="p-3.5 bg-surface-muted rounded-xl border border-border">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                        <span className="text-xs font-bold text-fg flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5 text-fg" />
                           ที่อยู่หลักสำหรับจัดส่ง
                         </span>
@@ -868,15 +868,15 @@ export default function Profile() {
                         (() => {
                           const defAddr = addresses.find((a) => a.isDefault) || addresses[0];
                           return (
-                            <div className="text-xs text-gray-600 space-y-0.5">
-                              <p className="font-semibold text-gray-800">{defAddr.fullName}</p>
+                            <div className="text-xs text-fg-muted space-y-0.5">
+                              <p className="font-semibold text-fg">{defAddr.fullName}</p>
                               <p>{defAddr.addressLine1} {defAddr.subdistrict} {defAddr.district} {defAddr.province} {defAddr.postalCode}</p>
-                              <p className="text-gray-500">โทร: {defAddr.phoneNumber}</p>
+                              <p className="text-fg-muted">โทร: {defAddr.phoneNumber}</p>
                             </div>
                           );
                         })()
                       ) : (
-                        <p className="text-xs text-gray-400 italic">
+                        <p className="text-xs text-fg-subtle italic">
                           ยังไม่ได้เพิ่มที่อยู่จัดส่ง
                         </p>
                       )}
@@ -891,7 +891,7 @@ export default function Profile() {
                         </span>
                       </div>
                       <p className="text-xs text-amber-800 leading-relaxed">
-                        ทุกๆ การสั่งซื้อสินค้า 100 บาท รับทันที 1 แต้มสะสม เพื่อนำไปแลกเป็นคูปองส่วนลดและสิทธิพิเศษมากมาย!
+                        ทุก ๆ ฿10 จากคำสั่งซื้อที่ชำระเงินแล้ว รับ 1 แต้มสะสม (ระดับสมาชิกสูงขึ้นได้แต้มมากขึ้น) นำไปแลกเป็นคูปองส่วนลดได้
                       </p>
                     </div>
                   </CardContent>
@@ -915,7 +915,7 @@ export default function Profile() {
         {activeTab === "shipping" && (
           <Card className="animate-fade-in">
             <CardHeader className="border-b pb-4 flex flex-row items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-800">ที่อยู่จัดส่ง</h2>
+              <h2 className="text-xl font-bold text-fg">ที่อยู่จัดส่ง</h2>
               <Button
                 className="flex items-center gap-2"
                 onClick={() => {
@@ -942,9 +942,9 @@ export default function Profile() {
                 <div className="space-y-6">
                   {addresses.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-12">
-                      <MapPin className="w-12 h-12 text-gray-300 mb-2" />
-                      <p className="text-gray-500 text-lg">ยังไม่มีที่อยู่</p>
-                      <p className="text-gray-400 text-sm">
+                      <MapPin className="w-12 h-12 text-fg-subtle mb-2" />
+                      <p className="text-fg-muted text-lg">ยังไม่มีที่อยู่</p>
+                      <p className="text-fg-subtle text-sm">
                         เพิ่มที่อยู่สำหรับการจัดส่งสินค้า
                       </p>
                     </div>
@@ -954,10 +954,10 @@ export default function Profile() {
                       <div
                         key={addr.id}
                         className={classNames(
-                          "border rounded-xl p-5 bg-white shadow-sm relative group transition-all",
+                          "border rounded-xl p-5 bg-surface shadow-sm relative group transition-all",
                           addr.isDefault
                             ? "border-green-500 bg-green-50"
-                            : "border-gray-200"
+                            : "border-border"
                         )}
                       >
                         <div className="flex items-start gap-3">
@@ -965,12 +965,12 @@ export default function Profile() {
                             {addr.isDefault ? (
                               <Star className="w-5 h-5 text-yellow-500 fill-yellow-300" />
                             ) : (
-                              <MapPin className="w-5 h-5 text-gray-400" />
+                              <MapPin className="w-5 h-5 text-fg-subtle" />
                             )}
                           </div>
                           <div className="flex-1">
                             <div className="flex justify-between items-start">
-                              <p className="font-semibold text-gray-800">
+                              <p className="font-semibold text-fg">
                                 {addr.fullName || "ไม่ระบุ"}
                               </p>
                               {addr.isDefault && (
@@ -979,14 +979,14 @@ export default function Profile() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">
+                            <p className="text-sm text-fg-muted mt-1">
                               {addr.addressLine1 || "ไม่ระบุที่อยู่"}
                             </p>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-fg-muted">
                               {addr.subdistrict && `${addr.subdistrict}, `}
                               {addr.district}, {addr.province} {addr.postalCode}
                             </p>
-                            <div className="flex items-center mt-2 text-xs text-gray-500">
+                            <div className="flex items-center mt-2 text-xs text-fg-muted">
                               <Phone className="w-3 h-3 mr-1" />
                               <span>
                                 {addr.phoneNumber || "ไม่ระบุเบอร์โทร"}
@@ -1029,7 +1029,7 @@ export default function Profile() {
                 >
                   <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-gray-600 mb-1">
+                      <label className="block text-fg-muted mb-1">
                         ชื่อ-นามสกุล
                       </label>
                       <Input
@@ -1042,7 +1042,7 @@ export default function Profile() {
                     </div>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-gray-600 mb-1">
+                    <label className="block text-fg-muted mb-1">
                       ที่อยู่ (บ้านเลขที่, อาคาร, ถนน)
                     </label>
                     <Textarea
@@ -1054,24 +1054,24 @@ export default function Profile() {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">จังหวัด</label>
+                    <label className="block text-fg-muted mb-1">จังหวัด</label>
                     <select
                       name="state"
                       value={addressData.state}
                       onChange={handleAddressChange}
                       required
-                      className="w-full border rounded px-3 py-2 text-gray-800 bg-white"
+                      className="w-full border rounded px-3 py-2 text-fg bg-surface"
                     >
-                      <option value="" className="text-gray-800 bg-white">เลือกจังหวัด</option>
+                      <option value="" className="text-fg bg-surface">เลือกจังหวัด</option>
                       {provinces.map((prov) => (
-                        <option key={prov.id} value={prov.nameTh} className="text-gray-800 bg-white">
+                        <option key={prov.id} value={prov.nameTh} className="text-fg bg-surface">
                           {prov.nameTh}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">
+                    <label className="block text-fg-muted mb-1">
                       เขต/อำเภอ
                     </label>
                     <select
@@ -1079,37 +1079,37 @@ export default function Profile() {
                       value={addressData.city}
                       onChange={handleAddressChange}
                       required
-                      className="w-full border rounded px-3 py-2 text-gray-800 bg-white"
+                      className="w-full border rounded px-3 py-2 text-fg bg-surface"
                       disabled={!addressData.state}
                     >
-                      <option value="" className="text-gray-800 bg-white">เลือกอำเภอ</option>
+                      <option value="" className="text-fg bg-surface">เลือกอำเภอ</option>
                       {districts.map((dist) => (
-                        <option key={dist.id} value={dist.nameTh} className="text-gray-800 bg-white">
+                        <option key={dist.id} value={dist.nameTh} className="text-fg bg-surface">
                           {dist.nameTh}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">ตำบล</label>
+                    <label className="block text-fg-muted mb-1">ตำบล</label>
                     <select
                       name="subdistrict"
                       value={addressData.subdistrict}
                       onChange={handleAddressChange}
                       required
-                      className="w-full border rounded px-3 py-2 text-gray-800 bg-white"
+                      className="w-full border rounded px-3 py-2 text-fg bg-surface"
                       disabled={!addressData.city}
                     >
-                      <option value="" className="text-gray-800 bg-white">เลือกตำบล</option>
+                      <option value="" className="text-fg bg-surface">เลือกตำบล</option>
                       {subdistricts.map((sub) => (
-                        <option key={sub.id} value={sub.nameTh} className="text-gray-800 bg-white">
+                        <option key={sub.id} value={sub.nameTh} className="text-fg bg-surface">
                           {sub.nameTh}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">ประเทศ</label>
+                    <label className="block text-fg-muted mb-1">ประเทศ</label>
                     <Input
                       name="country"
                       value={addressData.country}
@@ -1119,7 +1119,7 @@ export default function Profile() {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">
+                    <label className="block text-fg-muted mb-1">
                       รหัสไปรษณีย์
                     </label>
                     <Input
@@ -1131,7 +1131,7 @@ export default function Profile() {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">
+                    <label className="block text-fg-muted mb-1">
                       เบอร์โทรศัพท์
                     </label>
                     <Input
@@ -1156,7 +1156,7 @@ export default function Profile() {
                         }
                         className="mr-2 accent-indigo-500"
                       />
-                      <label htmlFor="isDefault" className="text-gray-600">
+                      <label htmlFor="isDefault" className="text-fg-muted">
                         ตั้งเป็นที่อยู่หลัก
                       </label>
                     </div>
@@ -1196,13 +1196,13 @@ export default function Profile() {
         {activeTab === "orders" && (
           <Card className="animate-fade-in">
             <CardHeader className="border-b pb-4 flex flex-row items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-fg">
                 ประวัติการสั่งซื้อ
               </h2>
             </CardHeader>
             <CardContent className="pt-6">
               {loadingOrders ? (
-                <div className="text-gray-500 text-center py-8">
+                <div className="text-fg-muted text-center py-8">
                   กำลังโหลด...
                 </div>
               ) : errorOrders ? (
@@ -1210,7 +1210,7 @@ export default function Profile() {
                   {errorOrders}
                 </div>
               ) : orders.length === 0 ? (
-                <div className="text-gray-500 text-center py-8">
+                <div className="text-fg-muted text-center py-8">
                   ยังไม่มีประวัติการสั่งซื้อ
                 </div>
               ) : (
@@ -1221,7 +1221,7 @@ export default function Profile() {
                     return (
                       <div
                         key={order.id}
-                        className="flex items-center justify-between bg-white rounded-xl border p-4 mb-4 shadow-sm hover:shadow transition"
+                        className="flex items-center justify-between bg-surface rounded-xl border p-4 mb-4 shadow-sm hover:shadow transition"
                       >
                         {/* รูปสินค้า */}
                         <div className="relative mr-4 h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
@@ -1238,14 +1238,14 @@ export default function Profile() {
                           <div className="flex items-center gap-2 mb-1">
                             {/* getStatusBadge ใช้จากหน้า profile หรือคัดลอกฟังก์ชันจาก orders/page.js */}
                             {getStatusBadge(order.status)}
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-fg-subtle">
                               {new Date(order.createdAt).toLocaleDateString()}
                             </span>
                           </div>
-                          <div className="font-bold text-gray-800 text-sm">
+                          <div className="font-bold text-fg text-sm">
                             Order ID: {order.id}
                           </div>
-                          <div className="truncate text-gray-700 text-sm">
+                          <div className="truncate text-fg text-sm">
                             {firstItem?.product?.name}
                             {moreCount > 0 && (
                               <span className="text-fg ml-1">
@@ -1281,7 +1281,7 @@ export default function Profile() {
         {activeTab === "coupons" && (
           <Card className="animate-fade-in">
             <CardHeader className="border-b pb-4">
-              <h2 className="text-xl font-bold text-gray-800">คูปองของฉัน</h2>
+              <h2 className="text-xl font-bold text-fg">คูปองของฉัน</h2>
             </CardHeader>
             <CardContent className="pt-6">
               <CouponWallet />
@@ -1301,7 +1301,7 @@ function getStatusBadge(status) {
     shipped: { color: "bg-purple-100 text-purple-800", icon: Package },
     delivered: { color: "bg-green-100 text-green-800", icon: Package },
     cancelled: { color: "bg-red-100 text-red-800", icon: Package },
-    refunded: { color: "bg-gray-100 text-gray-800", icon: Package },
+    refunded: { color: "bg-surface-muted text-fg", icon: Package },
   };
   const key = status?.toLowerCase();
   const badge = map[key] || map["pending"];

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FiFacebook, FiGithub, FiInstagram } from "react-icons/fi";
 import Container from "@/components/shop/Container";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 const columns = [
   {
@@ -41,6 +42,7 @@ const socials = [
 
 export default function Footer() {
   const pathname = usePathname();
+  const { siteName } = useSiteSettings();
   if (pathname?.startsWith("/admin")) return null;
 
   return (
@@ -48,7 +50,7 @@ export default function Footer() {
       <Container className="py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
-            <p className="font-display text-2xl font-bold italic uppercase tracking-tight">Challenge</p>
+            <p className="font-display text-2xl font-bold italic uppercase tracking-tight">{siteName}</p>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/65">
               อุปกรณ์วิ่ง ฟิตเนส และเทรนนิ่ง สำหรับคนที่ไม่หยุดพัฒนาตัวเอง
             </p>
@@ -87,7 +89,7 @@ export default function Footer() {
           ))}
         </div>
         <div className="mt-12 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/50 sm:flex-row sm:justify-between">
-          <p>© {new Date().getFullYear()} CHALLENGE. สงวนลิขสิทธิ์</p>
+          <p>© {new Date().getFullYear()} {siteName}. สงวนลิขสิทธิ์</p>
           <p>ราคาสินค้ายังไม่รวม VAT 7% ซึ่งคำนวณในขั้นตอนชำระเงิน</p>
         </div>
       </Container>

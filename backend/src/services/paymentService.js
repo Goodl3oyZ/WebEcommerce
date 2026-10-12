@@ -374,11 +374,13 @@ export const paymentService = {
     });
   },
 
+  /** Active methods the store can actually take (card and PromptPay). */
   async getPaymentMethods() {
-    return db.query.paymentMethods.findMany({
+    const methods = await db.query.paymentMethods.findMany({
       where: eq(paymentMethods.isActive, true),
       columns: { id: true, name: true, code: true, description: true },
     });
+    return methods.filter((m) => ["card", "credit_card", "promptpay"].includes(m.code?.toLowerCase()));
   },
 
   async getPaymentHistory(userId, pagination) {

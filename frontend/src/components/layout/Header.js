@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import useCartStore from "@/store/cartStore";
 import { categoriesAPI } from "@/lib/api/categories";
 import Container from "@/components/shop/Container";
@@ -24,9 +25,10 @@ import Container from "@/components/shop/Container";
 const isAdmin = (user) => user?.role === "admin" || user?.role === "super_admin";
 
 function Wordmark() {
+  const { siteName } = useSiteSettings();
   return (
-    <span className="font-display text-xl font-bold italic uppercase tracking-tight text-fg sm:text-2xl">
-      Challenge
+    <span className="max-w-[10rem] truncate font-display text-xl font-bold italic uppercase tracking-tight text-fg sm:max-w-none sm:text-2xl">
+      {siteName}
     </span>
   );
 }
@@ -187,7 +189,7 @@ export default function Header() {
           <Menu className="h-5 w-5" aria-hidden />
         </button>
 
-        <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="CHALLENGE หน้าแรก">
+        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2" aria-label="หน้าแรก">
           <Image src="/favicon.png" alt="" width={32} height={32} className="h-8 w-8" priority />
           <Wordmark />
         </Link>

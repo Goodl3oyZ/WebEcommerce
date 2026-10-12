@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import { Banknote, Check, CreditCard, Loader2, Lock, MapPin, QrCode, Tag, Truck, X } from "lucide-react";
+import { Check, CreditCard, Loader2, Lock, MapPin, QrCode, Tag, Truck, X } from "lucide-react";
 import { addressAPI, cartAPI, couponsAPI, orderAPI, paymentsAPI, shippingAPI } from "@/lib/api";
 import { createCardToken } from "@/lib/omise";
 import { couponErrorMessage } from "@/lib/api/coupons";
@@ -25,7 +25,6 @@ const QR_POLL_MS = 4000;
 const METHOD_UI = {
   card: { Icon: CreditCard, hint: "Visa / Mastercard / JCB ผ่าน Omise" },
   promptpay: { Icon: QrCode, hint: "สแกน QR ด้วยแอปธนาคาร" },
-  cod: { Icon: Banknote, hint: "ชำระเงินสดเมื่อได้รับสินค้า" },
 };
 
 const OMISE_ERRORS = {
@@ -289,8 +288,6 @@ export default function CheckoutPage() {
       } else if (payKind === "card") {
         if (order?.paymentStatus === "completed") toast.success("ชำระเงินสำเร็จ ขอบคุณที่สั่งซื้อ");
         else toast("กำลังรอยืนยันการชำระเงิน");
-      } else {
-        toast.success("สั่งซื้อสำเร็จ ชำระเงินเมื่อได้รับสินค้า");
       }
       router.push(`/orders/${order.id}`);
     } catch (e) {
@@ -378,8 +375,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const ctaLabel =
-    payKind === "cod" ? "ยืนยันคำสั่งซื้อ" : payKind === "promptpay" ? "สร้าง QR ชำระเงิน" : `ชำระเงิน ${formatTHB(totals.total)}`;
+  const ctaLabel = payKind === "promptpay" ? "สร้าง QR ชำระเงิน" : `ชำระเงิน ${formatTHB(totals.total)}`;
 
   return (
     <Container className="py-8 sm:py-10">

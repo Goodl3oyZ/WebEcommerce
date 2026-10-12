@@ -5,7 +5,7 @@ export default function Error({ error, reset }) {
       <h1 className="text-2xl font-bold text-red-600 mb-4">
         เกิดข้อผิดพลาด (500)
       </h1>
-      <p className="text-gray-700 mb-6">
+      <p className="text-fg mb-6">
         {error?.message || "ขออภัย เกิดข้อผิดพลาดบางอย่าง"}
       </p>
       <button

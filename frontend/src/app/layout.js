@@ -8,6 +8,8 @@ import ClientLayout from "@/components/Chat/ClientLayout"; // อย่าลื
 import { Kanit, Noto_Sans_Thai } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
+import MaintenanceGate from "@/components/layout/MaintenanceGate";
 
 // Kanit: headings / brand; Noto Sans Thai: body and UI text.
 const kanit = Kanit({
@@ -23,19 +25,31 @@ const notoSansThai = Noto_Sans_Thai({
   variable: "--font-admin",
 });
 
-export const metadata = {
-  title: {
-    default: "CHALLENGE — อุปกรณ์วิ่ง ฟิตเนส และเทรนนิ่ง",
-    template: "%s | CHALLENGE",
-  },
-  description:
-    "ร้านอุปกรณ์กีฬาสำหรับนักวิ่งและสายเทรนนิ่ง: รองเท้า เสื้อผ้า และอุปกรณ์เสริมสำหรับทุกการซ้อม",
-  icons: {
-    icon: "/favicon.png",
-  },
-};
+/** Public settings fetched on the server (store name before the page hydrates). */
+async function getPublicSettings() {
+  const base = process.env.BACKEND_URL || "http://localhost:5000";
+  try {
+    const res = await fetch(`${base}/api/settings/public`, { next: { revalidate: 60 } });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body?.data ?? body;
+  } catch {
+    return null;
+  }
+}
 
-export default function RootLayout({ children }) {
+export async function generateMetadata() {
+  const name = (await getPublicSettings())?.siteName || "CHALLENGE";
+  return {
+    title: { default: `${name} — อุปกรณ์วิ่ง ฟิตเนส และเทรนนิ่ง`, template: `%s | ${name}` },
+    description:
+      "ร้านอุปกรณ์กีฬาสำหรับนักวิ่งและสายเทรนนิ่ง: รองเท้า เสื้อผ้า และอุปกรณ์เสริมสำหรับทุกการซ้อม",
+    icons: { icon: "/favicon.png" },
+  };
+}
+
+export default async function RootLayout({ children }) {
+  const settings = await getPublicSettings();
   return (
     <html lang="th" suppressHydrationWarning={true}>
       <body
@@ -43,6 +57,7 @@ export default function RootLayout({ children }) {
         suppressHydrationWarning={true}
       >
         <ThemeProvider>
+          <SiteSettingsProvider initial={settings}>
           <AuthProvider>
             <ChatProvider>
               <a
@@ -65,11 +80,14 @@ export default function RootLayout({ children }) {
                 strategy="afterInteractive"
               />
               <main id="main-content" className="w-full min-h-[70vh]">
-                <ClientLayout>{children}</ClientLayout>
+                <MaintenanceGate>
+                  <ClientLayout>{children}</ClientLayout>
+                </MaintenanceGate>
               </main>
             </ChatProvider>
             <Footer />
           </AuthProvider>
+          </SiteSettingsProvider>
         </ThemeProvider>
       </body>
     </html>
