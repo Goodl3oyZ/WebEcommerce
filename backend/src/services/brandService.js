@@ -1,6 +1,6 @@
 import { db } from "../config/db.js";
 import { brands, products } from "../models/schema.js";
-import { eq, and, like, or, desc, sql } from "drizzle-orm";
+import { eq, and, ilike, or, desc, sql } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 
 export const brandService = {
@@ -11,8 +11,8 @@ export const brandService = {
     if (search) {
       whereConditions.push(
         or(
-          like(brands.name, `%${search}%`),
-          like(brands.description, `%${search}%`)
+          ilike(brands.name, `%${search}%`),
+          ilike(brands.description, `%${search}%`)
         )
       );
     }
@@ -88,7 +88,23 @@ export const brandService = {
   },
 
   async createBrand(brandData) {
-    const [newBrand] = await db.insert(brands).values(brandData).returning();
+    const name = String(brandData.name || "").trim();
+    const existing = await db.query.brands.findFirst({
+      where: eq(brands.name, name),
+    });
+    if (existing) {
+      throw ApiError.conflict("มีแบรนด์นี้อยู่แล้ว");
+    }
+    const [newBrand] = await db
+      .insert(brands)
+      .values({
+        name,
+        description: brandData.description?.trim() || null,
+        logo: brandData.logo || null,
+        website: brandData.website || null,
+        isActive: brandData.isActive ?? true,
+      })
+      .returning();
 
     return newBrand;
   },
@@ -133,16 +149,25 @@ export const brandService = {
   },
 
   async deleteBrand(id) {
-    // Check if brand exists
     const existingBrand = await db.query.brands.findFirst({
       where: eq(brands.id, id),
     });
 
     if (!existingBrand) {
-      throw new ApiError("Brand not found", 404);
+      throw ApiError.notFound("ไม่พบแบรนด์");
     }
 
-    // Soft delete by setting isActive to false
+    const [related] = await db
+      .select({ count: sql`count(*)::int` })
+      .from(products)
+      .where(eq(products.brandId, id));
+
+    if (related?.count > 0) {
+      throw ApiError.badRequest(
+        `ไม่สามารถลบแบรนด์ได้ เนื่องจากมีสินค้าผูกอยู่ ${related.count} รายการ`
+      );
+    }
+
     const [updatedBrand] = await db
       .update(brands)
       .set({

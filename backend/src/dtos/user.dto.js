@@ -108,12 +108,22 @@ export const userDto = {
           "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
         ),
       confirmPassword: z.string(),
+      role: z.enum(["user", "admin", "moderator", "super_admin"]).optional(),
     })
     .strict()
     .refine((data) => data.password === data.confirmPassword, {
       message: "Passwords do not match",
       path: ["confirmPassword"],
     }),
+
+  adminCreateUser: z
+    .object({
+      name: z.string().min(2).max(255),
+      email: z.string().email(),
+      password: z.string().min(8),
+      role: z.enum(["user", "admin", "moderator", "super_admin"]).optional(),
+    })
+    .strict(),
 
   // Update profile - excludes sensitive fields
   updateProfile: z
@@ -127,7 +137,7 @@ export const userDto = {
         .optional(),
       bio: z.string().optional(),
     })
-    .strict()
+    .passthrough()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
     }),
@@ -210,6 +220,12 @@ export const userDto = {
   updateRole: z
     .object({
       role: z.enum(["user", "admin", "super_admin", "moderator"]),
+    })
+    .strict(),
+
+  setUserActive: z
+    .object({
+      isActive: z.boolean(),
     })
     .strict(),
 };

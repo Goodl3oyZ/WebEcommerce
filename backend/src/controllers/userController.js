@@ -192,8 +192,8 @@ export const userController = {
   // Get all users (Admin only)
   async getUsers(req, res, next) {
     try {
-      const { page, limit, search } = req.query;
-      const users = await userService.getUsers({ page, limit, search });
+      const { page = 1, limit = 10, search, role, isActive } = req.query;
+      const users = await userService.getUsers({ page, limit, search, role, isActive });
       res.json(users);
     } catch (error) {
       next(error);
@@ -226,8 +226,30 @@ export const userController = {
     try {
       const { userId } = req.params;
       const { role } = req.body;
-      const updatedUser = await userService.updateUser(userId, { role });
+      const updatedUser = await userService.updateUserRole(userId, role);
       res.json(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async setUserActive(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const { isActive } = req.body;
+      const updated = await userService.setUserActive(userId, isActive);
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getAdminUserOrders(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const { page, limit } = req.query;
+      const orders = await userService.getUserOrders(userId, { page, limit });
+      res.json(orders);
     } catch (error) {
       next(error);
     }

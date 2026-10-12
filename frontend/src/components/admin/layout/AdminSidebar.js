@@ -1,0 +1,70 @@
+"use client";
+
+import {
+  FaBoxOpen,
+  FaTags,
+  FaBuilding,
+  FaStar,
+  FaTruck,
+  FaUsers,
+  FaTicketAlt,
+  FaShip,
+  FaCreditCard,
+  FaBell,
+  FaChartBar,
+  FaCog,
+  FaChartLine,
+  FaDatabase,
+} from "react-icons/fa";
+import { TabsList, TabsTrigger } from "@/components/ui/Tabs";
+import { ADMIN_NAV } from "@/components/admin/adminNav";
+
+const ICONS = {
+  "product-dashboard": FaChartLine,
+  products: FaBoxOpen,
+  categories: FaTags,
+  brands: FaBuilding,
+  reviews: FaStar,
+  orders: FaTruck,
+  users: FaUsers,
+  coupons: FaTicketAlt,
+  shipping: FaShip,
+  payments: FaCreditCard,
+  notifications: FaBell,
+  reports: FaChartBar,
+  settings: FaCog,
+  seed: FaDatabase,
+};
+
+export function AdminSidebar({ onNavigate }) {
+  let lastGroup = "";
+
+  return (
+    <nav aria-label="เมนูแอดมิน" className="h-full">
+      <TabsList className="flex w-full flex-col items-stretch gap-1 overflow-visible bg-transparent pb-0">
+        {ADMIN_NAV.map((item) => {
+          const Icon = ICONS[item.value];
+          const showGroup = item.group !== lastGroup;
+          lastGroup = item.group;
+          return (
+            <div key={item.value}>
+              {showGroup && (
+                <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle">
+                  {item.group}
+                </p>
+              )}
+              <TabsTrigger
+                value={item.value}
+                onClick={() => onNavigate?.()}
+                className="flex w-full items-center justify-start gap-3 px-3 py-2.5 text-left text-sm text-fg-muted hover:bg-primary-50 hover:text-primary-700 data-[state=active]:bg-primary-600 data-[state=active]:text-white data-[state=active]:shadow-sm dark:hover:bg-primary-900/40 dark:hover:text-primary-200"
+              >
+                {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
+                {item.label}
+              </TabsTrigger>
+            </div>
+          );
+        })}
+      </TabsList>
+    </nav>
+  );
+}

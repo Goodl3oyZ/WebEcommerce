@@ -6,10 +6,11 @@ import {
   productReviews,
   categories,
   brands,
+  orderItems,
 } from "../models/schema.js";
 import {
   eq,
-  like,
+  ilike,
   and,
   or,
   desc,
@@ -32,9 +33,14 @@ export const productService = {
     minPrice,
     maxPrice,
     search,
+    includeInactive = false,
   }) {
     const offset = (page - 1) * limit;
     const whereConditions = [];
+
+    if (!includeInactive) {
+      whereConditions.push(eq(products.isActive, true));
+    }
 
     if (category) {
       whereConditions.push(eq(products.categoryId, category));
@@ -51,8 +57,8 @@ export const productService = {
     if (search) {
       whereConditions.push(
         or(
-          like(products.name, `%${search}%`),
-          like(products.description, `%${search}%`)
+          ilike(products.name, `%${search}%`),
+          ilike(products.description, `%${search}%`)
         )
       );
     }
@@ -225,7 +231,10 @@ export const productService = {
 
     const [productsList, total] = await Promise.all([
       db.query.products.findMany({
-        where: eq(products.categoryId, categoryId),
+        where: and(
+          eq(products.categoryId, categoryId),
+          eq(products.isActive, true)
+        ),
         with: {
           category: true,
           variants: true,
@@ -237,7 +246,12 @@ export const productService = {
       db
         .select({ count: sql`count(*)` })
         .from(products)
-        .where(eq(products.categoryId, categoryId)),
+        .where(
+          and(
+            eq(products.categoryId, categoryId),
+            eq(products.isActive, true)
+          )
+        ),
     ]);
 
     // Generate fresh presigned URLs for product images
@@ -298,9 +312,12 @@ export const productService = {
     }
 
     const offset = (page - 1) * limit;
-    const searchCondition = or(
-      like(products.name, `%${query}%`),
-      like(products.description, `%${query}%`)
+    const searchCondition = and(
+      or(
+        ilike(products.name, `%${query}%`),
+        ilike(products.description, `%${query}%`)
+      ),
+      eq(products.isActive, true)
     );
 
     const [productsList, total] = await Promise.all([
@@ -411,12 +428,16 @@ export const productService = {
   },
 
   async createProduct(productData) {
-    const [newProduct] = await db
-      .insert(products)
-      .values(productData)
-      .returning();
-
-    // Generate presigned URL for imageUrl before returning
+    const payload = {
+      name: String(productData.name || "").trim(),
+      description: productData.description?.trim() || null,
+      price: String(productData.price),
+      imageUrl: productData.imageUrl || null,
+      categoryId: productData.categoryId,
+      brandId: productData.brandId || null,
+      isActive: productData.isActive ?? true,
+    };
+    const [newProduct] = await db.insert(products).values(payload).returning();
     return await this.withPresignedImageUrl(newProduct);
   },
 
@@ -441,10 +462,10 @@ export const productService = {
         name: updates.name,
         description: updates.description,
         price: updates.price,
-        stock: updates.stock,
-        imageUrl: updates.imageUrl, // <-- ตรงนี้!
+        imageUrl: updates.imageUrl,
         categoryId: updates.categoryId,
         brandId: updates.brandId,
+        isActive: updates.isActive,
       };
 
       // Remove undefined values
@@ -555,23 +576,43 @@ export const productService = {
   },
 
   async deleteProduct(id) {
+    const existing = await db.query.products.findFirst({
+      where: eq(products.id, id),
+    });
+    if (!existing) {
+      throw ApiError.notFound("ไม่พบสินค้า");
+    }
+
+    const [related] = await db
+      .select({ count: sql`count(*)::int` })
+      .from(orderItems)
+      .where(eq(orderItems.productId, id));
+
     const [deletedProduct] = await db
-      .delete(products)
+      .update(products)
+      .set({ isActive: false })
       .where(eq(products.id, id))
       .returning();
 
-    if (!deletedProduct) {
-      throw new ApiError("Product not found", 404);
-    }
-
-    return deletedProduct;
+    return {
+      ...deletedProduct,
+      relatedOrders: related?.count ?? 0,
+    };
   },
 
   async createVariant(productId, variantData) {
+    const sku = String(variantData.sku || "").trim();
+    const duplicate = await db.query.productVariants.findFirst({
+      where: eq(productVariants.sku, sku),
+    });
+    if (duplicate) {
+      throw ApiError.conflict("SKU นี้ถูกใช้แล้ว");
+    }
     const [newVariant] = await db
       .insert(productVariants)
       .values({
         ...variantData,
+        sku,
         productId,
       })
       .returning();

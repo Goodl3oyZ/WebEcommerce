@@ -5,7 +5,7 @@ export const productController = {
   // Get all products with pagination and filters
   async getProducts(req, res, next) {
     try {
-      const { page, limit, sort, category, minPrice, maxPrice, search } =
+      const { page, limit, sort, category, minPrice, maxPrice, search, includeInactive } =
         req.query;
       const products = await productService.getProducts({
         page,
@@ -15,6 +15,7 @@ export const productController = {
         minPrice,
         maxPrice,
         search,
+        includeInactive: includeInactive === "true" || (req.user?.role === "admin" && includeInactive !== "false"),
       });
       res.json(products);
     } catch (error) {
@@ -102,7 +103,7 @@ export const productController = {
     try {
       const { id } = req.params;
       await productService.deleteProduct(id);
-      res.status(204).send();
+      res.json({ success: true, message: "ปิดการขายสินค้าแล้ว (soft delete)" });
     } catch (error) {
       next(error);
     }

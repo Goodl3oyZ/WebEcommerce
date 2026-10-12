@@ -19,12 +19,16 @@ if (!connectionString) {
 }
 
 const migrationsFolder = path.resolve("./migrations");
+const journalPath = path.join(migrationsFolder, "meta", "_journal.json");
+
+if (!fs.existsSync(journalPath)) {
+  console.log(
+    "No migrations/meta/_journal.json found; skip SQL migrator (use npm run migrate / drizzle-kit push).",
+  );
+  process.exit(0);
+}
 
 async function maybeBaselineExistingSchema(pool) {
-  const journalPath = path.join(migrationsFolder, "meta", "_journal.json");
-  if (!fs.existsSync(journalPath)) {
-    return;
-  }
 
   const { rows: existingTables } = await pool.query(
     `SELECT 1 FROM information_schema.tables

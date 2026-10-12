@@ -90,29 +90,19 @@ export const paymentController = {
   }),
 
   processRefund: asyncHandler(async (req, res) => {
-    const { paymentId } = req.params;
+    const paymentId = req.params.id || req.params.paymentId;
     const { amount, reason } = req.body;
-    const userId = req.user.id;
-
-    const payment = await paymentService.getPayment(paymentId, userId);
-    if (!payment) {
-      throw new ApiError("Payment not found", 404);
-    }
-
-    const refund = await omiseService.createRefund(payment.chargeId, amount);
-
-    await paymentService.createRefund({
+    const refund = await paymentService.refundPayment(
+      null,
       paymentId,
       amount,
       reason,
-      refundId: refund.id,
-    });
-
+      req.user.id
+    );
     res.status(200).json({
       success: true,
-      data: {
-        refund,
-      },
+      data: { refund },
+      message: "คืนเงินสำเร็จ",
     });
   }),
 

@@ -30,6 +30,12 @@ router.put(
   validationMiddleware(brandDto.updateBrand),
   brandController.updateBrand
 );
+router.patch(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(brandDto.updateBrand),
+  brandController.updateBrand
+);
 router.delete("/:id", requireRole(ROLES.ADMIN), brandController.deleteBrand);
 
 export default router;

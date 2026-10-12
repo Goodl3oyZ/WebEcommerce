@@ -4,20 +4,23 @@ import { ApiError } from "../utils/ApiError.js";
 const errorHandler = (err, req, res, next) => {
   console.error(err);
 
-  // Handle Zod validation errors
   if (err instanceof ZodError) {
     return res.status(400).json({
+      success: false,
       status: "error",
-      message: "Validation error",
-      errors: err.errors,
+      message: "ข้อมูลไม่ถูกต้อง",
+      errors: err.errors.map((e) => ({
+        field: e.path.join("."),
+        message: e.message,
+      })),
     });
   }
 
-  // Handle Joi validation errors
   if (err.isJoi) {
     return res.status(400).json({
+      success: false,
       status: "error",
-      message: "Validation error",
+      message: "ข้อมูลไม่ถูกต้อง",
       errors: err.details.map((detail) => ({
         field: detail.path.join("."),
         message: detail.message,
@@ -25,9 +28,9 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Handle custom API errors
   if (err instanceof ApiError) {
     return res.status(err.statusCode).json({
+      success: false,
       status: err.status,
       message: err.message,
       ...(err.errors && { errors: err.errors }),
@@ -35,27 +38,26 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Handle database errors
   if (err.code === "23505") {
-    // Unique violation
     return res.status(409).json({
+      success: false,
       status: "error",
-      message: "Resource already exists",
+      message: "ข้อมูลซ้ำกับที่มีอยู่ในระบบ",
       code: "DUPLICATE_ENTRY",
     });
   }
   if (err.code === "23503") {
-    // Foreign key violation
     return res.status(400).json({
+      success: false,
       status: "error",
-      message: "Referenced resource does not exist",
+      message: "ไม่สามารถดำเนินการได้ เพราะมีข้อมูลที่เกี่ยวข้อง",
       code: "FOREIGN_KEY_VIOLATION",
     });
   }
 
-  // Handle JWT errors
   if (err.name === "JsonWebTokenError") {
     return res.status(401).json({
+      success: false,
       status: "error",
       message: "Invalid token",
       code: "INVALID_TOKEN",
@@ -63,19 +65,17 @@ const errorHandler = (err, req, res, next) => {
   }
   if (err.name === "TokenExpiredError") {
     return res.status(401).json({
+      success: false,
       status: "error",
       message: "Token expired",
       code: "TOKEN_EXPIRED",
     });
   }
 
-  // Default error
   res.status(500).json({
+    success: false,
     status: "error",
-    message:
-      process.env.NODE_ENV === "production"
-        ? "Internal server error"
-        : err.message,
+    message: "เกิดข้อผิดพลาดภายในระบบ",
   });
 };
 

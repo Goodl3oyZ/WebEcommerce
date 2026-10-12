@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { adminAPI } from "@/lib/api";
 import toast from "react-hot-toast";
+import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
+import ErrorState from "@/components/ErrorState";
+import EmptyState from "@/components/EmptyState";
 
 const NOTIFICATION_TYPES = [
   { value: "order", label: "ออเดอร์" },
@@ -222,13 +225,24 @@ export function NotificationsPanel() {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">กำลังโหลด...</div>
+        <PanelSkeleton rows={8} />
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-4">{error}</div>
+        <ErrorState message={error} onRetry={loadData} />
+      ) : notifications.length === 0 ? (
+        <EmptyState
+          title="ยังไม่มีการแจ้งเตือน"
+          description="ส่งการแจ้งเตือนแรกไปยังผู้ใช้ในระบบ"
+          actionLabel="ส่งการแจ้งเตือน"
+          onAction={() => {
+            setForm(initialForm);
+            setFormErrors({});
+            setShowForm(true);
+          }}
+        />
       ) : (
-        <div className="overflow-x-auto rounded-xl shadow border border-gray-100">
-          <table className="min-w-full bg-white text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto max-h-[70vh] rounded-xl shadow border border-border">
+          <table className="min-w-full bg-surface text-sm">
+            <thead className="sticky top-0 z-10 bg-surface-muted">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">ชื่อ</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">ข้อความ</th>
@@ -238,14 +252,9 @@ export function NotificationsPanel() {
                 <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {notifications.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400">ยังไม่มีการแจ้งเตือน</td>
-                </tr>
-              ) : (
-                notifications.map((n) => (
-                  <tr key={n.id} className="hover:bg-gray-50 transition">
+            <tbody className="divide-y divide-border">
+              {notifications.map((n) => (
+                  <tr key={n.id} className="hover:bg-surface-muted transition">
                     <td className="px-4 py-3 font-medium text-gray-800 max-w-[180px] truncate">{n.title}</td>
                     <td className="px-4 py-3 text-gray-600 max-w-[250px] truncate">{n.message}</td>
                     <td className="px-4 py-3 text-center">
@@ -268,8 +277,7 @@ export function NotificationsPanel() {
                       >ลบ</button>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
             </tbody>
           </table>
         </div>

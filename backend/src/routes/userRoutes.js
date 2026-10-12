@@ -58,14 +58,25 @@ router.get("/", requireRole(ROLES.ADMIN), userController.getUsers);
 router.post(
   "/",
   requireRole(ROLES.ADMIN),
-  validationMiddleware(userDto.createUser),
+  validationMiddleware(userDto.adminCreateUser),
   userController.createUser
 );
 router.post(
   "/create",
   requireRole(ROLES.ADMIN),
-  validationMiddleware(userDto.createUser),
+  validationMiddleware(userDto.adminCreateUser),
   userController.createUser
+);
+router.get(
+  "/:userId/orders",
+  requireRole(ROLES.ADMIN),
+  userController.getAdminUserOrders
+);
+router.patch(
+  "/:userId/status",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(userDto.setUserActive),
+  userController.setUserActive
 );
 router.get("/:userId", requireRole(ROLES.ADMIN), userController.getUserById);
 router.put(

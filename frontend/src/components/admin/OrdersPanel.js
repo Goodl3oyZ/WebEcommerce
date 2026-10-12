@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { adminAPI } from "@/lib/api";
+import { ResponsiveTable } from "@/components/admin/ui/ResponsiveTable";
+import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
+import ErrorState from "@/components/ErrorState";
 
 const STATUS_OPTIONS = [
   "all",
@@ -11,6 +15,15 @@ const STATUS_OPTIONS = [
   "refunded",
 ];
 
+const NEXT_STATUS = {
+  pending: ["processing", "cancelled"],
+  processing: ["shipped", "cancelled"],
+  shipped: ["delivered", "cancelled"],
+  delivered: ["refunded"],
+  cancelled: [],
+  refunded: [],
+};
+
 export function OrdersPanel() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,8 +32,11 @@ export function OrdersPanel() {
   const [limit] = useState(10);
   const [status, setStatus] = useState("all");
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
+  const [selected, setSelected] = useState(null);
+  const [nextStatus, setNextStatus] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
     setError(null);
     const params = {
@@ -39,14 +55,88 @@ export function OrdersPanel() {
         setError(err.message || "Failed to fetch orders");
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    load();
   }, [page, limit, status]);
+
+  const changeStatus = async (order, newStatus) => {
+    if (!newStatus) return;
+    if (!confirm(`เปลี่ยนสถานะออเดอร์ ${order.orderNumber} เป็น ${newStatus}?`)) {
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await adminAPI.updateOrderStatus(order.id, newStatus);
+      toast.success("อัปเดตสถานะแล้ว");
+      setSelected(null);
+      load();
+    } catch (err) {
+      toast.error(err.message || "เปลี่ยนสถานะไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const columns = [
+    { key: "orderNumber", header: "Order #", searchValue: (o) => o.orderNumber },
+    {
+      key: "user",
+      header: "ลูกค้า",
+      render: (o) => o.user?.name || o.userId,
+      searchValue: (o) => o.user?.name || o.userId,
+    },
+    { key: "status", header: "สถานะ" },
+    {
+      key: "total",
+      header: "ยอดรวม",
+      render: (o) => o.totalAmount || o.total,
+      searchValue: (o) => o.totalAmount || o.total,
+    },
+    {
+      key: "createdAt",
+      header: "วันที่",
+      render: (o) => new Date(o.createdAt).toLocaleString("th-TH"),
+    },
+    {
+      key: "actions",
+      header: "จัดการ",
+      render: (order) => {
+        const options = NEXT_STATUS[order.status] || [];
+        return (
+          <div className="flex flex-wrap justify-end gap-2 md:justify-start">
+            <button
+              type="button"
+              className="text-info hover:underline"
+              onClick={() => {
+                setSelected(order);
+                setNextStatus(options[0] || "");
+              }}
+            >
+              ดู/เปลี่ยนสถานะ
+            </button>
+            {options.includes("refunded") && (
+              <button
+                type="button"
+                className="text-warning hover:underline"
+                onClick={() => changeStatus(order, "refunded")}
+              >
+                Refund
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Orders Management</h2>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-xl font-bold text-fg">จัดการออเดอร์</h2>
         <select
-          className="border rounded px-2 py-1"
+          className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-fg"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
@@ -61,84 +151,84 @@ export function OrdersPanel() {
         </select>
       </div>
       {loading ? (
-        <div>Loading...</div>
+        <PanelSkeleton rows={8} />
       ) : error ? (
-        <div className="text-red-500">{error}</div>
+        <ErrorState message={error} onRetry={load} />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full border text-sm">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="p-2 border">Order #</th>
-                <th className="p-2 border">User</th>
-                <th className="p-2 border">Status</th>
-                <th className="p-2 border">Total</th>
-                <th className="p-2 border">Created</th>
-                <th className="p-2 border">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center p-4">
-                    No orders found.
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => (
-                  <tr key={order.id}>
-                    <td className="p-2 border">{order.orderNumber}</td>
-                    <td className="p-2 border">
-                      {order.user?.name || order.userId}
-                    </td>
-                    <td className="p-2 border">{order.status}</td>
-                    <td className="p-2 border">
-                      {order.totalAmount || order.total}
-                    </td>
-                    <td className="p-2 border">
-                      {new Date(order.createdAt).toLocaleString()}
-                    </td>
-                    <td className="p-2 border">
-                      {/* TODO: Add actions: view, change status, refund, delete */}
-                      <button className="text-blue-600 hover:underline mr-2">
-                        View
-                      </button>
-                      <button className="text-green-600 hover:underline mr-2">
-                        Change Status
-                      </button>
-                      <button className="text-yellow-600 hover:underline mr-2">
-                        Refund
-                      </button>
-                      <button className="text-red-600 hover:underline">
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          columns={columns}
+          data={orders}
+          emptyTitle="ยังไม่มีออเดอร์"
+          emptyDescription="เมื่อลูกค้าสั่งซื้อ ออเดอร์จะแสดงที่นี่"
+          searchPlaceholder="ค้นหาเลขออเดอร์หรือชื่อลูกค้า"
+        />
       )}
-      <div className="flex justify-between items-center mt-4">
+      <div className="mt-4 flex items-center justify-between">
         <button
-          className="px-3 py-1 border rounded disabled:opacity-50"
+          className="rounded-xl border border-border px-3 py-2 text-sm disabled:opacity-50"
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page <= 1}
         >
-          Previous
+          ก่อนหน้า
         </button>
-        <span>
-          Page {page} of {pagination.pages || 1}
+        <span className="text-sm text-fg-muted">
+          หน้า {page} / {pagination.pages || 1}
         </span>
         <button
-          className="px-3 py-1 border rounded disabled:opacity-50"
-          onClick={() => setPage((p) => Math.min(pagination.pages || 1, p + 1))}
+          className="rounded-xl border border-border px-3 py-2 text-sm disabled:opacity-50"
+          onClick={() =>
+            setPage((p) => Math.min(pagination.pages || 1, p + 1))
+          }
           disabled={page >= (pagination.pages || 1)}
         >
-          Next
+          ถัดไป
         </button>
       </div>
+
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-surface p-6">
+            <h3 className="mb-2 text-lg font-bold">ออเดอร์ {selected.orderNumber}</h3>
+            <p className="mb-4 text-sm text-fg-muted">
+              สถานะปัจจุบัน: {selected.status}
+            </p>
+            {(NEXT_STATUS[selected.status] || []).length === 0 ? (
+              <p className="text-sm text-fg-muted">ไม่สามารถเปลี่ยนสถานะต่อได้</p>
+            ) : (
+              <select
+                className="mb-4 w-full rounded-xl border border-border px-3 py-2"
+                value={nextStatus}
+                onChange={(e) => setNextStatus(e.target.value)}
+              >
+                {(NEXT_STATUS[selected.status] || []).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 rounded-xl border border-border py-2"
+                onClick={() => setSelected(null)}
+              >
+                ปิด
+              </button>
+              {(NEXT_STATUS[selected.status] || []).length > 0 && (
+                <button
+                  type="button"
+                  disabled={submitting || !nextStatus}
+                  className="flex-1 rounded-xl bg-primary-600 py-2 text-white disabled:opacity-60"
+                  onClick={() => changeStatus(selected, nextStatus)}
+                >
+                  {submitting ? "กำลังบันทึก..." : "บันทึก"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

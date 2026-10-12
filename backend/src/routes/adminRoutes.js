@@ -9,5 +9,6 @@ router.use(authMiddleware);
 router.use(requireRole(ROLES.ADMIN));
 
 router.get("/dashboard", adminController.getDashboard);
+router.post("/seed", adminController.runSeed);
 
 export default router;

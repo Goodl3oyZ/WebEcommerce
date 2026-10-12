@@ -216,12 +216,13 @@ export const orderController = {
       const { status, notes } = req.body;
       // เช็คว่าเป็น admin หรือ user route
       // ถ้า path มี /admin/ แปลว่า admin, ไม่งั้นคือ user
-      const isAdmin = req.baseUrl.includes("/admin");
+      const isAdmin = req.originalUrl.includes("/admin/");
       let order;
       if (isAdmin) {
         order = await orderService.updateOrderStatus(orderId, {
           status,
           notes,
+          actorId: req.user.id,
         });
       } else {
         // user ต้องเป็นเจ้าของ order

@@ -9,7 +9,7 @@ export const usersAPI = {
 
   // Update user profile
   async updateProfile(formData) {
-    const response = await apiClient.put("/uploads/avatar", formData, {
+    const response = await apiClient.put("/users/profile", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

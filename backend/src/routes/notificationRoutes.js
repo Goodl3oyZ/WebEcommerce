@@ -18,7 +18,6 @@ router.get("/admin/:id", requireAdmin, notificationController.getNotificationByI
 router.delete(
   "/admin/:id",
   requireAdmin,
-  validationMiddleware(notificationDto.deleteNotification),
   notificationController.deleteNotification
 );
 
@@ -63,11 +62,7 @@ router.patch(
   validationMiddleware(notificationDto.updateNotification),
   notificationController.updateNotification
 );
-router.delete(
-  "/:id",
-  validationMiddleware(notificationDto.deleteNotification),
-  notificationController.deleteNotification
-);
+router.delete("/:id", notificationController.deleteNotification);
 router.get("/:id", notificationController.getNotificationById);
 
 export default router;

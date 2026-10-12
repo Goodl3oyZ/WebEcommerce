@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { adminAPI } from "@/lib/api";
 import toast from "react-hot-toast";
+import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
+import ErrorState from "@/components/ErrorState";
+import EmptyState from "@/components/EmptyState";
 
 const ROLES = ["user", "admin", "moderator"];
 
@@ -301,33 +304,31 @@ export function UsersPanel() {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">กำลังโหลด...</div>
+        <PanelSkeleton rows={8} />
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-4">
-          {error}
-        </div>
+        <ErrorState message={error} onRetry={loadData} />
+      ) : users.length === 0 ? (
+        <EmptyState
+          title="ไม่พบผู้ใช้งาน"
+          description="เพิ่มผู้ใช้คนแรก หรือปรับคำค้นหา"
+          actionLabel="เพิ่มผู้ใช้"
+          onAction={openCreate}
+        />
       ) : (
-        <div className="overflow-x-auto rounded-xl shadow border border-gray-100">
-          <table className="min-w-full bg-white text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto max-h-[70vh] rounded-xl shadow border border-border">
+          <table className="min-w-full bg-surface text-sm">
+            <thead className="sticky top-0 z-10 bg-surface-muted">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">ชื่อ</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">อีเมล</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">Role</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">สถานะ</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">วันที่สมัคร</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">ชื่อ</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">อีเมล</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">Role</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">สถานะ</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">วันที่สมัคร</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {users.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400">
-                    ไม่พบผู้ใช้งาน
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
+            <tbody className="divide-y divide-border">
+              {users.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3 font-medium text-gray-800">
                       {user.name || "-"}
@@ -353,16 +354,44 @@ export function UsersPanel() {
                         : "-"}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => openRoleModal(user)}
-                        className="text-xs bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-2 py-1 rounded transition"
-                      >
-                        เปลี่ยน Role
-                      </button>
+                      <div className="flex justify-center gap-1">
+                        <button
+                          onClick={() => openRoleModal(user)}
+                          className="text-xs bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-2 py-1 rounded transition"
+                        >
+                          เปลี่ยน Role
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const next = !user.isActive;
+                            if (
+                              !confirm(
+                                `${next ? "ปลดล็อก" : "ระงับ"}บัญชี ${user.email}?`
+                              )
+                            )
+                              return;
+                            try {
+                              await adminAPI.setUserActive(user.id, {
+                                isActive: next,
+                              });
+                              toast.success(next ? "ปลดล็อกแล้ว" : "ระงับบัญชีแล้ว");
+                              loadData();
+                            } catch (err) {
+                              toast.error(err.message || "ดำเนินการไม่สำเร็จ");
+                            }
+                          }}
+                          className={`text-xs px-2 py-1 rounded transition ${
+                            user.isActive
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {user.isActive ? "ระงับ" : "ปลดล็อก"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
             </tbody>
           </table>
         </div>

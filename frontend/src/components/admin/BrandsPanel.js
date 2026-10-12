@@ -46,8 +46,8 @@ export function BrandsPanel() {
       reset();
       setEditingId(null);
       loadBrands();
-    } catch {
-      toast.error("Failed to save brand");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || error?.message || "Failed to save brand");
     }
   };
 
@@ -65,8 +65,8 @@ export function BrandsPanel() {
       await adminAPI.deleteBrand(id);
       toast.success("Brand deleted!");
       loadBrands();
-    } catch {
-      toast.error("Failed to delete brand");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || error?.message || "Failed to delete brand");
     }
   };
 

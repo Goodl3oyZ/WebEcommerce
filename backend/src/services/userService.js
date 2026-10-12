@@ -9,7 +9,7 @@ import {
   orders as ordersTable,
   pointsHistory,
 } from "../models/schema.js";
-import { eq, and, like, or, desc, sql } from "drizzle-orm";
+import { eq, and, ilike, or, desc, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { hashPassword } from "../utils/hashPassword.js"; // ฟังก์ชันแฮชรหัสผ่าน
@@ -19,15 +19,12 @@ export const userService = {
   async createUser(userData) {
     try {
       // ตรวจสอบว่าผู้ใช้มีอยู่ในระบบหรือไม่
+      const email = String(userData.email).trim().toLowerCase();
       const existingUser = await db.query.users.findFirst({
-        where: eq(users.email, userData.email),
+        where: eq(users.email, email),
       });
       if (existingUser) {
-        throw new ApiError(
-          "User with this email already exists",
-          409,
-          "DUPLICATE_EMAIL"
-        );
+        throw ApiError.conflict("อีเมลนี้ถูกใช้แล้ว");
       }
 
       // Map username to name if provided
@@ -42,7 +39,7 @@ export const userService = {
       // Create user data object
       const userInsertData = {
         name,
-        email: userData.email,
+        email,
         password: hashedPassword,
         isActive: true,
         isVerified: false,
@@ -164,19 +161,28 @@ export const userService = {
         where: eq(users.id, userId),
         columns: {
           id: true,
-          username: true,
+          name: true,
           email: true,
-          role: true,
+          isActive: true,
+          isVerified: true,
           createdAt: true,
           updatedAt: true,
         },
+        with: {
+          roles: { columns: { role: true }, limit: 1 },
+        },
       });
       if (!user) {
-        throw new ApiError("User not found", 404);
+        throw ApiError.notFound("ไม่พบผู้ใช้");
       }
-      return user;
+      return {
+        ...user,
+        role: user.roles?.[0]?.role || "user",
+        roles: undefined,
+      };
     } catch (error) {
-      throw new ApiError(`Error fetching user: ${error.message}`, 500);
+      if (error instanceof ApiError) throw error;
+      throw ApiError.internal("ไม่สามารถโหลดผู้ใช้ได้");
     }
   },
 
@@ -186,42 +192,89 @@ export const userService = {
         where: eq(users.id, userId),
       });
       if (!user) {
-        throw new ApiError("User not found", 404);
+        throw ApiError.notFound("ไม่พบผู้ใช้");
       }
 
-      // ถ้ามีการอัปเดตรหัสผ่าน ให้แฮชก่อนบันทึก
-      if (updateData.password) {
-        updateData.password = await hashPassword(updateData.password);
+      const { role, ...rest } = updateData;
+      const allowed = ["name", "email", "password", "isActive", "avatar"];
+      const userFields = {};
+      for (const key of allowed) {
+        if (rest[key] !== undefined) userFields[key] = rest[key];
+      }
+      if (userFields.password) {
+        userFields.password = await hashPassword(userFields.password);
       }
 
-      // อัปเดตข้อมูล
-      const [updatedUser] = await db
-        .update(users)
-        .set(updateData)
-        .where(eq(users.id, userId))
-        .returning();
+      let updatedUser = user;
+      if (Object.keys(userFields).length > 0) {
+        const [row] = await db
+          .update(users)
+          .set({ ...userFields, updatedAt: new Date() })
+          .where(eq(users.id, userId))
+          .returning();
+        updatedUser = row;
+      }
+
+      if (role) {
+        await this.updateUserRole(userId, role);
+      }
 
       const { password: _, ...userWithoutPassword } = updatedUser;
       return userWithoutPassword;
     } catch (error) {
-      throw new ApiError(`Error updating user: ${error.message}`, 500);
+      if (error instanceof ApiError) throw error;
+      throw ApiError.internal("ไม่สามารถอัปเดตผู้ใช้ได้");
     }
   },
 
-  async deleteUser(userId) {
-    try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
-      if (!user) {
-        throw new ApiError("User not found", 404);
-      }
-
-      await db.delete(users).where(eq(users.id, userId));
-      return { message: "User successfully deleted" };
-    } catch (error) {
-      throw new ApiError(`Error deleting user: ${error.message}`, 500);
+  async updateUserRole(userId, role) {
+    const existing = await db.query.userRoles.findFirst({
+      where: eq(userRoles.userId, userId),
+    });
+    if (existing) {
+      await db
+        .update(userRoles)
+        .set({ role })
+        .where(eq(userRoles.userId, userId));
+    } else {
+      await db.insert(userRoles).values({ userId, role });
     }
+    return this.getUserById(userId);
+  },
+
+  async setUserActive(userId, isActive) {
+    const [updated] = await db
+      .update(users)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!updated) throw ApiError.notFound("ไม่พบผู้ใช้");
+    const { password: _, ...safe } = updated;
+    return safe;
+  },
+
+  async deleteUser(userId) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+    if (!user) {
+      throw ApiError.notFound("ไม่พบผู้ใช้");
+    }
+
+    const [related] = await db
+      .select({ count: sql`count(*)::int` })
+      .from(ordersTable)
+      .where(eq(ordersTable.userId, userId));
+
+    await db
+      .update(users)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    return {
+      message: "ระงับบัญชีแล้ว (soft delete)",
+      relatedOrders: related?.count ?? 0,
+    };
   },
 
   async getProfile(userId) {
@@ -235,8 +288,12 @@ export const userService = {
           avatar: true,
           isVerified: true,
           isActive: true,
+          points: true,
           createdAt: true,
           updatedAt: true,
+          lastLoginAt: true,
+          lastActivityAt: true,
+          provider: true,
         },
       });
 
@@ -244,17 +301,43 @@ export const userService = {
         throw new ApiError("User not found", 404, "USER_NOT_FOUND");
       }
 
+      // Fetch summary stats in parallel
+      const [orderStats, addressCount, roleRows] = await Promise.all([
+        db
+          .select({
+            totalOrders: sql`count(*)::int`,
+            totalSpent: sql`coalesce(sum(${ordersTable.total}), 0)`,
+          })
+          .from(ordersTable)
+          .where(eq(ordersTable.userId, userId)),
+        db
+          .select({ count: sql`count(*)::int` })
+          .from(sql`addresses`)
+          .where(sql`addresses.user_id = ${userId}`),
+        db.query.userRoles.findMany({
+          where: eq(userRoles.userId, userId),
+        }),
+      ]);
+
       // Convert dates to ISO strings to prevent circular references
       const serializedUser = {
         ...user,
         createdAt: user.createdAt?.toISOString(),
         updatedAt: user.updatedAt?.toISOString(),
+        lastLoginAt: user.lastLoginAt?.toISOString() || null,
+        lastActivityAt: user.lastActivityAt?.toISOString() || null,
       };
 
       return {
         success: true,
         data: {
           user: serializedUser,
+          stats: {
+            totalOrders: orderStats[0]?.totalOrders || 0,
+            totalSpent: Number(orderStats[0]?.totalSpent || 0),
+            addressCount: addressCount[0]?.count || 0,
+            roles: roleRows.map((r) => r.role),
+          },
         },
       };
     } catch (error) {
@@ -438,16 +521,26 @@ export const userService = {
     };
   },
 
-  async getUsers({ page = 1, limit = 10, search }) {
+  async getUsers({ page = 1, limit = 10, search, role, isActive }) {
     const offset = (page - 1) * limit;
-    let whereClause = undefined;
+    const conditions = [];
 
     if (search) {
-      whereClause = or(
-        like(users.name, `%${search}%`),
-        like(users.email, `%${search}%`)
+      conditions.push(
+        or(
+          ilike(users.name, `%${search}%`),
+          ilike(users.email, `%${search}%`)
+        )
       );
     }
+    if (isActive === "true" || isActive === true) {
+      conditions.push(eq(users.isActive, true));
+    }
+    if (isActive === "false" || isActive === false) {
+      conditions.push(eq(users.isActive, false));
+    }
+
+    const whereClause = conditions.length ? and(...conditions) : undefined;
 
     const [usersList, total] = await Promise.all([
       db.query.users.findMany({
@@ -478,11 +571,13 @@ export const userService = {
     ]);
 
     // Flatten role from roles relation
-    const usersWithRole = usersList.map((u) => ({
-      ...u,
-      role: u.roles?.[0]?.role || "user",
-      roles: undefined,
-    }));
+    const usersWithRole = usersList
+      .map((u) => ({
+        ...u,
+        role: u.roles?.[0]?.role || "user",
+        roles: undefined,
+      }))
+      .filter((u) => (role ? u.role === role : true));
 
     return {
       users: usersWithRole,

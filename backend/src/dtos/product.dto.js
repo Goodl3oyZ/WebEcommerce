@@ -1,13 +1,24 @@
 import { z } from "zod";
 
+const uuidOrNull = z.preprocess(
+  (val) => (val === "" || val === null || val === undefined ? undefined : val),
+  z.string().uuid().optional()
+);
+
 const baseProductSchema = z.object({
   name: z.string().min(1),
-  description: z.string().min(1),
-  price: z.number().min(0),
-  categoryId: z.string().uuid(),
-  brandId: z.string().uuid().optional(),
-  imageUrl: z.array(z.string()).optional(),
-  attributes: z.record(z.any()).optional(),
+  description: z.string().optional().nullable(),
+  price: z.coerce.number().min(0),
+  categoryId: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.string().uuid()
+  ),
+  brandId: uuidOrNull,
+  imageUrl: z.union([z.array(z.string()), z.string(), z.record(z.any())]).optional().nullable(),
+  attributes: z.record(z.any()).optional().nullable(),
+  variants: z.array(z.record(z.any())).optional(),
+  hasVariants: z.boolean().optional(),
+  stock: z.coerce.number().optional(),
   isActive: z.boolean().default(true),
 });
 export const baseReviewSchema = z.object({
@@ -20,8 +31,8 @@ export const baseVariantSchema = z.object({
   color: z.string().min(1).max(50),
   size: z.string().min(1).max(10),
   sku: z.string().min(1).max(100),
-  stock: z.number().int().nonnegative(),
-  price: z.number().nonnegative(),
+  stock: z.coerce.number().int().nonnegative(),
+  price: z.coerce.number().nonnegative(),
 });
 // Product DTOs
 export const productDto = {

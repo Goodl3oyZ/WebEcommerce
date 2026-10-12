@@ -54,13 +54,17 @@ export const adminAPI = {
     axiosInstance.post("/users/create", userData).then((r) => r.data),
   updateUserRole: async (userId, newUserRole) =>
     axiosInstance.put(`/users/${userId}/role`, newUserRole).then((r) => r.data),
+  setUserActive: async (userId, data) =>
+    axiosInstance.patch(`/users/${userId}/status`, data).then((r) => r.data),
+  getUserOrders: async (userId, params = {}) =>
+    axiosInstance.get(`/users/${userId}/orders`, { params }).then((r) => r.data),
 
   // --- Orders (admin only) ---
   getAllOrders: async (params = {}) =>
     axiosInstance.get("/orders/admin/all", { params }).then((r) => r.data),
-  updateOrderStatus: async (orderId, status, comment) =>
+  updateOrderStatus: async (orderId, status, notes) =>
     axiosInstance
-      .put(`/orders/admin/${orderId}/status`, { status, comment })
+      .put(`/orders/admin/${orderId}/status`, { status, notes })
       .then((r) => r.data),
   getOrderStats: async (params = {}) =>
     axiosInstance.get("/orders/admin/stats", { params }).then((r) => r.data),
@@ -121,4 +125,6 @@ export const adminAPI = {
     axiosInstance.put("/settings", data).then((r) => r.data),
   getDashboard: async () =>
     axiosInstance.get("/admin/dashboard").then((r) => r.data),
+  runSeed: async (seedType) =>
+    axiosInstance.post("/admin/seed", { seedType }).then((r) => r.data),
 };

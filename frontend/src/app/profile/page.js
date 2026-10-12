@@ -26,6 +26,16 @@ import {
   ChevronRight,
   User as UserIcon,
   X as CloseIcon,
+  CheckCircle2,
+  AlertCircle,
+  Calendar,
+  Mail,
+  ShieldCheck,
+  ShoppingBag,
+  CreditCard,
+  Edit3,
+  Sparkles,
+  Clock,
 } from "lucide-react";
 import { shippingAPI } from "@/lib/api/shipping";
 import errorPage from "../error";
@@ -43,6 +53,12 @@ export default function Profile() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("personal");
   const [profile, setProfile] = useState(null);
+  const [userStats, setUserStats] = useState({
+    totalOrders: 0,
+    totalSpent: 0,
+    addressCount: 0,
+    roles: [],
+  });
   const [points, setPoints] = useState(0);
   const [amloading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,10 +120,13 @@ export default function Profile() {
         ]);
 
         if (profileRes?.data?.user) {
-          const user = profileRes.data.user;
-          setProfile(user);
-          setFormData({ name: user.name });
-          setImagePreview(user.avatar || null);
+          const u = profileRes.data.user;
+          setProfile(u);
+          if (profileRes.data.stats) {
+            setUserStats(profileRes.data.stats);
+          }
+          setFormData({ name: u.name || "", phone: u.phone || "" });
+          setImagePreview(u.avatar || null);
         }
 
         if (addressRes?.addresses) {
@@ -353,15 +372,26 @@ export default function Profile() {
 
     try {
       const payload = new FormData();
-      Object.entries(formData).forEach(([k, v]) => payload.append(k, v));
-      if (selectedImage) payload.append("image", selectedImage);
+      if (formData.name) payload.append("name", formData.name);
+      if (formData.phone) payload.append("phone", formData.phone);
+      if (selectedImage) payload.append("avatar", selectedImage);
 
-      const updated = await usersAPI.updateProfile(payload);
-      setProfile((prev) => ({ ...prev, avatar: updated.url }));
-      setSuccessMsg("บันทึกข้อมูลเรียบร้อยแล้ว");
+      const res = await usersAPI.updateProfile(payload);
+      const updated = res?.data || res;
+      if (updated) {
+        setProfile((prev) => ({
+          ...prev,
+          name: updated.name || prev?.name,
+          avatar: updated.avatar || prev?.avatar,
+          phone: updated.phone || prev?.phone,
+        }));
+        if (updated.avatar) setImagePreview(updated.avatar);
+      }
+      setToast({ show: true, type: "success", message: "บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว" });
       setEditMode(false);
     } catch (err) {
-      setErrorMsg("เกิดข้อผิดพลาดในการบันทึก: " + err.message);
+      console.error("Error updating profile:", err);
+      setErrorMsg("เกิดข้อผิดพลาดในการบันทึก: " + (err.response?.data?.message || err.message));
     } finally {
       setIsSubmitting(false);
     }
@@ -516,83 +546,367 @@ export default function Profile() {
 
         {/* Personal Info Tab */}
         {activeTab === "personal" && (
-          <Card className="mb-8 animate-fade-in">
-            <CardHeader className="flex flex-col md:flex-row items-center gap-8 border-b pb-6">
-              <div className="relative w-36 h-36 group">
-                <Image
-                  src={imagePreview || "/default-avatar.png"}
-                  alt="Avatar"
-                  className="rounded-full object-cover border-4 border-indigo-200 shadow-lg"
-                  fill
-                />
-                {editMode && (
-                  <label className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-white text-xs mb-1">เปลี่ยนรูป</span>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                    />
-                  </label>
-                )}
+          <div className="space-y-6 animate-fade-in mb-8">
+            {/* Profile Hero Card */}
+            <Card className="overflow-hidden border-0 shadow-lg bg-white">
+              {/* Top Banner Gradient */}
+              <div className="h-32 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 relative">
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white rounded-full text-xs font-medium flex items-center gap-1.5 shadow-sm">
+                    <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                    {profile?.isVerified !== false ? "บัญชีได้รับการยืนยันแล้ว" : "ยังไม่ได้ยืนยันบัญชี"}
+                  </span>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {!editMode ? (
-                <div className="space-y-4">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div>
-                      <div className="text-gray-500 text-xs mb-1">ชื่อ</div>
-                      <div className="text-lg font-medium">
-                        {formData.name || "-"}
+
+              <CardContent className="px-6 pb-6 relative pt-0">
+                <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between -mt-14 mb-6 gap-4 border-b pb-6">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 text-center sm:text-left">
+                    <div className="relative w-28 h-28 group shrink-0">
+                      <Image
+                        src={imagePreview || "/default-avatar.png"}
+                        alt="Avatar"
+                        className="rounded-full object-cover border-4 border-white shadow-xl bg-white"
+                        fill
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditMode(!editMode)}
+                        className="absolute bottom-1 right-1 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-md transition-transform hover:scale-105"
+                        title="เปลี่ยนรูปโปรไฟล์"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="mt-2 sm:mt-0">
+                      <div className="flex items-center gap-2 justify-center sm:justify-start">
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          {profile?.name || formData.name || "ผู้ใช้งาน"}
+                        </h2>
+                        {userStats.roles?.includes("admin") && (
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">
+                            Admin
+                          </span>
+                        )}
                       </div>
+                      <p className="text-sm text-gray-500 flex items-center gap-1.5 justify-center sm:justify-start mt-1">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        {profile?.email || user?.email || "-"}
+                      </p>
                     </div>
                   </div>
-                  <Button onClick={() => setEditMode(true)} className="mt-2">
-                    แก้ไขข้อมูล
+
+                  <Button
+                    onClick={() => setEditMode(!editMode)}
+                    variant={editMode ? "ghost" : "outline"}
+                    className="flex items-center gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    {editMode ? "ยกเลิกแก้ไข" : "แก้ไขโปรไฟล์"}
                   </Button>
                 </div>
-              ) : (
-                <form
-                  onSubmit={handleSubmit}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
-                >
-                  <div>
-                    <label className="block text-gray-600 mb-1">
-                      ชื่อ-นามสกุล
-                    </label>
-                    <Input
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="ชื่อ-นามสกุล"
-                      required
-                    />
+
+                {/* Edit Form */}
+                {editMode && (
+                  <form onSubmit={handleSubmit} className="space-y-6 pt-2 border-b pb-6 mb-4">
+                    <h3 className="text-base font-bold text-gray-800 border-b pb-2">
+                      แก้ไขข้อมูลส่วนตัว
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                          เปลี่ยนรูปโปรไฟล์
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <div className="relative w-14 h-14 rounded-full overflow-hidden border shrink-0">
+                            <Image
+                              src={imagePreview || "/default-avatar.png"}
+                              alt="Preview"
+                              className="object-cover"
+                              fill
+                            />
+                          </div>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                          ชื่อ-นามสกุล <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          name="name"
+                          value={formData.name}
+                          onChange={handleInputChange}
+                          placeholder="กรอกชื่อ-นามสกุล"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                          อีเมล (ไม่สามารถแก้ไขได้)
+                        </label>
+                        <Input
+                          value={profile?.email || user?.email || ""}
+                          disabled
+                          className="bg-gray-100 text-gray-500 cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                          เบอร์โทรศัพท์
+                        </label>
+                        <Input
+                          name="phone"
+                          value={formData.phone || ""}
+                          onChange={handleInputChange}
+                          placeholder="08X-XXX-XXXX"
+                        />
+                      </div>
+                    </div>
+
+                    {errorMsg && (
+                      <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {errorMsg}
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 pt-2">
+                      <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                        {isSubmitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setEditMode(false)}
+                      >
+                        ยกเลิก
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Quick Stat Cards Dashboard (4 Stats Grid) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Total Orders Card */}
+              <button
+                onClick={() => setActiveTab("orders")}
+                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left group"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                    <ShoppingBag className="w-5 h-5" />
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-0.5">
+                  {userStats.totalOrders || 0}
+                </div>
+                <div className="text-xs text-gray-500 font-medium">คำสั่งซื้อทั้งหมด</div>
+              </button>
+
+              {/* Total Spent Card */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-left">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <CreditCard className="w-5 h-5" />
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-0.5">
+                  ฿{Number(userStats.totalSpent || 0).toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-500 font-medium">ยอดชำระสะสม</div>
+              </div>
+
+              {/* Points Card */}
+              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-left">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+                    <Star className="w-5 h-5" />
+                  </span>
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                    สะสมแต้ม
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-amber-600 mb-0.5">
+                  {points || profile?.points || 0}
+                </div>
+                <div className="text-xs text-gray-500 font-medium">แต้มสะสมทั้งหมด</div>
+              </div>
+
+              {/* Saved Addresses Card */}
+              <button
+                onClick={() => setActiveTab("shipping")}
+                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left group"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="p-2.5 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform">
+                    <MapPin className="w-5 h-5" />
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-0.5">
+                  {addresses.length || userStats.addressCount || 0}
+                </div>
+                <div className="text-xs text-gray-500 font-medium">ที่อยู่จัดส่งที่บันทึก</div>
+              </button>
+            </div>
+
+            {/* Detail Info Cards Grid (2 Columns) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Account Info Details */}
+              <Card className="border border-gray-100 shadow-sm">
+                <CardHeader className="border-b pb-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <User className="w-4 h-4 text-indigo-600" />
+                    ข้อมูลรายละเอียดบัญชี
+                  </h3>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-medium text-gray-500">ชื่อ-นามสกุล</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {profile?.name || formData.name || "-"}
+                    </span>
                   </div>
 
-                  <div className="col-span-full flex gap-2 mt-4">
-                    <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? "กำลังบันทึก..." : "บันทึก"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setEditMode(false)}
-                    >
-                      ยกเลิก
-                    </Button>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-medium text-gray-500">อีเมล</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {profile?.email || user?.email || "-"}
+                      </span>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" title="อีเมลได้รับการยืนยัน" />
+                    </div>
                   </div>
-                  {successMsg && (
-                    <p className="col-span-full text-green-600">{successMsg}</p>
-                  )}
-                  {errorMsg && (
-                    <p className="col-span-full text-red-500">{errorMsg}</p>
-                  )}
-                </form>
-              )}
-            </CardContent>
-          </Card>
+
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-medium text-gray-500">เบอร์โทรศัพท์</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {formData.phone || profile?.phone || "ไม่ได้ระบุ"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-medium text-gray-500">วิธีเข้าสู่ระบบ</span>
+                    <span className="text-sm font-semibold text-gray-800 capitalize">
+                      {profile?.provider === "google" ? "Google Account" : "Email & Password"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                    <span className="text-xs font-medium text-gray-500">วันที่สมัครสมาชิก</span>
+                    <span className="text-sm font-semibold text-gray-800 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                      {profile?.createdAt
+                        ? new Date(profile.createdAt).toLocaleDateString("th-TH", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })
+                        : "-"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs font-medium text-gray-500">เข้าใช้งานล่าสุด</span>
+                    <span className="text-sm font-semibold text-gray-800 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      {profile?.lastLoginAt
+                        ? new Date(profile.lastLoginAt).toLocaleDateString("th-TH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "เมื่อเร็วๆ นี้"}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Summary & Perks Card */}
+              <Card className="border border-gray-100 shadow-sm flex flex-col justify-between">
+                <div>
+                  <CardHeader className="border-b pb-4">
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      ที่อยู่หลัก & สิทธิประโยชน์
+                    </h3>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-4">
+                    {/* Default Shipping Address Overview */}
+                    <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                          ที่อยู่หลักสำหรับจัดส่ง
+                        </span>
+                        <button
+                          onClick={() => setActiveTab("shipping")}
+                          className="text-xs text-indigo-600 hover:underline font-medium"
+                        >
+                          จัดการที่อยู่
+                        </button>
+                      </div>
+
+                      {addresses.find((a) => a.isDefault) || addresses[0] ? (
+                        (() => {
+                          const defAddr = addresses.find((a) => a.isDefault) || addresses[0];
+                          return (
+                            <div className="text-xs text-gray-600 space-y-0.5">
+                              <p className="font-semibold text-gray-800">{defAddr.fullName}</p>
+                              <p>{defAddr.addressLine1} {defAddr.subdistrict} {defAddr.district} {defAddr.province} {defAddr.postalCode}</p>
+                              <p className="text-gray-500">โทร: {defAddr.phoneNumber}</p>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">
+                          ยังไม่ได้เพิ่มที่อยู่จัดส่ง
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Member Benefits */}
+                    <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                        <span className="text-xs font-bold text-amber-900">
+                          สิทธิพิเศษสำหรับสมาชิก
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        ทุกๆ การสั่งซื้อสินค้า 100 บาท รับทันที 1 แต้มสะสม เพื่อนำไปแลกเป็นคูปองส่วนลดและสิทธิพิเศษมากมาย!
+                      </p>
+                    </div>
+                  </CardContent>
+                </div>
+
+                <div className="p-6 pt-0">
+                  <Button
+                    onClick={() => setActiveTab("orders")}
+                    className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-0 flex items-center justify-center gap-2 font-medium text-sm py-2.5"
+                  >
+                    <Package className="w-4 h-4" />
+                    ดูประวัติคำสั่งซื้อทั้งหมด
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
         )}
 
         {/* Address Tab */}

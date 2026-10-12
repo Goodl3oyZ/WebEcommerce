@@ -61,10 +61,10 @@ export default function Header() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 w-full z-[100] transition-all duration-300 ${
           scrolled
-            ? "bg-white/90 backdrop-blur-xl shadow-md border-b border-gray-100"
-            : "bg-white/80 backdrop-blur-lg shadow-none border-none"
+            ? "bg-white/95 backdrop-blur-xl shadow-md border-b border-gray-100"
+            : "bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100/60"
         }`}
         style={{ WebkitBackdropFilter: "blur(14px)" }}
       >

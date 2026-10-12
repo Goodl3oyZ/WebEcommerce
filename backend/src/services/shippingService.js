@@ -8,6 +8,7 @@ import {
   shippingHistory,
 } from "../models/schema.js";
 import { eq, and, desc } from "drizzle-orm";
+import { ApiError } from "../utils/ApiError.js";
 
 export const shippingService = {
   async calculateShippingCost(addressId, items) {
@@ -266,16 +267,91 @@ export const shippingService = {
   },
 
   async createShippingMethod(data) {
-    const [method] = await db.insert(shippingMethods).values(data).returning();
+    const code = String(data.code || "").trim().toUpperCase();
+    const existing = await db.query.shippingMethods.findFirst({
+      where: eq(shippingMethods.code, code),
+    });
+    if (existing) {
+      throw ApiError.conflict("รหัสวิธีการจัดส่งนี้ถูกใช้แล้ว");
+    }
+    const [method] = await db
+      .insert(shippingMethods)
+      .values({
+        name: String(data.name).trim(),
+        code,
+        description: data.description || null,
+        price: String(data.price),
+        isActive: data.isActive ?? true,
+        shippingZoneId: data.shippingZoneId || null,
+      })
+      .returning();
     return method;
   },
 
   async updateShippingMethod(id, data) {
+    const payload = { updatedAt: new Date() };
+    if (data.name != null) payload.name = String(data.name).trim();
+    if (data.code != null) payload.code = String(data.code).trim().toUpperCase();
+    if (data.description !== undefined) payload.description = data.description;
+    if (data.price != null) payload.price = String(data.price);
+    if (data.isActive != null) payload.isActive = data.isActive;
+    if (data.shippingZoneId !== undefined) {
+      payload.shippingZoneId = data.shippingZoneId;
+    }
     const [method] = await db
       .update(shippingMethods)
-      .set(data)
+      .set(payload)
       .where(eq(shippingMethods.id, id))
       .returning();
+    if (!method) throw ApiError.notFound("ไม่พบวิธีการจัดส่ง");
     return method;
+  },
+
+  async deleteShippingMethod(id) {
+    const [method] = await db
+      .update(shippingMethods)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(shippingMethods.id, id))
+      .returning();
+    if (!method) throw ApiError.notFound("ไม่พบวิธีการจัดส่ง");
+    return method;
+  },
+
+  async createShippingZone(data) {
+    const [zone] = await db
+      .insert(shippingZones)
+      .values({
+        name: String(data.name).trim(),
+        description: data.description || null,
+        baseCost: String(data.baseCost),
+        isActive: data.isActive ?? true,
+      })
+      .returning();
+    return zone;
+  },
+
+  async updateShippingZone(id, data) {
+    const payload = { updatedAt: new Date() };
+    if (data.name != null) payload.name = String(data.name).trim();
+    if (data.description !== undefined) payload.description = data.description;
+    if (data.baseCost != null) payload.baseCost = String(data.baseCost);
+    if (data.isActive != null) payload.isActive = data.isActive;
+    const [zone] = await db
+      .update(shippingZones)
+      .set(payload)
+      .where(eq(shippingZones.id, id))
+      .returning();
+    if (!zone) throw ApiError.notFound("ไม่พบโซนจัดส่ง");
+    return zone;
+  },
+
+  async deleteShippingZone(id) {
+    const [zone] = await db
+      .update(shippingZones)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(shippingZones.id, id))
+      .returning();
+    if (!zone) throw ApiError.notFound("ไม่พบโซนจัดส่ง");
+    return zone;
   },
 };

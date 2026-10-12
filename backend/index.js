@@ -44,6 +44,8 @@ import reportRoutes from "./src/routes/reportRoutes.js";
 import supplierRoutes from "./src/routes/supplierRoutes.js";
 import inventoryRoutes from "./src/routes/inventoryRoutes.js";
 import notificationRoutes from "./src/routes/notificationRoutes.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./src/config/swagger.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -182,6 +184,35 @@ app.use(morgan("dev"));
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(compression());
+
+// Swagger API Documentation UI (with security check for production)
+if (process.env.NODE_ENV === "production" && process.env.SWAGGER_PROTECTED === "true") {
+  app.use("/api-docs", (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Basic ")) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="Swagger Docs"');
+      return res.status(401).send("Authentication required");
+    }
+    const credentials = Buffer.from(authHeader.split(" ")[1], "base64").toString("utf-8");
+    const [user, pass] = credentials.split(":");
+    if (user === (process.env.SWAGGER_USER || "admin") && pass === (process.env.SWAGGER_PASS || "admin")) {
+      return next();
+    }
+    res.setHeader("WWW-Authenticate", 'Basic realm="Swagger Docs"');
+    return res.status(401).send("Access denied");
+  });
+}
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: "WebEcommerce API Documentation",
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  })
+);
 
 app.use("/api/auth", authRoutes);
 app.use("/oauth", oauthRoutes);

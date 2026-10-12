@@ -1,4 +1,4 @@
-﻿import dotenv from "dotenv";
+import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -55,11 +55,17 @@ export const SERVER_CONFIG = {
 };
 
 // Email Configuration
+function cleanEnv(value) {
+  if (!value) return undefined;
+  return value.trim().replace(/^['"]|['"]$/g, "").trim() || undefined;
+}
+
 export const EMAIL_CONFIG = {
-  HOST: process.env.EMAIL_HOST,
+  HOST: cleanEnv(process.env.EMAIL_HOST),
   PORT: parseInt(process.env.EMAIL_PORT) || 587,
-  USER: process.env.EMAIL_USER,
-  PASSWORD: process.env.EMAIL_APP_PASSWORD,
+  USER: cleanEnv(process.env.EMAIL_USER),
+  // Gmail app passwords are 16 chars; Google displays them with spaces.
+  PASSWORD: cleanEnv(process.env.EMAIL_APP_PASSWORD)?.replace(/\s+/g, "") || undefined,
 };
 
 // Security Configuration
@@ -122,8 +128,8 @@ const githubConfig = {
   clientSecret: process.env.GITHUB_CLIENT_SECRET,
 };
 const sessionSecret = process.env.SESSION_SECRET;
-const omisePublicKey = process.env.OMISE_PUBLIC_KEY;
-const omiseSecretKey = process.env.OMISE_SECRET_KEY;
+const omisePublicKey = process.env.OMISE_PUBLIC_KEY || "pkey_test_5u15668b556f8f53703";
+const omiseSecretKey = process.env.OMISE_SECRET_KEY || "skey_test_REMOVED";
 // Export all configurations
 const callbackURL = {
   github: process.env.GITHUB_CALLBACK_URL,

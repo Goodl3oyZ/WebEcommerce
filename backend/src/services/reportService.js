@@ -7,57 +7,87 @@ import {
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { supplierService } from "./supplierService.js";
 
-// Generate sales report
-const generateSalesReport = async ({ startDate, endDate, groupBy }) => {
-  const whereConditions = [eq(orders.status, "COMPLETED")];
+import { redis } from "../config/redis.js";
 
-  if (startDate && endDate) {
-    whereConditions.push(
-      gte(orders.createdAt, new Date(startDate)),
-      lte(orders.createdAt, new Date(endDate))
-    );
+async function getCachedReport(cacheKey, fetchFn, ttlSeconds = 300) {
+  try {
+    if (redis?.isOpen) {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    }
+  } catch (err) {
+    console.warn("Redis cache read error:", err.message);
   }
 
-  const ordersData = await db.query.orders.findMany({
-    where: and(...whereConditions),
-    with: {
-      items: {
-        with: {
-          product: {
-            with: {
-              category: true,
+  const result = await fetchFn();
+
+  try {
+    if (redis?.isOpen) {
+      await redis.setEx(cacheKey, ttlSeconds, JSON.stringify(result));
+    }
+  } catch (err) {
+    console.warn("Redis cache write error:", err.message);
+  }
+
+  return result;
+}
+
+// Generate sales report with Redis cache
+const generateSalesReport = async ({ startDate, endDate, groupBy }) => {
+  const cacheKey = `report:sales:${startDate || "all"}:${endDate || "all"}:${groupBy || "none"}`;
+  return getCachedReport(cacheKey, async () => {
+    const whereConditions = [eq(orders.status, "COMPLETED")];
+
+    if (startDate && endDate) {
+      whereConditions.push(
+        gte(orders.createdAt, new Date(startDate)),
+        lte(orders.createdAt, new Date(endDate))
+      );
+    }
+
+    const ordersData = await db.query.orders.findMany({
+      where: and(...whereConditions),
+      with: {
+        items: {
+          with: {
+            product: {
+              with: {
+                category: true,
+              },
             },
+            variant: true,
           },
-          variant: true,
         },
       },
-    },
+    });
+
+    let report;
+    switch (groupBy) {
+      case "daily":
+        report = groupSalesByDaily(ordersData);
+        break;
+      case "monthly":
+        report = groupSalesByMonthly(ordersData);
+        break;
+      case "product":
+        report = groupSalesByProduct(ordersData);
+        break;
+      case "category":
+        report = groupSalesByCategory(ordersData);
+        break;
+      default:
+        report = {
+          totalSales: calculateTotalSales(ordersData),
+          totalOrders: ordersData.length,
+          averageOrderValue: calculateAverageOrderValue(ordersData),
+          orders: ordersData,
+        };
+    }
+
+    return report;
   });
-
-  let report;
-  switch (groupBy) {
-    case "daily":
-      report = groupSalesByDaily(ordersData);
-      break;
-    case "monthly":
-      report = groupSalesByMonthly(ordersData);
-      break;
-    case "product":
-      report = groupSalesByProduct(ordersData);
-      break;
-    case "category":
-      report = groupSalesByCategory(ordersData);
-      break;
-    default:
-      report = {
-        totalSales: calculateTotalSales(ordersData),
-        totalOrders: ordersData.length,
-        averageOrderValue: calculateAverageOrderValue(ordersData),
-        orders: ordersData,
-      };
-  }
-
-  return report;
 };
 
 // Generate inventory report

@@ -1,6 +1,6 @@
 import { db } from "../config/db.js";
 import { coupons, orderCoupons, orders, users } from "../models/schema.js";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, ilike } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 
 function isCouponActive(coupon, now = new Date()) {
@@ -72,8 +72,10 @@ export const couponService = {
     return all.filter((coupon) => isCouponActive(coupon, now));
   },
 
-  async getCoupons() {
+  async getCoupons({ search } = {}) {
+    const where = search ? ilike(coupons.code, `%${search}%`) : undefined;
     return db.query.coupons.findMany({
+      where,
       orderBy: [desc(coupons.createdAt)],
     });
   },
@@ -91,11 +93,20 @@ export const couponService = {
   },
 
   async createCoupon(data) {
+    const code = String(data.code || "").trim().toUpperCase();
+    const type =
+      data.type === "fixed" ? "fixed_amount" : data.type;
+    const existing = await db.query.coupons.findFirst({
+      where: eq(coupons.code, code),
+    });
+    if (existing) {
+      throw ApiError.conflict("รหัสคูปองนี้ถูกใช้แล้ว");
+    }
     const [coupon] = await db
       .insert(coupons)
       .values({
-        code: data.code,
-        type: data.type,
+        code,
+        type,
         value: String(data.value),
         minPurchase:
           data.minPurchase != null ? String(data.minPurchase) : null,
@@ -138,8 +149,22 @@ export const couponService = {
 
   async deleteCoupon(id) {
     const coupon = await this.getCouponById(id);
-    await db.delete(coupons).where(eq(coupons.id, id));
-    return coupon;
+    const [usage] = await db
+      .select({ count: sql`count(*)::int` })
+      .from(orderCoupons)
+      .where(eq(orderCoupons.couponId, id));
+
+    const [updated] = await db
+      .update(coupons)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(coupons.id, id))
+      .returning();
+
+    return {
+      ...updated,
+      disabledInsteadOfDeleted: (usage?.count ?? 0) > 0,
+      usageCount: usage?.count ?? 0,
+    };
   },
 
   async activateCoupon(id) {

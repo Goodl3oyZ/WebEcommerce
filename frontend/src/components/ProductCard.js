@@ -46,16 +46,15 @@ export default function ProductCard({ product }) {
 
   // Price formatter
   const formatPrice = (price) => {
-    if (price === undefined || price === null) return "0.00";
+    if (price === undefined || price === null) return "ยังไม่กำหนดราคา";
     const numPrice = typeof price === "string" ? parseFloat(price) : price;
-    return isNaN(numPrice)
-      ? "0.00"
-      : numPrice.toLocaleString("th-TH", {
-          style: "currency",
-          currency: "THB",
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-        });
+    if (isNaN(numPrice) || numPrice <= 0) return "ยังไม่กำหนดราคา";
+    return numPrice.toLocaleString("th-TH", {
+      style: "currency",
+      currency: "THB",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
   };
 
   return (

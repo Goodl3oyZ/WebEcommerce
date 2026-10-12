@@ -44,7 +44,7 @@ export const paymentDto = {
 
   // Process refund
   processRefund: z.object({
-    amount: z.number().min(0),
+    amount: z.coerce.number().min(0),
     reason: z.string().min(1),
     refundDetails: z.record(z.any()).optional(),
   }),

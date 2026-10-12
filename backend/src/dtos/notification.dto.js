@@ -8,9 +8,9 @@ export const notificationDto = {
     title: z.string().min(1),
     message: z.string().min(1),
     priority: z.enum(["low", "medium", "high"]).default("medium"),
-    recipients: z.array(z.number()).optional(),
+    userId: z.string().uuid().optional(),
+    recipients: z.array(z.string().uuid()).optional(),
     metadata: z.record(z.any()).optional(),
-    scheduledFor: z.string().datetime().optional(),
   }),
 
   // Update notification
@@ -27,9 +27,11 @@ export const notificationDto = {
     }),
 
   // Mark as read
-  markAsRead: z.object({
-    notificationIds: z.array(z.string().uuid()),
-  }),
+  markAsRead: z
+    .object({
+      notificationIds: z.array(z.string().uuid()).optional(),
+    })
+    .optional(),
 
   // Delete notification
   deleteNotification: z.object({

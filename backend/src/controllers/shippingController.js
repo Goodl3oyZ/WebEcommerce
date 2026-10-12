@@ -279,32 +279,26 @@ export const shippingController = {
     }
   },
 
-  async createShippingMethod(req, res) {
+  async createShippingMethod(req, res, next) {
     try {
       const method = await shippingService.createShippingMethod(req.body);
       res.status(201).json(method);
     } catch (error) {
-      res.status(500).json({
-        message: "Error creating shipping method",
-        error: error.message,
-      });
+      next(error);
     }
   },
 
-  async updateShippingMethod(req, res) {
+  async updateShippingMethod(req, res, next) {
     try {
       const { id } = req.params;
       const method = await shippingService.updateShippingMethod(id, req.body);
       res.json(method);
     } catch (error) {
-      res.status(500).json({
-        message: "Error updating shipping method",
-        error: error.message,
-      });
+      next(error);
     }
   },
 
-  async calculateShipping(req, res) {
+  async calculateShipping(req, res, next) {
     try {
       const { addressId, items } = req.body;
       const cost = await shippingService.calculateShippingCost(
@@ -423,71 +417,44 @@ export const shippingController = {
     }
   },
 
-  async deleteShippingMethod(req, res) {
+  async deleteShippingMethod(req, res, next) {
     try {
       const { id } = req.params;
       await shippingService.deleteShippingMethod(id);
-      res.status(204).send();
+      res.status(200).json({ success: true, message: "ปิดใช้งานวิธีจัดส่งแล้ว" });
     } catch (error) {
-      if (error.message === "Shipping method not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error deleting shipping method",
-        error: error.message,
-      });
+      next(error);
     }
   },
 
-  async deleteShippingZone(req, res) {
+  async deleteShippingZone(req, res, next) {
     try {
       const { id } = req.params;
       await shippingService.deleteShippingZone(id);
-      res.status(204).send();
+      res.status(200).json({ success: true, message: "ปิดใช้งานโซนจัดส่งแล้ว" });
     } catch (error) {
-      if (error.message === "Shipping zone not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error deleting shipping zone",
-        error: error.message,
-      });
+      next(error);
     }
   },
 
-  async createShippingZone(req, res) {
+  async createShippingZone(req, res, next) {
     try {
       const zoneData = req.body;
       const zone = await shippingService.createShippingZone(zoneData);
       res.status(201).json(zone);
     } catch (error) {
-      if (error.message === "Invalid zone data") {
-        return res.status(400).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error creating shipping zone",
-        error: error.message,
-      });
+      next(error);
     }
   },
 
-  async updateShippingZone(req, res) {
+  async updateShippingZone(req, res, next) {
     try {
       const { id } = req.params;
       const zoneData = req.body;
       const zone = await shippingService.updateShippingZone(id, zoneData);
       res.json(zone);
     } catch (error) {
-      if (error.message === "Shipping zone not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Invalid zone data") {
-        return res.status(400).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error updating shipping zone",
-        error: error.message,
-      });
+      next(error);
     }
   },
 };

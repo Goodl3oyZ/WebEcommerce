@@ -183,4 +183,52 @@ export const adminController = {
         .json({ message: "Error fetching dashboard", error: error.message });
     }
   },
+
+  // Run Seed Scripts
+  async runSeed(req, res) {
+    const { exec } = await import("child_process");
+    try {
+      const { seedType } = req.body || {};
+      let script = "";
+
+      switch (seedType) {
+        case "address":
+          script = "node src/seed/seed-address-thai.js";
+          break;
+        case "shipping":
+          script = "node src/seed/seed-shipping-payment.js";
+          break;
+        case "main":
+          script = "node src/seed/seed.js";
+          break;
+        case "all":
+          script =
+            "node src/seed/seed.js && node src/seed/seed-shipping-payment.js && node src/seed/seed-address-thai.js";
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid seedType provided" });
+      }
+
+      const cwd = process.cwd();
+      exec(script, { cwd, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Seed execution error (${seedType}):`, error);
+          return res.status(500).json({
+            success: false,
+            message: `Seed failed: ${error.message}`,
+            output: (stdout || "") + "\n" + (stderr || ""),
+          });
+        }
+        res.json({
+          success: true,
+          message: `Seed '${seedType}' completed successfully!`,
+          output: stdout || stderr || "Seed completed",
+        });
+      });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error running seed script", error: error.message });
+    }
+  },
 };

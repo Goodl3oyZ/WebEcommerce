@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { adminAPI } from "@/lib/api";
 import toast from "react-hot-toast";
+import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
+import ErrorState from "@/components/ErrorState";
+import EmptyState from "@/components/EmptyState";
 
 const COUPON_TYPE_LABELS = {
   percentage: "ลด %",
@@ -361,15 +364,20 @@ export function CouponsPanel() {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">กำลังโหลด...</div>
+        <PanelSkeleton rows={8} />
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-4">
-          {error}
-        </div>
+        <ErrorState message={error} onRetry={loadData} />
+      ) : coupons.length === 0 ? (
+        <EmptyState
+          title="ยังไม่มีคูปอง"
+          description="สร้างคูปองแรกเพื่อใช้โปรโมชันกับลูกค้า"
+          actionLabel="เพิ่มคูปองใหม่"
+          onAction={openCreate}
+        />
       ) : (
-        <div className="overflow-x-auto rounded-xl shadow border border-gray-100">
-          <table className="min-w-full bg-white text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto max-h-[70vh] rounded-xl shadow border border-border">
+          <table className="min-w-full bg-surface text-sm">
+            <thead className="sticky top-0 z-10 bg-surface-muted">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">รหัสคูปอง</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">ประเภท</th>
@@ -380,16 +388,9 @@ export function CouponsPanel() {
                 <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {coupons.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400">
-                    ยังไม่มีคูปอง
-                  </td>
-                </tr>
-              ) : (
-                coupons.map((coupon) => (
-                  <tr key={coupon.id} className="hover:bg-gray-50 transition">
+            <tbody className="divide-y divide-border">
+              {coupons.map((coupon) => (
+                  <tr key={coupon.id} className="hover:bg-surface-muted transition">
                     <td className="px-4 py-3 font-mono font-bold text-blue-700">
                       {coupon.code}
                     </td>
@@ -443,8 +444,7 @@ export function CouponsPanel() {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
             </tbody>
           </table>
         </div>

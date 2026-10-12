@@ -1,5 +1,5 @@
 import { db } from "../config/db.js";
-import { notifications } from "../models/schema.js";
+import { notifications, users } from "../models/schema.js";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -71,27 +71,42 @@ const markAllAsRead = async (userId) => {
 
 const deleteNotification = async (notificationId, userId) => {
   await getNotificationById(notificationId, userId);
-
-  await db
-    .delete(notifications)
-    .where(
-      and(
-        eq(notifications.id, notificationId),
-        eq(notifications.userId, userId)
-      )
-    );
+  const conditions = [eq(notifications.id, notificationId)];
+  if (userId) conditions.push(eq(notifications.userId, userId));
+  await db.delete(notifications).where(and(...conditions));
 };
 
 const createNotification = async (notificationData) => {
-  const [created] = await db
-    .insert(notifications)
-    .values({
-      ...notificationData,
-      isRead: false,
-    })
-    .returning();
+  const payload = {
+    title: String(notificationData.title || "").trim(),
+    message: String(notificationData.message || "").trim(),
+    type: notificationData.type,
+    metadata: {
+      ...(notificationData.metadata || {}),
+      priority: notificationData.priority || "medium",
+    },
+    isRead: false,
+  };
 
-  return created;
+  const recipientIds = [
+    ...(notificationData.userId ? [notificationData.userId] : []),
+    ...(notificationData.recipients || []),
+  ].filter(Boolean);
+
+  if (recipientIds.length === 0) {
+    const allUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.isActive, true));
+    recipientIds.push(...allUsers.map((u) => u.id));
+  }
+
+  if (recipientIds.length === 0) {
+    throw ApiError.badRequest("ไม่มีผู้รับการแจ้งเตือน");
+  }
+
+  const rows = recipientIds.map((userId) => ({ ...payload, userId }));
+  return db.insert(notifications).values(rows).returning();
 };
 
 const updateNotification = async (notificationId, updateData, userId = null) => {

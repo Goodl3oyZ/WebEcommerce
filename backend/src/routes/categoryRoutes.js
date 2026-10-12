@@ -30,6 +30,12 @@ router.put(
   validationMiddleware(categoryDto.updateCategory),
   categoryController.updateCategory
 );
+router.patch(
+  "/:id",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(categoryDto.updateCategory),
+  categoryController.updateCategory
+);
 router.delete(
   "/:id",
   requireRole(ROLES.ADMIN),

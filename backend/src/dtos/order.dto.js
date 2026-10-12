@@ -31,6 +31,7 @@ export const orderDto = {
     .object({
       status: z.enum([
         "pending",
+        "confirmed",
         "processing",
         "shipped",
         "delivered",

@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { adminAPI } from "@/lib/api";
 import toast from "react-hot-toast";
+import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
+import ErrorState from "@/components/ErrorState";
+import EmptyState from "@/components/EmptyState";
 
 const REPORT_TABS = [
   { key: "sales", label: "ยอดขาย", icon: "💰" },
@@ -27,7 +30,13 @@ function StatCard({ label, value, sub, color = "blue" }) {
 }
 
 function SalesReportView({ data }) {
-  if (!data) return <div className="text-gray-400 py-8 text-center">ไม่มีข้อมูล</div>;
+  if (!data)
+    return (
+      <EmptyState
+        title="ยังไม่มีข้อมูลยอดขาย"
+        description="เลือกช่วงวันที่แล้วกดดูรายงาน"
+      />
+    );
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -40,9 +49,9 @@ function SalesReportView({ data }) {
       {data.dailySales?.length > 0 && (
         <div>
           <h4 className="font-semibold text-gray-700 mb-3">ยอดขายรายวัน (30 วันล่าสุด)</h4>
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
+          <div className="overflow-x-auto max-h-[70vh] rounded-xl border border-gray-100">
             <table className="min-w-full bg-white text-sm">
-              <thead className="bg-gray-50">
+              <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">วันที่</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-600">จำนวนออเดอร์</th>
@@ -78,7 +87,13 @@ function SalesReportView({ data }) {
 }
 
 function InventoryReportView({ data }) {
-  if (!data) return <div className="text-gray-400 py-8 text-center">ไม่มีข้อมูล</div>;
+  if (!data)
+    return (
+      <EmptyState
+        title="ยังไม่มีข้อมูลสินค้าคงคลัง"
+        description="เลือกช่วงวันที่แล้วกดดูรายงาน"
+      />
+    );
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -91,9 +106,9 @@ function InventoryReportView({ data }) {
       {data.lowStockItems?.length > 0 && (
         <div>
           <h4 className="font-semibold text-gray-700 mb-3 text-orange-700">⚠ สินค้าใกล้หมดสต็อก</h4>
-          <div className="overflow-x-auto rounded-xl border border-orange-100">
+          <div className="overflow-x-auto max-h-[70vh] rounded-xl border border-orange-100">
             <table className="min-w-full bg-white text-sm">
-              <thead className="bg-orange-50">
+              <thead className="sticky top-0 z-10 bg-orange-50">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-orange-700">สินค้า</th>
                   <th className="px-4 py-3 text-left font-semibold text-orange-700">SKU</th>
@@ -118,7 +133,13 @@ function InventoryReportView({ data }) {
 }
 
 function CustomerReportView({ data }) {
-  if (!data) return <div className="text-gray-400 py-8 text-center">ไม่มีข้อมูล</div>;
+  if (!data)
+    return (
+      <EmptyState
+        title="ยังไม่มีข้อมูลลูกค้า"
+        description="เลือกช่วงวันที่แล้วกดดูรายงาน"
+      />
+    );
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -131,9 +152,9 @@ function CustomerReportView({ data }) {
       {data.topCustomers?.length > 0 && (
         <div>
           <h4 className="font-semibold text-gray-700 mb-3">Top ลูกค้า</h4>
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
+          <div className="overflow-x-auto max-h-[70vh] rounded-xl border border-gray-100">
             <table className="min-w-full bg-white text-sm">
-              <thead className="bg-gray-50">
+              <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">ชื่อ</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">อีเมล</th>
@@ -203,8 +224,14 @@ export function ReportsPanel() {
   };
 
   const renderContent = () => {
-    if (loading[activeTab]) return <div className="text-center py-12 text-gray-400">กำลังโหลด...</div>;
-    if (errors[activeTab]) return <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-4">{errors[activeTab]}</div>;
+    if (loading[activeTab]) return <PanelSkeleton cards={4} rows={6} />;
+    if (errors[activeTab])
+      return (
+        <ErrorState
+          message={errors[activeTab]}
+          onRetry={() => loadReport(activeTab)}
+        />
+      );
     if (activeTab === "sales") return <SalesReportView data={data.sales} />;
     if (activeTab === "inventory") return <InventoryReportView data={data.inventory} />;
     if (activeTab === "customer") return <CustomerReportView data={data.customer} />;

@@ -1,6 +1,6 @@
 import { db } from "../config/db.js";
 import { categories, products } from "../models/schema.js";
-import { eq, and, like, or, desc, sql } from "drizzle-orm";
+import { eq, and, ilike, or, desc, sql } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { productService } from "./productService.js";
 
@@ -12,21 +12,17 @@ export const categoryService = {
     if (search) {
       whereConditions.push(
         or(
-          like(categories.name, `%${search}%`),
-          like(categories.description, `%${search}%`)
+          ilike(categories.name, `%${search}%`),
+          ilike(categories.description, `%${search}%`)
         )
       );
     }
 
     const categoryList = await db.query.categories.findMany({
       where: whereConditions.length > 0 ? and(...whereConditions) : undefined,
-      with: {
-        parent: true,
-        children: true,
-      },
       limit: parseInt(limit),
       offset: parseInt(offset),
-      orderBy: (categories, { asc }) => [asc(categories.order)],
+      orderBy: (categories, { asc }) => [asc(categories.name)],
     });
 
     const total = await db
@@ -104,18 +100,39 @@ export const categoryService = {
   },
 
   async createCategory(categoryData) {
+    const name = String(categoryData.name || "").trim();
+    if (!name) {
+      throw ApiError.badRequest("กรุณากรอกชื่อหมวดหมู่");
+    }
+    const existing = await db.query.categories.findFirst({
+      where: eq(categories.name, name),
+    });
+    if (existing) {
+      throw ApiError.conflict("มีหมวดหมู่นี้อยู่แล้ว");
+    }
     const [newCategory] = await db
       .insert(categories)
-      .values(categoryData)
+      .values({
+        name,
+        description: categoryData.description?.trim() || null,
+      })
       .returning();
 
     return newCategory;
   },
 
   async updateCategory(id, updates) {
+    const payload = {};
+    if (updates.name != null) payload.name = String(updates.name).trim();
+    if (updates.description !== undefined) {
+      payload.description = updates.description?.trim() || null;
+    }
+    if (Object.keys(payload).length === 0) {
+      throw ApiError.badRequest("ไม่มีข้อมูลที่จะอัปเดต");
+    }
     const [updatedCategory] = await db
       .update(categories)
-      .set(updates)
+      .set(payload)
       .where(eq(categories.id, id))
       .returning();
 
@@ -133,10 +150,10 @@ export const categoryService = {
       .from(products)
       .where(eq(products.categoryId, id));
 
-    if (Number(productsCount[0].count) > 0) {
-      throw new ApiError(
-        "Cannot delete category with associated products",
-        400
+    const related = Number(productsCount[0].count);
+    if (related > 0) {
+      throw ApiError.badRequest(
+        `ไม่สามารถลบหมวดหมู่ได้ เพราะมีสินค้าผูกอยู่ ${related} รายการ`
       );
     }
 
@@ -153,66 +170,8 @@ export const categoryService = {
   },
 
   async getCategoryTree() {
-    const allCategories = await db.query.categories.findMany({
-      with: {
-        children: true,
-      },
-      orderBy: (categories, { asc }) => [asc(categories.order)],
+    return db.query.categories.findMany({
+      orderBy: (categories, { asc }) => [asc(categories.name)],
     });
-
-    // Build tree structure
-    const categoryMap = new Map();
-    const tree = [];
-
-    // First pass: create map of all categories
-    allCategories.forEach((category) => {
-      categoryMap.set(category.id, {
-        ...category,
-        children: [],
-      });
-    });
-
-    // Second pass: build tree structure
-    allCategories.forEach((category) => {
-      const categoryWithChildren = categoryMap.get(category.id);
-      if (category.parentId) {
-        const parent = categoryMap.get(category.parentId);
-        if (parent) {
-          parent.children.push(categoryWithChildren);
-        }
-      } else {
-        tree.push(categoryWithChildren);
-      }
-    });
-
-    return tree;
-  },
-
-  async updateCategoryOrder(id, order) {
-    const [updatedCategory] = await db
-      .update(categories)
-      .set({ order })
-      .where(eq(categories.id, id))
-      .returning();
-
-    if (!updatedCategory) {
-      throw new Error("Category not found");
-    }
-
-    return updatedCategory;
-  },
-
-  async updateCategoryVisibility(id, isVisible) {
-    const [updatedCategory] = await db
-      .update(categories)
-      .set({ isVisible })
-      .where(eq(categories.id, id))
-      .returning();
-
-    if (!updatedCategory) {
-      throw new Error("Category not found");
-    }
-
-    return updatedCategory;
   },
 };

@@ -6,12 +6,12 @@ export const couponDto = {
   createCoupon: z
     .object({
       code: z.string().min(1),
-      type: z.enum(["percentage", "fixed"]),
-      value: z.number().min(0),
+      type: z.enum(["percentage", "fixed", "fixed_amount"]),
+      value: z.coerce.number().min(0),
       minPurchase: z.number().min(0).optional(),
       maxDiscount: z.number().min(0).optional(),
-      startDate: z.string().datetime(),
-      endDate: z.string().datetime(),
+      startDate: z.string().min(1),
+      endDate: z.string().min(1),
       usageLimit: z.number().min(0).optional(),
       perUserLimit: z.number().min(0).optional(),
       isActive: z.boolean().default(true),
@@ -30,12 +30,12 @@ export const couponDto = {
   updateCoupon: z
     .object({
       code: z.string().min(1).optional(),
-      type: z.enum(["percentage", "fixed"]).optional(),
-      value: z.number().min(0).optional(),
+      type: z.enum(["percentage", "fixed", "fixed_amount"]).optional(),
+      value: z.coerce.number().min(0).optional(),
       minPurchase: z.number().min(0).optional(),
       maxDiscount: z.number().min(0).optional(),
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
+      startDate: z.string().min(1).optional(),
+      endDate: z.string().min(1).optional(),
       usageLimit: z.number().min(0).optional(),
       perUserLimit: z.number().min(0).optional(),
       isActive: z.boolean().optional(),

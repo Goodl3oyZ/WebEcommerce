@@ -4,8 +4,11 @@ import {
   orders,
   paymentMethods,
   storePaymentSettings,
+  refunds,
 } from "../models/schema.js";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { ApiError } from "../utils/ApiError.js";
+import { writeAuditLog } from "./auditService.js";
 
 export const paymentService = {
   async createPayment(
@@ -64,6 +67,16 @@ export const paymentService = {
     }
   },
 
+  async getTransactionById(paymentId) {
+    const payment = await db.query.paymentTransactions.findFirst({
+      where: eq(paymentTransactions.id, paymentId),
+    });
+    if (!payment) {
+      throw ApiError.notFound("ไม่พบรายการชำระเงิน");
+    }
+    return payment;
+  },
+
   async getPaymentById(userId, paymentId) {
     const payment = await db.query.paymentTransactions.findFirst({
       where: and(
@@ -73,7 +86,7 @@ export const paymentService = {
     });
 
     if (!payment) {
-      throw new Error("Payment not found");
+      throw ApiError.notFound("ไม่พบรายการชำระเงิน");
     }
 
     return payment;
@@ -117,29 +130,63 @@ export const paymentService = {
     }
   },
 
-  async refundPayment(userId, paymentId, amount, reason) {
-    try {
-      const payment = await this.getPaymentById(userId, paymentId);
-      if (payment.status !== "completed") {
-        throw new Error("Payment not eligible for refund");
-      }
-      if (amount > payment.amount) {
-        throw new Error("Refund amount cannot exceed payment amount");
-      }
-      const [refundedPayment] = await db
+  async refundPayment(userId, paymentId, amount, reason, actorId) {
+    const payment = userId
+      ? await this.getPaymentById(userId, paymentId)
+      : await this.getTransactionById(paymentId);
+    if (payment.status !== "completed") {
+      throw ApiError.badRequest("รายการนี้ไม่สามารถคืนเงินได้");
+    }
+    if (amount > Number(payment.amount)) {
+      throw ApiError.badRequest("จำนวนเงินคืนต้องไม่เกินยอดชำระ");
+    }
+
+    return db.transaction(async (tx) => {
+      const [refundedPayment] = await tx
         .update(paymentTransactions)
         .set({
           status: "refunded",
-          refundAmount: amount,
+          refundAmount: String(amount),
           refundReason: reason,
           updatedAt: new Date(),
         })
         .where(eq(paymentTransactions.id, paymentId))
         .returning();
+
+      if (payment.orderId) {
+        await tx
+          .update(orders)
+          .set({
+            status: "refunded",
+            paymentStatus: "refunded",
+            refundAmount: String(amount),
+            refundReason: reason,
+            refundedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, payment.orderId));
+
+        await tx.insert(refunds).values({
+          orderId: payment.orderId,
+          amount: String(amount),
+          reason,
+          status: "completed",
+          processedBy: actorId || userId || null,
+          processedAt: new Date(),
+        });
+      }
+
+      await writeAuditLog({
+        actorId: actorId || userId,
+        entity: "payments",
+        entityId: paymentId,
+        action: "refund",
+        before: { status: payment.status, amount: payment.amount },
+        after: { status: "refunded", refundAmount: amount, reason },
+      });
+
       return refundedPayment;
-    } catch (err) {
-      throw err;
-    }
+    });
   },
 
   async getPaymentMethods() {
@@ -475,5 +522,70 @@ export const paymentService = {
       }
     }
     return updated;
+  },
+
+  async processRefund(paymentId, { amount, reason, processedBy }) {
+    return await db.transaction(async (tx) => {
+      const payment = await tx.query.paymentTransactions.findFirst({
+        where: eq(paymentTransactions.id, paymentId),
+      });
+
+      if (!payment) {
+        throw ApiError.notFound("ไม่พบรายการชำระเงิน");
+      }
+
+      const refundAmt = amount ? String(amount) : payment.amount;
+
+      const [refundRecord] = await tx
+        .insert(refunds)
+        .values({
+          orderId: payment.orderId,
+          amount: refundAmt,
+          reason: reason || "Admin initiated refund",
+          status: "completed",
+          processedBy: processedBy || null,
+          processedAt: new Date(),
+        })
+        .returning();
+
+      const [updatedPayment] = await tx
+        .update(paymentTransactions)
+        .set({
+          status: "refunded",
+          refundAmount: refundAmt,
+          refundReason: reason,
+          updatedAt: new Date(),
+        })
+        .where(eq(paymentTransactions.id, paymentId))
+        .returning();
+
+      if (payment.orderId) {
+        await tx
+          .update(orders)
+          .set({
+            status: "refunded",
+            paymentStatus: "refunded",
+            refundAmount: refundAmt,
+            refundReason: reason,
+            refundedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, payment.orderId));
+      }
+
+      await writeAuditLog({
+        actorId: processedBy,
+        entity: "payments",
+        entityId: paymentId,
+        action: "refund",
+        before: { status: payment.status },
+        after: { status: "refunded", amount: refundAmt, reason },
+      });
+
+      return {
+        payment: updatedPayment,
+        refund: refundRecord,
+      };
+    });
   },
 };

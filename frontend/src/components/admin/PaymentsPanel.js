@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { adminAPI } from "@/lib/api";
 import toast from "react-hot-toast";
+import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
+import ErrorState from "@/components/ErrorState";
+import EmptyState from "@/components/EmptyState";
 
 const STATUS_BADGE = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -220,13 +223,18 @@ export function PaymentsPanel() {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">กำลังโหลด...</div>
+        <PanelSkeleton rows={8} />
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-600 rounded-lg p-4">{error}</div>
+        <ErrorState message={error} onRetry={loadData} />
+      ) : payments.length === 0 ? (
+        <EmptyState
+          title="ไม่มีรายการชำระเงิน"
+          description="เมื่อมีการชำระเงิน รายการจะแสดงที่นี่"
+        />
       ) : (
-        <div className="overflow-x-auto rounded-xl shadow border border-gray-100">
-          <table className="min-w-full bg-white text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto max-h-[70vh] rounded-xl shadow border border-border">
+          <table className="min-w-full bg-surface text-sm">
+            <thead className="sticky top-0 z-10 bg-surface-muted">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Transaction ID</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Order ID</th>
@@ -237,14 +245,9 @@ export function PaymentsPanel() {
                 <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {payments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400">ไม่มีรายการชำระเงิน</td>
-                </tr>
-              ) : (
-                payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50 transition">
+            <tbody className="divide-y divide-border">
+              {payments.map((p) => (
+                  <tr key={p.id} className="hover:bg-surface-muted transition">
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.id?.slice(0, 8)}...</td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.orderId?.slice(0, 8)}...</td>
                     <td className="px-4 py-3 text-gray-600">{METHOD_LABEL[p.paymentMethod] || p.paymentMethod || "-"}</td>
@@ -274,8 +277,7 @@ export function PaymentsPanel() {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
             </tbody>
           </table>
         </div>

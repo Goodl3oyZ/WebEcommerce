@@ -1,5 +1,15 @@
 export class ApiError extends Error {
-  constructor(statusCode, message, errors = null, code = null) {
+  constructor(statusCodeOrMessage, messageOrStatus, errors = null, code = null) {
+    const statusFirst = typeof statusCodeOrMessage === "number";
+    const statusCode = statusFirst
+      ? statusCodeOrMessage
+      : typeof messageOrStatus === "number"
+        ? messageOrStatus
+        : 500;
+    const message = statusFirst
+      ? messageOrStatus || "Error"
+      : statusCodeOrMessage;
+
     super(message);
     this.statusCode = statusCode;
     this.errors = errors;

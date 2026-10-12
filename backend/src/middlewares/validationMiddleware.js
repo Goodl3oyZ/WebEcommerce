@@ -32,8 +32,9 @@ export const validationMiddleware = (schema, source = "body") => {
           message: err.message,
         }));
         return res.status(400).json({
+          success: false,
           status: "error",
-          message: "Validation failed",
+          message: "ข้อมูลไม่ถูกต้อง (Validation failed)",
           errors,
         });
       }

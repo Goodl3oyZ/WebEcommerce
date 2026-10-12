@@ -4,41 +4,14 @@ import { z } from "zod";
 export const categoryDto = {
   // Create category
   createCategory: z.object({
-    name: z.string().min(1),
+    name: z.string().min(1).trim(),
     description: z.string().optional(),
-    parentId: z.string().uuid().optional(),
-    image: z.string().url().optional(),
-    isActive: z.boolean().default(true),
-    attributes: z
-      .array(
-        z.object({
-          name: z.string(),
-          type: z.enum(["text", "number", "boolean", "select"]),
-          required: z.boolean().default(false),
-          options: z.array(z.string()).optional(),
-        })
-      )
-      .optional(),
   }),
 
-  // Update category
   updateCategory: z
     .object({
       name: z.string().min(1).optional(),
       description: z.string().optional(),
-      parentId: z.string().uuid().optional(),
-      image: z.string().url().optional(),
-      isActive: z.boolean().optional(),
-      attributes: z
-        .array(
-          z.object({
-            name: z.string(),
-            type: z.enum(["text", "number", "boolean", "select"]),
-            required: z.boolean().default(false),
-            options: z.array(z.string()).optional(),
-          })
-        )
-        .optional(),
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",

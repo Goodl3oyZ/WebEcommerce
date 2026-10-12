@@ -70,5 +70,13 @@ router.post(
   paymentController.processRefund
 );
 router.get("/:id", paymentController.getPaymentById);
+router.delete("/:id", (req, res) => {
+  res.status(400).json({
+    success: false,
+    status: "error",
+    message: "ไม่สามารถลบข้อมูลธุรกรรมการชำระเงินได้ โปรดใช้การคืนเงิน (Refund) แทน",
+    code: "HARD_DELETE_PROHIBITED",
+  });
+});
 
 export default router;

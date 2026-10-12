@@ -14,7 +14,7 @@ export const couponController = {
   }),
 
   getCoupons: catchAsync(async (req, res) => {
-    const coupons = await couponService.getCoupons();
+    const coupons = await couponService.getCoupons({ search: req.query.search });
     res.json(coupons);
   }),
 
@@ -34,8 +34,14 @@ export const couponController = {
   }),
 
   deleteCoupon: catchAsync(async (req, res) => {
-    await couponService.deleteCoupon(req.params.id);
-    res.status(204).send();
+    const coupon = await couponService.deleteCoupon(req.params.id);
+    res.json({
+      success: true,
+      data: coupon,
+      message: coupon.disabledInsteadOfDeleted
+        ? "คูปองเคยถูกใช้แล้ว จึงปิดการใช้งานแทนการลบ"
+        : "ปิดการใช้งานคูปองแล้ว",
+    });
   }),
 
   activateCoupon: catchAsync(async (req, res) => {

@@ -31,7 +31,7 @@ import ProductTable from "@/components/ui/ProductTable";
 // Mock API functions (replace with your actual API)
 const mockAPI = {
   products: {
-    getAll: async () => productsAPI.getAllProducts(),
+    getAll: async (params) => productsAPI.getAllProducts(params),
     create: async (data) => productsAPI.createProduct(data),
     update: async (id, data) => productsAPI.updateProduct(id, data),
     delete: async (id) => productsAPI.deleteProduct(id),
@@ -169,7 +169,7 @@ export function ProductsPanel() {
     setIsLoading(true);
     try {
       const [productsRes, brandsRes, categoriesRes] = await Promise.all([
-        mockAPI.products.getAll(),
+        mockAPI.products.getAll({ includeInactive: "true" }),
         mockAPI.brands.getAll(),
         mockAPI.categories.getAll(),
       ]);
@@ -413,7 +413,7 @@ export function ProductsPanel() {
 
   // Final save
   const handleFinalSave = async () => {
-    if (!productData || variants.length === 0) {
+    if (!productData) {
       toast.error("ข้อมูลไม่ครบถ้วน");
       return;
     }
@@ -426,105 +426,106 @@ export function ProductsPanel() {
       // Strictly coerce price and stock to numbers before sending
       const priceNum = Number(productData.price);
       const stockNum = Number(productData.stock);
-      const fixedProductData = {
-        ...productData,
-        price: isNaN(priceNum) ? 0 : priceNum,
-        stock: isNaN(stockNum) ? 0 : stockNum,
-      };
 
-      // Create product (ไม่มีรูปภาพก่อน)
+      const isEdit = !!editingProduct;
+
+      // Product payload
       const productPayload = {
-        ...fixedProductData,
-        price: isNaN(priceNum) ? 0 : priceNum, // force number
-        stock: isNaN(stockNum) ? 0 : stockNum, // force number
-        imageUrl: [], // ยังไม่มีรูปภาพ
-        stock: totalStock, // This `stock` will be the sum of variant stocks
-        hasVariants: watchHasVariants, // Use the actual value from the form
+        name: productData.name,
+        description: productData.description || "",
+        price: isNaN(priceNum) ? 0 : priceNum,
+        stock: variants.length > 0 ? totalStock : (isNaN(stockNum) ? 0 : stockNum),
+        categoryId: productData.categoryId || undefined,
+        brandId: productData.brandId || undefined,
+        isActive: productData.isActive ?? true,
       };
 
-      const productResponse = await mockAPI.products.create(productPayload);
+      let productId = null;
 
-      if (productResponse.status === 201) {
-        // สร้าง variants ตามสถานะ hasVariants
-        if (watchHasVariants) {
-          // สถานะ 2: มีหลาย variants - สร้างแต่ละ variant แยก
+      if (isEdit) {
+        const response = await mockAPI.products.update(
+          editingProduct.id,
+          productPayload
+        );
+        if (response.status === 200 || response.status === 204) {
+          productId = editingProduct.id;
+          toast.success("อัปเดตสินค้าสำเร็จ!");
+        }
+      } else {
+        const response = await mockAPI.products.create(productPayload);
+        if (response.status === 201 || response.status === 200) {
+          productId = response.data.id;
+          toast.success("สร้างสินค้าใหม่สำเร็จ!");
+        }
+      }
+
+      if (productId) {
+        // Handle variants if needed
+        if (variants.length > 0) {
           const variantsPayload = variants.map((variant) => {
             const vPrice = Number(variant.price);
             const vStock = Number(variant.stock);
             return {
-              // แปลงข้อมูลให้ตรงกับ backend schema
+              id: variant.id,
               color: variant.color || "Default",
               size: variant.size || "Default",
-              sku: variant.sku,
+              sku: variant.sku || generateSKU(productData.name, "Variant"),
               price: isNaN(vPrice) ? 0 : vPrice,
               stock: isNaN(vStock) ? 0 : vStock,
             };
           });
 
-          await mockAPI.variants.createBatch(
-            productResponse.data.id,
-            variantsPayload
-          );
-        } else {
-          // สถานะ 1: ไม่มี variants - สร้าง default variant เดียว
-          const defaultVariant = {
-            color: "Default",
-            size: "Default",
-            sku: generateSKU(productData.name, "Default"),
-            price: fixedProductData.price,
-            stock: fixedProductData.stock,
-          };
-
-          await mockAPI.variants.createBatch(productResponse.data.id, [
-            defaultVariant,
-          ]);
-        }
-
-        // อัปโหลดรูปภาพหลังจากสร้างสินค้า (ถ้ามีรูปภาพที่เลือก)
-        if (uploadedImages.length > 0) {
-          try {
-            const uploadedUrls = await uploadImages(
-              uploadedImages,
-              productResponse.data.id
-            );
-
-            // อัปเดตสินค้าให้มีรูปภาพ
-            await mockAPI.products.update(productResponse.data.id, {
-              imageUrl: uploadedUrls,
-            });
-
-            toast.success("อัปโหลดรูปภาพสำเร็จ");
-          } catch (error) {
-            console.error("Upload error:", error);
-            toast.error(
-              "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ แต่สินค้าถูกสร้างแล้ว"
-            );
+          if (!isEdit) {
+            await mockAPI.variants.createBatch(productId, variantsPayload);
           }
         }
 
-        toast.success("บันทึกสินค้าสำเร็จ!");
+        // Upload images
+        if (uploadedImages.length > 0) {
+          try {
+            const uploadedUrls = await uploadImages(uploadedImages, productId);
+            await mockAPI.products.update(productId, {
+              imageUrl: uploadedUrls,
+            });
+          } catch (imgErr) {
+            console.error("Upload error:", imgErr);
+          }
+        }
+
         resetForm();
         loadInitialData();
       }
     } catch (error) {
-      toast.error("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
       console.error(error);
+      const errMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
+      toast.error(errMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Delete product
-  const handleDeleteProduct = async (productId) => {
-    if (!confirm("คุณแน่ใจหรือไม่ที่จะลบสินค้านี้?")) return;
+  // Toggle Hide/Show Product
+  const handleToggleActiveProduct = async (productOrId) => {
+    const product =
+      typeof productOrId === "object"
+        ? productOrId
+        : products.find((p) => p.id === productOrId);
+    if (!product) return;
+
+    const newActiveState = !product.isActive;
+    const actionLabel = newActiveState ? "เปิดแสดงสินค้า" : "ซ่อนสินค้า";
+    if (!confirm(`คุณแน่ใจหรือไม่ที่จะ ${actionLabel} "${product.name}"?`)) return;
 
     setIsLoading(true);
     try {
-      await mockAPI.products.delete(productId);
-      toast.success("ลบสินค้าสำเร็จ!");
+      await mockAPI.products.update(product.id, { isActive: newActiveState });
+      toast.success(`${actionLabel}สำเร็จ!`);
       loadInitialData();
     } catch (error) {
-      toast.error("เกิดข้อผิดพลาดในการลบสินค้า");
+      toast.error(`เกิดข้อผิดพลาดในการ ${actionLabel}`);
     } finally {
       setIsLoading(false);
     }
@@ -599,30 +600,63 @@ export function ProductsPanel() {
     }
   };
 
-  // เพิ่มฟังก์ชัน handleEditProduct ที่หายไป
+  // Handle Edit Product
   const handleEditProduct = (product) => {
     setEditingProduct(product);
-    setProductData({
-      name: product.name,
-      description: product.description,
-      categoryId: product.categoryId,
-      brandId: product.brandId,
-      isActive: product.isActive,
-      hasVariants: product.hasVariants,
-      price: product.price,
-      stock: product.stock,
-    });
 
-    // Convert existing images to the new format
-    const existingImages = (product.imageUrl || []).map((url, index) => ({
+    const initialValues = {
+      name: product.name || "",
+      description: product.description || "",
+      categoryId: product.categoryId || "",
+      brandId: product.brandId || "",
+      isActive: product.isActive ?? true,
+      hasVariants:
+        product.hasVariants || (product.variants && product.variants.length > 0),
+      price: product.price || 0,
+      stock: product.stock || 0,
+    };
+
+    setProductData(initialValues);
+    reset(initialValues);
+
+    // Convert existing images to current format
+    const rawImages = Array.isArray(product.imageUrl)
+      ? product.imageUrl
+      : product.imageUrl
+      ? [product.imageUrl]
+      : [];
+    const existingImages = rawImages.map((url, index) => ({
       id: `existing-${index}`,
       url,
-      isPrimary: index === 0, // First image is primary
+      isPrimary: index === 0,
     }));
     setUploadedImages(existingImages);
 
+    // Populate variants
+    if (product.variants && product.variants.length > 0) {
+      setVariants(
+        product.variants.map((v) => ({
+          id: v.id,
+          color: v.color || "Default",
+          size: v.size || "Default",
+          sku: v.sku || "",
+          price: v.price || product.price || 0,
+          stock: v.stock || 0,
+        }))
+      );
+    } else {
+      setVariants([
+        {
+          color: "Default",
+          size: "Default",
+          sku: generateSKU(product.name || "PRD", "Default"),
+          price: product.price || 0,
+          stock: product.stock || 0,
+        },
+      ]);
+    }
+
     setCurrentStep(0);
-    // TODO: Load variants if product has variants
   };
 
   // เก็บไฟล์ที่เลือกไว้ (ไม่อัปโหลดทันที)
@@ -739,8 +773,22 @@ export function ProductsPanel() {
                 {/* Step 1: Basic Information */}
                 {currentStep === 0 && (
                   <div className="bg-gray-50 rounded-lg p-6">
+                    {editingProduct && (
+                      <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
+                        <span className="font-semibold text-sm">
+                          ✏️ กำลังแก้ไขสินค้า: <span className="underline">{editingProduct.name}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={resetForm}
+                          className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded-md transition"
+                        >
+                          ยกเลิกการแก้ไข (สร้างใหม่)
+                        </button>
+                      </div>
+                    )}
                     <h2 className="text-lg font-semibold mb-4">
-                      ข้อมูลพื้นฐานสินค้า
+                      {editingProduct ? "แก้ไขข้อมูลสินค้า" : "ข้อมูลพื้นฐานสินค้า"}
                     </h2>
                     <form
                       onSubmit={handleSubmit(handleBasicInfoSubmit)}
@@ -1433,7 +1481,7 @@ export function ProductsPanel() {
                       categories={categories}
                       brands={brands}
                       onEdit={handleEditProduct}
-                      onDelete={handleDeleteProduct}
+                      onDelete={handleToggleActiveProduct}
                       onView={(product) => {
                         handleEditProduct(product);
                         setCurrentStep(0);
@@ -1467,11 +1515,11 @@ export function ProductsPanel() {
                                 <FaEdit size={12} />
                               </button>
                               <button
-                                onClick={() => handleDeleteProduct(product.id)}
-                                className="text-red-600 hover:text-red-800 p-1"
-                                title="ลบ"
+                                onClick={() => handleToggleActiveProduct(product)}
+                                className={`p-1 ${product.isActive ? 'text-amber-600 hover:text-amber-800' : 'text-green-600 hover:text-green-800'}`}
+                                title={product.isActive ? 'ซ่อนสินค้า' : 'แสดงสินค้า'}
                               >
-                                <FaTrash size={12} />
+                                <FaEye size={12} />
                               </button>
                             </div>
                           </div>

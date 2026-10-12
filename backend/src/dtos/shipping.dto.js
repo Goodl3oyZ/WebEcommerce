@@ -148,7 +148,7 @@ export const shippingDto = {
     name: z.string().min(1).max(100),
     code: z.string().min(1).max(50),
     description: z.string().optional(),
-    price: z.number().min(0),
+    price: z.coerce.number().min(0),
     isActive: z.boolean().default(true),
     shippingZoneId: z.string().uuid().optional(),
   }),
@@ -158,7 +158,7 @@ export const shippingDto = {
       name: z.string().min(1).max(100).optional(),
       code: z.string().min(1).max(50).optional(),
       description: z.string().optional(),
-      price: z.number().min(0).optional(),
+      price: z.coerce.number().min(0).optional(),
       isActive: z.boolean().optional(),
       shippingZoneId: z.string().uuid().optional(),
     })
@@ -166,8 +166,22 @@ export const shippingDto = {
       message: "At least one field must be provided for update",
     }),
 
-  createShippingZone: CreateShippingZoneDto,
-  updateShippingZone: UpdateShippingZoneDto,
+  createShippingZone: z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().optional(),
+    baseCost: z.coerce.number().min(0),
+    isActive: z.boolean().optional(),
+  }),
+  updateShippingZone: z
+    .object({
+      name: z.string().min(1).max(100).optional(),
+      description: z.string().optional(),
+      baseCost: z.coerce.number().min(0).optional(),
+      isActive: z.boolean().optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field must be provided for update",
+    }),
 
   createShipment: z.object({
     orderId: z.string().uuid(),

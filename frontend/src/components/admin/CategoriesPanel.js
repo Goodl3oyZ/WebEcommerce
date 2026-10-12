@@ -34,11 +34,15 @@ export function CategoriesPanel() {
 
   const onSubmit = async (data) => {
     try {
+      const payload = {
+        name: data.name,
+        description: data.description,
+      };
       if (editingId) {
-        await adminAPI.updateCategory(editingId, data);
+        await adminAPI.updateCategory(editingId, payload);
         toast.success("Category updated!");
       } else {
-        await adminAPI.createCategory(data);
+        await adminAPI.createCategory(payload);
         toast.success("Category created!");
       }
       reset();

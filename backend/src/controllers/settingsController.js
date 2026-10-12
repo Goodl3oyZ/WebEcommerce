@@ -7,16 +7,26 @@ let appSettings = {
 
 export const settingsController = {
   getSettings: (req, res) => {
-    res.json(appSettings);
+    res.json({
+      success: true,
+      data: appSettings,
+    });
   },
 
   getPublicSettings: (req, res) => {
     const { siteName, maintenance, theme, currency } = appSettings;
-    res.json({ siteName, maintenance, theme, currency });
+    res.json({
+      success: true,
+      data: { siteName, maintenance, theme, currency },
+    });
   },
 
   updateSettings: (req, res) => {
     appSettings = { ...appSettings, ...req.body };
-    res.json(appSettings);
+    res.json({
+      success: true,
+      data: appSettings,
+      message: "การตั้งค่าถูกบันทึกเรียบร้อยแล้ว",
+    });
   },
 };

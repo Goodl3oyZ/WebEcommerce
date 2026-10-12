@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import {
   FaEdit,
   FaTrash,
@@ -15,6 +16,9 @@ import {
   FaTimes,
   FaImage,
 } from "react-icons/fa";
+import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
+import EmptyState from "@/components/EmptyState";
+import { resolveProductImageUrl } from "@/lib/images";
 
 export default function ProductTable({
   products = [],
@@ -39,7 +43,7 @@ export default function ProductTable({
     return products.filter((product) => {
       const matchesSearch =
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchTerm.toLowerCase());
+        (product.description || "").toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory =
         !selectedCategory || product.categoryId == selectedCategory;
       const matchesBrand = !selectedBrand || product.brandId == selectedBrand;
@@ -116,14 +120,7 @@ export default function ProductTable({
   };
 
   if (isLoading) {
-    return (
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-medium">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <PanelSkeleton rows={8} />;
   }
 
   return (
@@ -253,9 +250,9 @@ export default function ProductTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="hidden max-h-[70vh] overflow-auto md:block">
         <table className="w-full">
-          <thead className="bg-gray-50">
+          <thead className="sticky top-0 z-10 bg-gray-50">
             <tr>
               <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 สินค้า
@@ -318,15 +315,17 @@ export default function ProductTable({
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-16 w-16">
-                      {product.imageUrl && product.imageUrl.length > 0 ? (
-                        <img
-                          className="h-16 w-16 rounded-lg object-cover shadow-sm"
-                          src={product.imageUrl[0]}
+                    <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-gray-200 shadow-sm">
+                      {resolveProductImageUrl(product.imageUrl) ? (
+                        <Image
+                          className="object-cover"
+                          src={resolveProductImageUrl(product.imageUrl)}
                           alt={product.name}
+                          fill
+                          sizes="64px"
                         />
                       ) : (
-                        <div className="h-16 w-16 rounded-lg bg-gray-200 flex items-center justify-center shadow-sm">
+                        <div className="flex h-16 w-16 items-center justify-center">
                           <FaImage className="text-gray-400 text-xl" />
                         </div>
                       )}
@@ -371,42 +370,39 @@ export default function ProductTable({
                 </td>
                 <td className="px-6 py-4">
                   <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                       product.isActive
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
+                        ? "bg-green-100 text-green-800 border border-green-200"
+                        : "bg-gray-100 text-gray-600 border border-gray-200"
                     }`}
                   >
-                    {product.isActive ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+                    {product.isActive ? "แสดงอยู่" : "ซ่อนอยู่"}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm font-medium">
-                  <div className="flex items-center gap-3">
-                    {onView && (
-                      <button
-                        onClick={() => onView(product)}
-                        className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="ดูรายละเอียด"
-                      >
-                        <FaEye size={16} />
-                      </button>
-                    )}
+                  <div className="flex items-center gap-2">
                     {onEdit && (
                       <button
                         onClick={() => onEdit(product)}
-                        className="p-2 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="แก้ไข"
+                        className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="แก้ไขสินค้า"
                       >
-                        <FaEdit size={16} />
+                        <FaEdit size={13} />
+                        แก้ไข
                       </button>
                     )}
-                    {onDelete && (
+                    {(onDelete || onView) && (
                       <button
-                        onClick={() => onDelete(product.id)}
-                        className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-colors"
-                        title="ลบ"
+                        onClick={() => onDelete ? onDelete(product) : onView(product)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
+                          product.isActive
+                            ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            : "bg-green-50 text-green-700 hover:bg-green-100"
+                        }`}
+                        title={product.isActive ? "ซ่อนสินค้าจากหน้าร้าน" : "เปิดแสดงสินค้าหน้าร้าน"}
                       >
-                        <FaTrash size={16} />
+                        <FaEye size={13} />
+                        {product.isActive ? "ซ่อนสินค้า" : "แสดงสินค้า"}
                       </button>
                     )}
                   </div>
@@ -416,6 +412,71 @@ export default function ProductTable({
           </tbody>
         </table>
       </div>
+
+      <ul className="space-y-3 p-4 md:hidden">
+        {paginatedProducts.map((product) => (
+          <li
+            key={product.id}
+            className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex gap-3">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-200">
+                {resolveProductImageUrl(product.imageUrl) ? (
+                  <Image
+                    src={resolveProductImageUrl(product.imageUrl)}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                    sizes="64px"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <FaImage className="text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-gray-900">{product.name}</p>
+                <p className="text-sm text-gray-500">
+                  ฿{Number(product.price).toLocaleString()} · {product.stock} ชิ้น
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex gap-2">
+              {onView && (
+                <button
+                  type="button"
+                  onClick={() => onView(product)}
+                  className="rounded-lg p-2 text-blue-600"
+                  aria-label="ดูรายละเอียด"
+                >
+                  <FaEye />
+                </button>
+              )}
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(product)}
+                  className="rounded-lg p-2 text-indigo-600"
+                  aria-label="แก้ไข"
+                >
+                  <FaEdit />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(product)}
+                  className={`rounded-lg p-2 ${product.isActive ? 'text-amber-600' : 'text-green-600'}`}
+                  aria-label={product.isActive ? 'ซ่อนสินค้า' : 'แสดงสินค้า'}
+                >
+                  <FaEye />
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -478,29 +539,20 @@ export default function ProductTable({
 
       {/* Empty State */}
       {paginatedProducts.length === 0 && (
-        <div className="p-12 text-center">
-          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <FaSearch className="text-gray-400 text-2xl" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            ไม่พบสินค้า
-          </h3>
-          <p className="text-gray-600 mb-4">
-            ไม่พบสินค้าที่ตรงกับเงื่อนไขการค้นหา
-          </p>
-          {(searchTerm ||
-            selectedCategory ||
-            selectedBrand ||
-            statusFilter) && (
-            <button
-              onClick={clearFilters}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-            >
-              <FaTimes size={12} />
-              ล้างตัวกรอง
-            </button>
-          )}
-        </div>
+        <EmptyState
+          title="ไม่พบสินค้า"
+          description="ไม่พบสินค้าที่ตรงกับเงื่อนไขการค้นหา"
+          actionLabel={
+            searchTerm || selectedCategory || selectedBrand || statusFilter
+              ? "ล้างตัวกรอง"
+              : undefined
+          }
+          onAction={
+            searchTerm || selectedCategory || selectedBrand || statusFilter
+              ? clearFilters
+              : undefined
+          }
+        />
       )}
     </div>
   );

@@ -63,5 +63,13 @@ router.patch(
   orderController.updateOrderStatus
 );
 router.get("/:orderId", orderController.getOrder);
+router.delete("/:orderId", (req, res) => {
+  res.status(400).json({
+    success: false,
+    status: "error",
+    message: "ไม่สามารถลบข้อมูลคำสั่งซื้อได้ โปรดใช้การยกเลิกหรือคืนเงินแทน",
+    code: "HARD_DELETE_PROHIBITED",
+  });
+});
 
 export default router;

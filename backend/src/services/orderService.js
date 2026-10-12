@@ -14,8 +14,10 @@ import {
   paymentTransactions,
   shipments,
 } from "../models/schema.js";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, ilike, or } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
+import { assertOrderTransition } from "../utils/orderStatus.js";
+import { writeAuditLog } from "./auditService.js";
 import { cartService } from "./cartService.js";
 import { generateOrderNumber } from "../utils/orderUtils.js";
 import { omiseService } from "./omiseService.js";
@@ -419,6 +421,7 @@ export const orderService = {
           orderData.omiseSource
         );
 
+        let createdCharge = null;
         if (["omise", "card", "promptpay"].includes(normalizedCode)) {
           try {
             const chargeParams = {
@@ -441,13 +444,26 @@ export const orderService = {
               chargeParams.card = orderData.omiseToken;
             }
             if (normalizedCode === "promptpay") {
-              if (!orderData.omiseSource) {
+              let sourceId = orderData.omiseSource;
+              if (!sourceId) {
+                try {
+                  const promptpaySource = await omiseService.createSource({
+                    type: "promptpay",
+                    amount: Math.round(total * 100),
+                    currency: "THB",
+                  });
+                  sourceId = promptpaySource?.id;
+                } catch (sourceErr) {
+                  console.error("[OrderService] Failed to auto-create Omise PromptPay source:", sourceErr);
+                }
+              }
+              if (!sourceId) {
                 throw new ApiError(
-                  "Missing Omise source for promptpay payment",
+                  "Missing or failed to create Omise source for promptpay payment",
                   400
                 );
               }
-              chargeParams.source = orderData.omiseSource;
+              chargeParams.source = sourceId;
             }
 
             console.log(
@@ -456,6 +472,7 @@ export const orderService = {
             );
 
             const charge = await omiseService.createCharge(chargeParams);
+            createdCharge = charge;
 
             // อัปเดต payment record
             await paymentService.updatePayment(
@@ -514,13 +531,14 @@ export const orderService = {
             "source=",
             orderData.omiseSource
           );
-          // สำหรับวิธีการชำระเงินที่ไม่ใช่ Omise (เช่น โอนเงิน)
-          // สถานะการชำระเงินของ Order และ Payment Transaction ควรเป็น "pending" หรือ "waiting_for_payment"
-          // และจะถูกอัปเดตเมื่อมีการยืนยันการชำระเงินภายหลัง
         }
 
         // Return complete order with items (ใช้ tx)
-        return await this.getOrderById(userId, order.id, tx);
+        const finalOrder = await this.getOrderById(userId, order.id, tx);
+        if (createdCharge) {
+          finalOrder.charge = createdCharge;
+        }
+        return finalOrder;
       });
     } catch (err) {
       console.error("Error creating order:", err); // Log error
@@ -605,9 +623,10 @@ export const orderService = {
     }
     if (search) {
       whereConditions.push(
-        sql`${orders.id}::text ILIKE ${`%${search}%`} OR ${
-          orders.userId
-        }::text ILIKE ${`%${search}%`}`
+        or(
+          ilike(orders.orderNumber, `%${search}%`),
+          sql`${orders.id}::text ILIKE ${`%${search}%`}`
+        )
       );
     }
 
@@ -641,6 +660,7 @@ export const orderService = {
 
     return {
       items: orderList,
+      orders: orderList,
       pagination: {
         total: total[0].count,
         page,
@@ -687,34 +707,40 @@ export const orderService = {
   },
 
   // เพิ่มฟังก์ชัน updateOrderStatus สำหรับ webhook/payment
-  async updateOrderStatus(orderId, { status, notes }) {
-    const validStatuses = [
-      "pending",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
-      "paid",
-      "refunded",
-    ];
-    if (!validStatuses.includes(status)) {
-      throw new Error("Invalid status");
+  async updateOrderStatus(orderId, { status, notes, userId, actorId }) {
+    const existing = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+    });
+    if (!existing) {
+      throw ApiError.notFound("ไม่พบออเดอร์");
     }
+    if (userId && existing.userId !== userId) {
+      throw ApiError.forbidden("ไม่มีสิทธิ์แก้ไขออเดอร์นี้");
+    }
+    assertOrderTransition(existing.status, status);
+
     const [updatedOrder] = await db
       .update(orders)
-      .set({ status, updatedAt: new Date() })
+      .set({ status, statusNotes: notes || existing.statusNotes, updatedAt: new Date() })
       .where(eq(orders.id, orderId))
       .returning();
-    if (!updatedOrder) {
-      throw new Error("Order not found");
-    }
-    // Add status history
+
     await db.insert(orderStatusHistory).values({
       orderId,
       status,
       comment: notes || `Status updated to ${status}`,
-      createdBy: null,
+      createdBy: actorId || userId || null,
     });
+
+    await writeAuditLog({
+      actorId: actorId || userId,
+      entity: "orders",
+      entityId: orderId,
+      action: "update_status",
+      before: { status: existing.status },
+      after: { status },
+    });
+
     return updatedOrder;
   },
 };
