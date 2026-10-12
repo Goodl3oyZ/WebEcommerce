@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --ci --coverage",
@@ -23,9 +23,12 @@
     "db:reset": "npm run migrate && npm run clearSeed && npm run seed:all",
     "docs:validate": "node scripts/validate-swagger.js",
     "storage:init": "node scripts/init-buckets.mjs",
+    "audit:routes": "node scripts/audit-routes.js",
     "docker:dev": "docker-compose -f docker-compose.yaml up --build",
     "docker:dev:down": "docker-compose -f docker-compose.yaml down",
-    "docker:dev:logs": "docker-compose -f docker-compose.yaml logs -f"
+    "docker:dev:logs": "docker-compose -f docker-compose.yaml logs -f",
+    "test:infra:down": "docker compose -f docker-compose.test.yml down",
+    "test:baseline:prune": "node scripts/prune-route-baseline.js"
   },
   "keywords": [],
   "author": "",
@@ -87,10 +90,19 @@
   "jest": {
     "testEnvironment": "node",
     "transform": {},
-    "moduleNameMapper": {
-      "^(\\.{1,2}/.*)\\.js$": "$1"
-    },
+    "testMatch": [
+      "<rootDir>/src/tests/**/*.test.js"
+    ],
+    "setupFiles": [
+      "<rootDir>/src/tests/setupEnv.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/tests/setupAfterEnv.js"
+    ],
     "globalSetup": "<rootDir>/src/tests/globalSetup.js",
+    "globalTeardown": "<rootDir>/src/tests/globalTeardown.js",
+    "testTimeout": 30000,
+    "maxWorkers": 4,
     "coverageDirectory": "coverage",
     "collectCoverageFrom": [
       "src/**/*.js",
