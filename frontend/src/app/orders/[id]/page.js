@@ -76,7 +76,7 @@ function getOrderProgressStatus(order, tracking) {
       const TRACKING_STATUS = {
         PICKED_UP: {
           label: "พนักงานรับพัสดุแล้ว",
-          color: "bg-blue-100 text-blue-700",
+          color: "bg-blue-100 text-fg",
           icon: Truck,
         },
         IN_TRANSIT: {
@@ -157,7 +157,7 @@ function OrderItem({ item }) {
         </div>
       </div>
       <div className="text-right min-w-[80px]">
-        <div className="text-indigo-700 font-bold text-base">
+        <div className="text-fg font-bold text-base">
           ฿{item.price.toLocaleString()}
         </div>
       </div>
@@ -189,7 +189,7 @@ function OrderSummary({ order }) {
       <hr className="my-2" />
       <div className="flex justify-between text-lg font-bold">
         <span>ยอดรวม</span>
-        <span className="text-indigo-800">
+        <span className="text-fg">
           ฿{Number(order.total).toLocaleString()}
         </span>
       </div>
@@ -201,10 +201,10 @@ function ShippingInfo({ order, tracking }) {
   return (
     <div className="bg-white rounded-xl shadow p-5 border flex flex-col gap-2">
       <div className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-        <Truck className="w-5 h-5 text-indigo-400" /> ข้อมูลการจัดส่ง
+        <Truck className="w-5 h-5 text-fg-subtle" /> ข้อมูลการจัดส่ง
       </div>
       <div className="text-sm text-gray-700">
-        <MapPin className="w-4 h-4 inline-block mr-1 text-indigo-300" />
+        <MapPin className="w-4 h-4 inline-block mr-1 text-fg-subtle" />
         {order.shippingAddress
           ? `${order.shippingAddress.fullName} | ${
               order.shippingAddress.addressLine1 || ""
@@ -246,7 +246,7 @@ function PaymentInfo({ order }) {
   return (
     <div className="bg-white rounded-xl shadow p-5 border flex flex-col gap-2">
       <div className="font-semibold text-gray-800 mb-1 flex items-center gap-2">
-        <CreditCard className="w-5 h-5 text-indigo-400" /> ข้อมูลการชำระเงิน
+        <CreditCard className="w-5 h-5 text-fg-subtle" /> ข้อมูลการชำระเงิน
       </div>
       <div className="text-sm text-gray-700">
         วิธีชำระเงิน: {order.paymentMethod && order.paymentMethod.name}
@@ -300,7 +300,7 @@ function PaymentModal({
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
-          className="mb-6 w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400"
+          className="mb-6 w-full border rounded-lg p-3 focus:ring-2 focus:ring-fg"
         >
           <option value="credit_card">บัตรเครดิต/เดบิต</option>
           <option value="promptpay">PromptPay</option>
@@ -308,7 +308,7 @@ function PaymentModal({
         {paymentMethod === "credit_card" && (
           <div className="space-y-3 mb-6">
             <input
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400"
+              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-fg"
               placeholder="ชื่อบนบัตร"
               value={cardInfo.name}
               onChange={(e) =>
@@ -316,7 +316,7 @@ function PaymentModal({
               }
             />
             <input
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400"
+              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-fg"
               placeholder="หมายเลขบัตร"
               value={cardInfo.number}
               onChange={(e) =>
@@ -326,7 +326,7 @@ function PaymentModal({
             />
             <div className="flex gap-2">
               <input
-                className="w-1/2 border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400"
+                className="w-1/2 border rounded-lg p-3 focus:ring-2 focus:ring-fg"
                 placeholder="MM/YY"
                 value={cardInfo.exp}
                 onChange={(e) =>
@@ -335,7 +335,7 @@ function PaymentModal({
                 maxLength={5}
               />
               <input
-                className="w-1/2 border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400"
+                className="w-1/2 border rounded-lg p-3 focus:ring-2 focus:ring-fg"
                 placeholder="CVC"
                 value={cardInfo.cvc}
                 onChange={(e) =>
@@ -353,7 +353,7 @@ function PaymentModal({
         )}
         <div className="flex gap-3 mt-4">
           <button
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg font-bold shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 bg-fg hover:bg-fg/85 text-white px-4 py-3 rounded-lg font-bold shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             onClick={onPay}
             disabled={isPaying}
           >
@@ -485,8 +485,8 @@ export default function OrderDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 to-white animate-fade-in">
-        <Loader2 className="w-14 h-14 text-indigo-500 animate-spin mb-6" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-canvas to-white animate-fade-in">
+        <Loader2 className="w-14 h-14 text-fg-muted animate-spin mb-6" />
         <div className="w-40 h-6 bg-gray-200 rounded mb-2 animate-pulse" />
         <div className="w-24 h-4 bg-gray-100 rounded animate-pulse" />
       </div>
@@ -516,7 +516,7 @@ export default function OrderDetailsPage() {
       <div className="bg-white rounded-xl shadow p-6 border flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Package className="w-8 h-8 text-indigo-500" />
+            <Package className="w-8 h-8 text-fg-muted" />
             <span className="text-xl md:text-2xl font-extrabold text-gray-900">
               คำสั่งซื้อ #{order.orderNumber || order.id}
             </span>
@@ -550,7 +550,7 @@ export default function OrderDetailsPage() {
                 : "คำสั่งซื้อนี้ยังไม่ได้ชำระเงิน"}
             </div>
             <button
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-semibold shadow"
+              className="bg-fg hover:bg-fg/85 text-white px-5 py-2 rounded-lg font-semibold shadow"
               onClick={() => setShowPaymentModal(true)}
             >
               ชำระเงิน
@@ -563,7 +563,7 @@ export default function OrderDetailsPage() {
             คำสั่งซื้อนี้ถูกยกเลิกแล้ว ชำระเงินไม่ได้ สั่งซื้อสินค้าชุดเดิมใหม่ได้
           </div>
           <button
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-semibold shadow disabled:opacity-60"
+            className="bg-fg hover:bg-fg/85 text-white px-5 py-2 rounded-lg font-semibold shadow disabled:opacity-60"
             onClick={handleReorder}
             disabled={isReordering}
           >
@@ -574,7 +574,7 @@ export default function OrderDetailsPage() {
       {/* Order Items */}
       <div className="bg-white rounded-xl shadow p-6 border">
         <div className="flex items-center gap-2 mb-4 text-lg font-bold text-gray-800">
-          <Package className="w-5 h-5 text-indigo-500" /> สินค้าในคำสั่งซื้อ
+          <Package className="w-5 h-5 text-fg-muted" /> สินค้าในคำสั่งซื้อ
         </div>
         {order.items.map((item) => (
           <OrderItem key={item.id} item={item} />

@@ -407,11 +407,11 @@ export default function Profile() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-indigo-50 to-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-canvas to-white">
       {/* Sidebar open button for mobile (user icon) - only when sidebar is closed */}
       {!sidebarOpen && (
         <button
-          className="fixed top-20 right-4 z-50 md:hidden bg-white rounded-full p-2 shadow focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="fixed top-20 right-4 z-50 md:hidden bg-white rounded-full p-2 shadow focus:outline-none focus:ring-2 focus:ring-fg"
           aria-label="เปิดเมนูโปรไฟล์"
           onClick={() => setSidebarOpen(true)}
         >
@@ -427,7 +427,7 @@ export default function Profile() {
               <Image
                 src={imagePreview || "/default-avatar.png"}
                 alt="Avatar"
-                className="rounded-full object-cover border-4 border-indigo-200 shadow"
+                className="rounded-full object-cover border-4 border-border shadow"
                 fill
               />
             </div>
@@ -435,7 +435,7 @@ export default function Profile() {
               {formData.name || "-"}
             </div>
             <div className="text-xs text-gray-500">{user?.email || "-"}</div>
-            <div className="mt-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium flex items-center gap-1">
+            <div className="mt-2 px-3 py-1 bg-surface-muted text-fg rounded-full text-xs font-medium flex items-center gap-1">
               <Star className="w-4 h-4 text-yellow-500" />
               {points} แต้มสะสม
             </div>
@@ -448,8 +448,8 @@ export default function Profile() {
                 className={classNames(
                   "flex items-center gap-3 px-4 py-2 rounded-lg transition text-base font-medium",
                   activeTab === tab.id
-                    ? "bg-indigo-600 text-white shadow"
-                    : "hover:bg-indigo-50 text-gray-700"
+                    ? "bg-fg text-white shadow"
+                    : "hover:bg-fg/5 text-gray-700"
                 )}
               >
                 <tab.icon className="w-5 h-5" />
@@ -478,7 +478,7 @@ export default function Profile() {
           <aside className="relative w-64 max-w-full bg-white p-6 shadow-lg h-full flex flex-col justify-start animate-slide-in-left">
             {/* Close button (X) above profile */}
             <button
-              className="absolute top-4 left-4 bg-gray-100 rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="absolute top-4 left-4 bg-gray-100 rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-fg"
               aria-label="ปิดเมนูโปรไฟล์"
               onClick={() => setSidebarOpen(false)}
             >
@@ -489,7 +489,7 @@ export default function Profile() {
                 <Image
                   src={imagePreview || "/default-avatar.png"}
                   alt="Avatar"
-                  className="rounded-full object-cover border-4 border-indigo-200 shadow"
+                  className="rounded-full object-cover border-4 border-border shadow"
                   fill
                 />
               </div>
@@ -497,7 +497,7 @@ export default function Profile() {
                 {formData.name || "-"}
               </div>
               <div className="text-xs text-gray-500">{user?.email || "-"}</div>
-              <div className="mt-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium flex items-center gap-1">
+              <div className="mt-2 px-3 py-1 bg-surface-muted text-fg rounded-full text-xs font-medium flex items-center gap-1">
                 <Star className="w-4 h-4 text-yellow-500" />
                 {points} แต้มสะสม
               </div>
@@ -513,8 +513,8 @@ export default function Profile() {
                   className={classNames(
                     "flex items-center gap-3 px-4 py-2 rounded-lg transition text-base font-medium",
                     activeTab === tab.id
-                      ? "bg-indigo-600 text-white shadow"
-                      : "hover:bg-indigo-50 text-gray-700"
+                      ? "bg-fg text-white shadow"
+                      : "hover:bg-fg/5 text-gray-700"
                   )}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -550,7 +550,7 @@ export default function Profile() {
             {/* Profile Hero Card */}
             <Card className="overflow-hidden border-0 shadow-lg bg-white">
               {/* Top Banner Gradient */}
-              <div className="h-32 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 relative">
+              <div className="h-32 bg-gradient-to-r from-[#0f0f0f] via-[#1c1c1c] to-[#0f0f0f] relative">
                 <div className="absolute top-4 right-4 flex gap-2">
                   <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white rounded-full text-xs font-medium flex items-center gap-1.5 shadow-sm">
                     <ShieldCheck className="w-4 h-4 text-emerald-300" />
@@ -572,7 +572,7 @@ export default function Profile() {
                       <button
                         type="button"
                         onClick={() => setEditMode(!editMode)}
-                        className="absolute bottom-1 right-1 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-md transition-transform hover:scale-105"
+                        className="absolute bottom-1 right-1 p-2 bg-fg hover:bg-fg/85 text-white rounded-full shadow-md transition-transform hover:scale-105"
                         title="เปลี่ยนรูปโปรไฟล์"
                       >
                         <Edit3 className="w-4 h-4" />
@@ -599,7 +599,7 @@ export default function Profile() {
                   <Button
                     onClick={() => setEditMode(!editMode)}
                     variant={editMode ? "ghost" : "outline"}
-                    className="flex items-center gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    className="flex items-center gap-2 border-border text-fg hover:bg-fg/5"
                   >
                     <Edit3 className="w-4 h-4" />
                     {editMode ? "ยกเลิกแก้ไข" : "แก้ไขโปรไฟล์"}
@@ -681,7 +681,7 @@ export default function Profile() {
                     )}
 
                     <div className="flex gap-3 pt-2">
-                      <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                      <Button type="submit" disabled={isSubmitting} className="bg-fg hover:bg-fg/85 text-white">
                         {isSubmitting ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
                       </Button>
                       <Button
@@ -705,7 +705,7 @@ export default function Profile() {
                 className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left group"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                  <span className="p-2.5 bg-surface-muted text-fg rounded-xl group-hover:scale-110 transition-transform">
                     <ShoppingBag className="w-5 h-5" />
                   </span>
                   <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
@@ -769,7 +769,7 @@ export default function Profile() {
               <Card className="border border-gray-100 shadow-sm">
                 <CardHeader className="border-b pb-4">
                   <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                    <User className="w-4 h-4 text-indigo-600" />
+                    <User className="w-4 h-4 text-fg" />
                     ข้อมูลรายละเอียดบัญชี
                   </h3>
                 </CardHeader>
@@ -851,12 +851,12 @@ export default function Profile() {
                     <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                          <MapPin className="w-3.5 h-3.5 text-fg" />
                           ที่อยู่หลักสำหรับจัดส่ง
                         </span>
                         <button
                           onClick={() => setActiveTab("shipping")}
-                          className="text-xs text-indigo-600 hover:underline font-medium"
+                          className="text-xs text-fg hover:underline font-medium"
                         >
                           จัดการที่อยู่
                         </button>
@@ -898,7 +898,7 @@ export default function Profile() {
                 <div className="p-6 pt-0">
                   <Button
                     onClick={() => setActiveTab("orders")}
-                    className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-0 flex items-center justify-center gap-2 font-medium text-sm py-2.5"
+                    className="w-full bg-surface-muted hover:bg-fg/10 text-fg border-0 flex items-center justify-center gap-2 font-medium text-sm py-2.5"
                   >
                     <Package className="w-4 h-4" />
                     ดูประวัติคำสั่งซื้อทั้งหมด
@@ -1248,7 +1248,7 @@ export default function Profile() {
                           <div className="truncate text-gray-700 text-sm">
                             {firstItem?.product?.name}
                             {moreCount > 0 && (
-                              <span className="text-indigo-600 ml-1">
+                              <span className="text-fg ml-1">
                                 & {moreCount} more item&#39;s
                               </span>
                             )}
@@ -1256,7 +1256,7 @@ export default function Profile() {
                         </div>
                         {/* ยอดรวมและปุ่มดูรายละเอียด */}
                         <div className="text-right ml-4 flex flex-col items-end">
-                          <div className="font-bold text-indigo-600 text-base">
+                          <div className="font-bold text-fg text-base">
                             ฿
                             {order.total?.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
@@ -1264,7 +1264,7 @@ export default function Profile() {
                           </div>
                           <button
                             onClick={() => router.push(`/orders/${order.id}`)}
-                            className="mt-2 text-indigo-600 hover:text-indigo-800"
+                            className="mt-2 text-fg hover:text-fg"
                             aria-label="ดูรายละเอียด"
                           >
                             <ChevronRight className="w-6 h-6" />

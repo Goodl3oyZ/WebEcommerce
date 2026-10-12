@@ -1,6 +1,7 @@
 "use client";
 
-import { FaBars, FaSearch } from "react-icons/fa";
+import Link from "next/link";
+import { FaBars, FaSearch, FaStore } from "react-icons/fa";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { getAdminNavItem } from "@/components/admin/adminNav";
 import { useTabs } from "@/components/ui/Tabs";
@@ -47,6 +48,14 @@ export function AdminTopBar({ onOpenSidebar, onOpenSearch }) {
       >
         <FaSearch />
       </button>
+      <Link
+        href="/"
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm text-fg transition-colors duration-150 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        aria-label="กลับหน้าร้าน"
+      >
+        <FaStore className="h-3.5 w-3.5" aria-hidden />
+        <span className="hidden sm:inline">หน้าร้าน</span>
+      </Link>
       <ThemeToggle />
     </header>
   );

@@ -16,6 +16,6 @@ export { uploadAPI } from "./upload";
 export { paymentsAPI } from "./payment";
 // export { notificationsAPI } from "./notifications";
 // export { settingsAPI } from "./settings";
-// export { couponsAPI } from "./coupons";
+export { couponsAPI } from "./coupons";
 export { usersAPI } from "./users";
 export { shippingAPI } from "./shipping";

@@ -137,6 +137,9 @@ services:
       BACKEND_URL: http://backend:5000
     ports:
       - "${FRONTEND_PORT}:3000"
+    # webpack dev server: it honours WATCHPACK_POLLING; Turbopack's file
+    # watcher misses changes made on a Windows/macOS host.
+    command: ["npx", "next", "dev", "--webpack"]
     volumes:
       - ../frontend:/app
       - /app/node_modules

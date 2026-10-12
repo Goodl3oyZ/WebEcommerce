@@ -8,7 +8,7 @@ export const ChatButton = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-24 right-4 z-50 lg:bottom-6 lg:right-6">
       {isOpen ? (
         <div className="relative">
           <button
@@ -21,10 +21,12 @@ export const ChatButton = () => {
         </div>
       ) : (
         <button
+          type="button"
           onClick={() => setIsOpen(true)}
-          className="bg-blue-500 text-white rounded-full p-4 hover:bg-blue-600 transition-colors shadow-lg"
+          aria-label="แชทกับร้านค้า"
+          className="rounded-full bg-fg p-4 text-canvas shadow-lg transition-colors hover:bg-fg/85"
         >
-          <MessageCircle size={24} />
+          <MessageCircle size={22} aria-hidden />
         </button>
       )}
     </div>

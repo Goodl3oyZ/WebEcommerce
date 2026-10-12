@@ -1,119 +1,66 @@
-// C:\Users\panud\OneDrive\Desktop\Web\frontend\src\components\Pagination.js
+"use client";
 
-import React from "react";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+/** Page numbers with ellipses: 1 … 4 5 6 … 12 */
+function pageList(current, total) {
+  const pages = new Set([1, total, current - 1, current, current + 1]);
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push(`gap-${p}`);
+    out.push(p);
+  });
+  return out;
+}
 
 export default function Pagination({ currentPage, totalPages, onPageChange }) {
-  const safeTotalPages = isNaN(totalPages) || totalPages < 1 ? 1 : totalPages;
-  const safeCurrentPage =
-    isNaN(currentPage) || currentPage < 1 ? 1 : currentPage;
-  const adjustedCurrentPage = Math.min(safeCurrentPage, safeTotalPages);
+  const total = Number.isFinite(totalPages) && totalPages > 0 ? totalPages : 1;
+  const current = Math.min(Math.max(Number(currentPage) || 1, 1), total);
+  if (total <= 1) return null;
 
-  const isFirstPage = adjustedCurrentPage <= 1;
-  const isLastPage = adjustedCurrentPage >= safeTotalPages;
-  // const hasOnlyOnePage = safeTotalPages <= 1; // You can remove or ignore this variable if you always want to show it
-
-  console.log("currentPage (safe):", adjustedCurrentPage);
-  console.log("totalPages (safe):", safeTotalPages);
-  console.log("isLastPage (safe):", isLastPage);
-
-  // REMOVE THIS BLOCK if you want to always show pagination
-  // if (hasOnlyOnePage) {
-  //   return null;
-  // }
-
-  const getPageNumbers = () => {
-    // ... (rest of the getPageNumbers function remains the same)
-    const pages = [];
-    const maxPagesToShow = 5;
-    const halfMax = Math.floor(maxPagesToShow / 2);
-
-    if (safeTotalPages <= maxPagesToShow) {
-      for (let i = 1; i <= safeTotalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-
-      let start = Math.max(2, adjustedCurrentPage - halfMax);
-      let end = Math.min(safeTotalPages - 1, adjustedCurrentPage + halfMax);
-
-      if (adjustedCurrentPage - start < halfMax) {
-        end = Math.min(
-          safeTotalPages - 1,
-          end + (halfMax - (adjustedCurrentPage - start))
-        );
-      }
-      if (end - adjustedCurrentPage < halfMax) {
-        start = Math.max(2, start - (halfMax - (end - adjustedCurrentPage)));
-      }
-
-      if (start > 2) {
-        pages.push("...");
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (end < safeTotalPages - 1) {
-        pages.push("...");
-      }
-
-      pages.push(safeTotalPages);
-    }
-    return pages;
-  };
-
-  const displayedPageNumbers = getPageNumbers();
+  const arrow =
+    "inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-fg transition-colors hover:border-fg disabled:pointer-events-none disabled:opacity-40";
 
   return (
-    <nav
-      className="flex items-center justify-center space-x-2 my-8"
-      aria-label="Pagination"
-    >
+    <nav aria-label="เลือกหน้า" className="flex items-center justify-center gap-1.5">
       <button
-        onClick={() => onPageChange(adjustedCurrentPage - 1)}
-        disabled={isFirstPage}
-        className="inline-flex items-center px-4 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-        aria-label="Previous page"
+        type="button"
+        className={arrow}
+        onClick={() => onPageChange(current - 1)}
+        disabled={current <= 1}
+        aria-label="หน้าก่อนหน้า"
       >
-        <FiChevronLeft className="h-5 w-5 mr-2" /> Previous
+        <ChevronLeft className="h-4 w-4" aria-hidden />
       </button>
-
-      {displayedPageNumbers.map((page) =>
-        page === "..." ? (
-          <span
-            key={page + Math.random()}
-            className="px-3 py-2 text-sm font-medium text-gray-700"
-          >
-            ...
+      {pageList(current, total).map((p) =>
+        typeof p === "string" ? (
+          <span key={p} className="px-1 text-fg-subtle" aria-hidden>
+            …
           </span>
         ) : (
           <button
-            key={page}
-            onClick={() => onPageChange(page)}
-            aria-current={adjustedCurrentPage === page ? "page" : undefined}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200
-              ${
-                adjustedCurrentPage === page
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "border border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
-            aria-label={`Page ${page}`}
+            key={p}
+            type="button"
+            onClick={() => onPageChange(p)}
+            aria-current={p === current ? "page" : undefined}
+            aria-label={`หน้า ${p}`}
+            className={`inline-flex h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-semibold tabular-nums transition-colors ${
+              p === current ? "bg-fg text-canvas" : "text-fg hover:bg-fg/5"
+            }`}
           >
-            {page}
+            {p}
           </button>
         )
       )}
-
       <button
-        onClick={() => onPageChange(adjustedCurrentPage + 1)}
-        disabled={isLastPage}
-        className="inline-flex items-center px-4 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-        aria-label="Next page"
+        type="button"
+        className={arrow}
+        onClick={() => onPageChange(current + 1)}
+        disabled={current >= total}
+        aria-label="หน้าถัดไป"
       >
-        Next <FiChevronRight className="h-5 w-5 ml-2" />
+        <ChevronRight className="h-4 w-4" aria-hidden />
       </button>
     </nav>
   );

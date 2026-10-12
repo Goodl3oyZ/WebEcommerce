@@ -1,167 +1,105 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
-import { FiStar, FiEye } from "react-icons/fi";
+import { Star } from "lucide-react";
 import ProductImage from "@/components/ui/ProductImage";
-import { resolveProductImageUrl } from "@/lib/images";
+import PriceTag from "@/components/shop/PriceTag";
+import { priceRange, productImages, totalStock } from "@/components/shop/productData";
 
-export default function ProductCard({ product }) {
-  const [hovered, setHovered] = useState(false);
+const NEW_DAYS = 14;
 
-  const images = Array.isArray(product.imageUrl)
-    ? product.imageUrl.filter((u) => resolveProductImageUrl(u))
-    : resolveProductImageUrl(product.imageUrl)
-      ? [product.imageUrl]
-      : [];
-  const displayImageUrl =
-    images.length > 0 ? images[hovered && images[1] ? 1 : 0] : null;
-
-  // Badge logic
+export default function ProductCard({ product, priority = false }) {
+  const images = productImages(product);
+  const { min, max } = priceRange(product);
+  const stock = totalStock(product);
+  const outOfStock = stock <= 0;
+  const optionCount = product.variants?.length ?? 0;
   const isNew =
-    product.createdAt &&
-    Date.now() - new Date(product.createdAt).getTime() <
-      1000 * 60 * 60 * 24 * 7;
-  const isHot = product.stock < 20 && product.stock > 0;
-  const isOutOfStock = product.stock === 0;
-
-  // Rating
-  const averageRating = product.reviews?.length
-    ? (
-        product.reviews.reduce((acc, r) => acc + r.rating, 0) /
-        product.reviews.length
-      ).toFixed(1)
-    : null;
-
-  // Stock + Variant
-  const stockText = isOutOfStock
-    ? "หมด"
-    : product.stock <= 10
-    ? `เหลือ ${product.stock} ชิ้น`
-    : null;
-  const variantText = product.variants?.length
-    ? `${product.variants.length} ตัวเลือก`
-    : null;
-
-  // Price formatter
-  const formatPrice = (price) => {
-    if (price === undefined || price === null) return "ยังไม่กำหนดราคา";
-    const numPrice = typeof price === "string" ? parseFloat(price) : price;
-    if (isNaN(numPrice) || numPrice <= 0) return "ยังไม่กำหนดราคา";
-    return numPrice.toLocaleString("th-TH", {
-      style: "currency",
-      currency: "THB",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
-  };
+    product.createdAt && Date.now() - new Date(product.createdAt).getTime() < NEW_DAYS * 86400000;
+  const reviewCount = product.reviewCount ?? product.reviews?.length ?? 0;
+  const rating = Number(product.rating ?? 0);
 
   return (
-    <div
-      className="group relative flex flex-col rounded-2xl border border-gray-100 bg-white shadow hover:shadow-lg transition-all duration-300 hover:scale-105"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <Link
+      href={`/products/${product.id}`}
+      className="group flex flex-col rounded-card focus-visible:outline-offset-4"
     >
-      {/* IMAGE */}
-      <div className="relative w-full aspect-[4/5] bg-gray-100 rounded-2xl border border-gray-100 shadow overflow-hidden flex items-center justify-center max-w-xs mx-auto">
+      <div className="relative aspect-square overflow-hidden rounded-card bg-surface-muted">
         <ProductImage
-          imageUrl={displayImageUrl}
+          imageUrl={images[0]}
           alt={product.name}
           fill
-          className="object-cover"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+          priority={priority}
+          className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
-        {/* BADGES */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-          {isNew && (
-            <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-              NEW
+        {images[1] && (
+          <ProductImage
+            imageUrl={images[1]}
+            alt=""
+            fill
+            className="object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          />
+        )}
+        <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5">
+          {outOfStock ? (
+            <span className="rounded-full bg-surface px-2.5 py-1 text-[11px] font-semibold text-fg shadow-sm">
+              สินค้าหมด
             </span>
-          )}
-          {isHot && !isOutOfStock && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-              HOT
-            </span>
-          )}
-          {isOutOfStock && (
-            <span className="bg-gray-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-              OUT
-            </span>
+          ) : (
+            isNew && (
+              <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-semibold text-brand-ink">
+                ใหม่
+              </span>
+            )
           )}
         </div>
-        {/* IMAGE COUNT INDICATOR */}
-        {images.length > 1 && (
-          <span className="absolute top-2 right-2 bg-black/70 text-white text-xs rounded-full px-2 py-0.5 z-10">
-            1 / {images.length}
-          </span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1 pt-3">
+        {product.brand?.name && (
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fg-subtle">
+            {product.brand.name}
+          </p>
+        )}
+        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-fg group-hover:underline group-hover:underline-offset-4 sm:text-[15px]">
+          {product.name}
+        </h3>
+        <div className="mt-auto flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 pt-1">
+          <PriceTag value={min} from={max != null && min !== max} />
+          {optionCount > 1 && <span className="text-xs text-fg-subtle">{optionCount} ตัวเลือก</span>}
+        </div>
+        {reviewCount > 0 && (
+          <p className="flex items-center gap-1 text-xs text-fg-muted">
+            <Star className="h-3.5 w-3.5 fill-fg text-fg" aria-hidden />
+            <span>
+              {rating.toFixed(1)} <span className="text-fg-subtle">({reviewCount})</span>
+            </span>
+            <span className="sr-only">คะแนนรีวิว</span>
+          </p>
         )}
       </div>
+    </Link>
+  );
+}
 
-      {/* DETAILS */}
-      <div className="flex flex-col flex-1 p-3 gap-2">
-        {/* NAME + CATEGORY */}
-        <div className="flex items-center gap-2">
-          <h3
-            className="text-sm font-bold text-gray-900 truncate flex-1"
-            title={product.name}
-          >
-            {product.name}
-          </h3>
-          {product.category && (
-            <span className="text-[10px] bg-purple-100 text-purple-700 rounded px-1.5 py-0.5 font-medium">
-              {product.category.name}
-            </span>
-          )}
-        </div>
-
-        {/* PRICE + RATING */}
-        <div className="flex items-center justify-between">
-          <span className="text-base font-bold text-blue-700">
-            {formatPrice(product.price)}
-          </span>
-          <span className="flex items-center gap-1 text-[11px] text-gray-700">
-            <FiStar className="text-yellow-400" />
-            {averageRating ? (
-              <>
-                <span className="font-semibold">{averageRating}</span>
-                <span className="text-gray-500">
-                  ({product.reviews.length})
-                </span>
-              </>
-            ) : (
-              <span className="text-gray-400">ยังไม่มีรีวิว</span>
-            )}
-          </span>
-        </div>
-
-        {/* STOCK + VARIANT */}
-        <div className="flex items-center gap-2">
-          {stockText && (
-            <span className="text-[10px] text-red-500 font-semibold">
-              {stockText}
-            </span>
-          )}
-          {variantText && (
-            <span className="text-[10px] text-blue-500 font-medium">
-              {variantText}
-            </span>
-          )}
-        </div>
-
-        {/* BUTTON */}
-        <div className="mt-auto">
-          <Link href={`/products/${product.id}`}>
-            <Button
-              className="w-full bg-gradient-to-r from-indigo-600 to-blue-500 text-white text-xs rounded-lg py-1 flex items-center justify-center gap-1 hover:from-indigo-700 hover:to-blue-600 shadow hover:shadow-md transition-all"
-              aria-label={`ดูรายละเอียด ${product.name}`}
-            >
-              <FiEye className="w-4 h-4" />
-              ดูรายละเอียด
-            </Button>
-          </Link>
-        </div>
-      </div>
+export function ProductCardSkeleton() {
+  return (
+    <div aria-hidden className="animate-pulse">
+      <div className="aspect-square rounded-card bg-surface-muted" />
+      <div className="mt-3 h-3 w-1/3 rounded bg-surface-muted" />
+      <div className="mt-2 h-4 w-4/5 rounded bg-surface-muted" />
+      <div className="mt-2 h-4 w-1/4 rounded bg-surface-muted" />
     </div>
   );
+}
+
+/** Responsive product grid: 2 → 3 → 4 columns. */
+export function ProductGrid({ children, columns = 4 }) {
+  const cols =
+    columns === 3
+      ? "grid-cols-2 lg:grid-cols-3"
+      : "grid-cols-2 md:grid-cols-3 xl:grid-cols-4";
+  return <div className={`grid ${cols} gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-10`}>{children}</div>;
 }

@@ -138,7 +138,7 @@ export default function Orders() {
         </div>
       )}
       <div className="flex items-center gap-3 mb-8 animate-fade-in-down">
-        <Package className="w-8 h-8 text-indigo-500 animate-bounce" />
+        <Package className="w-8 h-8 text-fg-muted animate-bounce" />
         <div>
           <h1 className="text-3xl font-extrabold text-gray-800">
             คำสั่งซื้อของฉัน
@@ -155,7 +155,7 @@ export default function Orders() {
             className="bg-white rounded-xl shadow p-6 border border-gray-100"
           >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
-              <div className="font-bold text-lg text-indigo-700">
+              <div className="font-bold text-lg text-fg">
                 #{order.orderNumber || order.id}
               </div>
               <div className="text-gray-500 text-sm">
@@ -188,7 +188,7 @@ export default function Orders() {
             <div className="flex gap-2 mt-2">
               <Link
                 href={`/orders/${order.id}`}
-                className="bg-indigo-600 text-white px-4 py-2 rounded font-bold"
+                className="bg-fg text-white px-4 py-2 rounded font-bold"
               >
                 ดูรายละเอียด
               </Link>
@@ -198,7 +198,7 @@ export default function Orders() {
                   href={`https://track.thailandpost.co.th/?trackNumber=${order.trackingNumber}`}
                   target="_blank"
                   rel="noopener"
-                  className="bg-blue-500 text-white px-4 py-2 rounded font-bold"
+                  className="bg-fg text-white px-4 py-2 rounded font-bold"
                 >
                   ติดตามพัสดุ
                 </a>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { FaImage } from "react-icons/fa";
+import { ImageOff } from "lucide-react";
 import { resolveProductImageUrl } from "@/lib/images";
 
 /**
@@ -16,6 +16,7 @@ export default function ProductImage({
   height,
   className = "object-cover",
   sizes,
+  priority = false,
   containerClassName = "",
 }) {
   const resolved = resolveProductImageUrl(imageUrl);
@@ -24,18 +25,19 @@ export default function ProductImage({
 
   const placeholder = (
     <div
-      className={`flex h-full w-full flex-col items-center justify-center bg-gray-100 text-gray-400 ${containerClassName}`}
-      aria-label={alt}
+      className={`flex h-full w-full flex-col items-center justify-center gap-1.5 bg-surface-muted text-fg-subtle ${containerClassName}`}
+      role="img"
+      aria-label={alt ? `${alt} (ไม่มีรูปภาพ)` : "ไม่มีรูปภาพ"}
     >
-      <FaImage className="mb-1 text-2xl" />
-      <span className="text-[10px] font-medium">No image</span>
+      <ImageOff className="h-6 w-6" aria-hidden />
+      <span className="text-[11px] font-medium">ไม่มีรูปภาพ</span>
     </div>
   );
 
   if (showPlaceholder) {
     if (fill) {
       return (
-        <div className={`relative h-full w-full ${containerClassName}`}>
+        <div className={`absolute inset-0 ${containerClassName}`}>
           {placeholder}
         </div>
       );
@@ -54,6 +56,7 @@ export default function ProductImage({
       height={!fill ? height : undefined}
       className={className}
       sizes={sizes}
+      priority={priority}
       onError={() => setFailed(true)}
       unoptimized={!isLocal}
     />
@@ -61,7 +64,7 @@ export default function ProductImage({
 
   if (fill) {
     return (
-      <div className={`relative h-full w-full ${containerClassName}`}>{img}</div>
+      <div className={`absolute inset-0 ${containerClassName}`}>{img}</div>
     );
   }
 

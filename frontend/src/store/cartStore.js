@@ -85,8 +85,9 @@ const useCartStore = create(
             set({ items: updatedItems });
           }
         } catch (error) {
-          console.error("Error removing item:", error);
+          console.error("Error removing item:", error.message);
           set({ error: error.message });
+          throw error;
         } finally {
           set({ isLoading: false });
         }
@@ -111,8 +112,9 @@ const useCartStore = create(
             set({ items: updatedItems });
           }
         } catch (error) {
-          console.error("Error updating quantity:", error);
+          console.error("Error updating quantity:", error.message);
           set({ error: error.message });
+          throw error;
         } finally {
           set({ isLoading: false });
         }
@@ -123,9 +125,8 @@ const useCartStore = create(
           const user = localStorage.getItem("user");
           if (!user) return;
 
-          if (get().isLoading) return;
-
-          set({ isLoading: true });
+          // No isLoading guard: add/update/remove call this while their own
+          // isLoading flag is still set, and the badge must refresh.
           const backendCart = await cartAPI.getCart();
 
           const backendItems =
@@ -142,10 +143,10 @@ const useCartStore = create(
                 : null,
             })) || [];
 
-          set({ items: backendItems, isLoading: false });
+          set({ items: backendItems });
         } catch (error) {
-          console.error("Error fetching cart from backend:", error);
-          set({ error: error.message, isLoading: false });
+          console.error("Error fetching cart from backend:", error.message);
+          set({ error: error.message });
         }
       },
 

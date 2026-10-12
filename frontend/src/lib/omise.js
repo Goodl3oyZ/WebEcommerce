@@ -8,8 +8,13 @@ export function createCardToken({ name, number, expiry, cvc }) {
       reject(new Error("Omise.js not loaded"));
       return;
     }
+    const publicKey = process.env.NEXT_PUBLIC_OMISE_PUBLIC_KEY;
+    if (!publicKey) {
+      reject(new Error("ยังไม่ได้ตั้งค่าการชำระเงินด้วยบัตร (NEXT_PUBLIC_OMISE_PUBLIC_KEY)"));
+      return;
+    }
     const [month, year = ""] = String(expiry).split("/");
-    window.Omise.setPublicKey(process.env.NEXT_PUBLIC_OMISE_PUBLIC_KEY || "pkey_test_5u15668b556f8f53703");
+    window.Omise.setPublicKey(publicKey);
     window.Omise.createToken(
       "card",
       {

@@ -17,6 +17,11 @@ module.exports = {
     extend: {
       fontFamily: {
         admin: ["var(--font-admin)", "Noto Sans Thai", "sans-serif"],
+        sans: ["var(--font-admin)", "Noto Sans Thai", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-admin)", "sans-serif"],
+      },
+      maxWidth: {
+        content: "80rem",
       },
       colors: {
         primary: {
@@ -49,6 +54,9 @@ module.exports = {
         danger: "hsl(var(--danger) / <alpha-value>)",
         "danger-soft": "hsl(var(--danger-soft) / <alpha-value>)",
         background: "hsl(var(--background) / <alpha-value>)",
+        brand: "hsl(var(--brand) / <alpha-value>)",
+        "brand-hover": "hsl(var(--brand-hover) / <alpha-value>)",
+        "brand-ink": "hsl(var(--brand-ink) / <alpha-value>)",
         mode: "jit",
       },
       boxShadow: {
@@ -58,6 +66,10 @@ module.exports = {
       borderRadius: {
         xl: "0.75rem",
         "2xl": "1rem",
+        card: "0.75rem",
+      },
+      transitionTimingFunction: {
+        out: "var(--ease-out)",
       },
       transitionDuration: {
         150: "150ms",
@@ -80,7 +92,6 @@ module.exports = {
     },
   },
   plugins: [
-    require("@tailwindcss/aspect-ratio"),
     require("@tailwindcss/forms"),
     require("@tailwindcss/typography"),
   ],

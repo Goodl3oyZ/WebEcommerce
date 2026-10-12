@@ -5,6 +5,7 @@ const protectedRoutes = [
   { matcher: /^\/admin(\/|$)/, role: "admin" },
   { matcher: /^\/profile(\/|$)/, role: "user" },
   { matcher: /^\/orders(\/|$)/, role: "user" },
+  { matcher: /^\/checkout(\/|$)/, role: "user" },
 ];
 
 export async function middleware(req) {
@@ -16,7 +17,9 @@ export async function middleware(req) {
   if (!route) return NextResponse.next();
 
   if (!token) {
-    return NextResponse.redirect(new URL("/auth/login", req.url));
+    const login = new URL("/auth/login", req.url);
+    login.searchParams.set("redirect", pathname + req.nextUrl.search);
+    return NextResponse.redirect(login);
   }
 
   try {
@@ -43,5 +46,5 @@ export async function middleware(req) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/profile/:path*", "/orders/:path*"],
+  matcher: ["/admin/:path*", "/profile/:path*", "/orders/:path*", "/checkout/:path*"],
 };

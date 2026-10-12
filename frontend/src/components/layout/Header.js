@@ -1,362 +1,320 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
+import {
+  ChevronDown,
+  ClipboardList,
+  LogOut,
+  Menu,
+  Search,
+  Shield,
+  ShoppingBag,
+  User,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import useCartStore from "@/store/cartStore";
-import { Button } from "@/components/ui/Button"; // Consistent naming
-import Image from "next/image";
-import {
-  FiShoppingCart,
-  FiUser,
-  FiPackage,
-  FiMenu,
-  FiX,
-  FiLogOut,
-  FiShoppingBag,
-  FiHome, // Added for potential home link in mobile menu
-  FiClipboard, // For orders
-  FiSettings, // For profile/settings
-  FiShield, // For Admin
-} from "react-icons/fi"; // Grouped for readability
+import { categoriesAPI } from "@/lib/api/categories";
+import Container from "@/components/shop/Container";
+
+const isAdmin = (user) => user?.role === "admin" || user?.role === "super_admin";
+
+function Wordmark() {
+  return (
+    <span className="font-display text-xl font-bold italic uppercase tracking-tight text-fg sm:text-2xl">
+      Challenge
+    </span>
+  );
+}
+
+function SearchForm({ autoFocus = false, onDone, className = "" }) {
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const submit = (e) => {
+    e.preventDefault();
+    const term = q.trim();
+    router.push(term ? `/products?search=${encodeURIComponent(term)}` : "/products");
+    onDone?.();
+  };
+  return (
+    <form role="search" onSubmit={submit} className={className}>
+      <label htmlFor={autoFocus ? "site-search-mobile" : "site-search"} className="sr-only">
+        ค้นหาสินค้า
+      </label>
+      <div className="flex h-10 items-center gap-2 rounded-full bg-surface-muted px-4 focus-within:ring-2 focus-within:ring-fg">
+        <Search className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
+        <input
+          id={autoFocus ? "site-search-mobile" : "site-search"}
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="ค้นหารองเท้า เสื้อ อุปกรณ์..."
+          autoFocus={autoFocus}
+          className="w-full border-0 bg-transparent p-0 text-sm text-fg placeholder:text-fg-subtle focus:outline-none focus:ring-0"
+        />
+      </div>
+    </form>
+  );
+}
+
+function AccountMenu({ user, logout }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => ref.current && !ref.current.contains(e.target) && setOpen(false);
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const item =
+    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-fg transition-colors hover:bg-fg/5";
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex h-10 items-center gap-2 rounded-full pl-1 pr-2 transition-colors hover:bg-fg/5"
+      >
+        <span className="relative h-8 w-8 overflow-hidden rounded-full bg-surface-muted">
+          {user.avatar ? (
+            <Image src={user.avatar} alt="" fill sizes="32px" className="object-cover" />
+          ) : (
+            <User className="absolute inset-0 m-auto h-4 w-4 text-fg-muted" aria-hidden />
+          )}
+        </span>
+        <span className="hidden max-w-[8rem] truncate text-sm font-medium lg:inline">
+          {user.name || user.email?.split("@")[0]}
+        </span>
+        <ChevronDown className="hidden h-4 w-4 text-fg-subtle lg:block" aria-hidden />
+        <span className="sr-only">เมนูบัญชี</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-surface p-1.5 shadow-lg"
+        >
+          <Link href="/profile" role="menuitem" className={item} onClick={() => setOpen(false)}>
+            <User className="h-4 w-4" aria-hidden /> บัญชีของฉัน
+          </Link>
+          <Link href="/orders" role="menuitem" className={item} onClick={() => setOpen(false)}>
+            <ClipboardList className="h-4 w-4" aria-hidden /> คำสั่งซื้อของฉัน
+          </Link>
+          {isAdmin(user) && (
+            <Link href="/admin" role="menuitem" className={item} onClick={() => setOpen(false)}>
+              <Shield className="h-4 w-4" aria-hidden /> จัดการระบบ
+            </Link>
+          )}
+          <div className="my-1 border-t border-border" />
+          <button
+            type="button"
+            role="menuitem"
+            className={`${item} text-danger`}
+            onClick={() => {
+              setOpen(false);
+              logout();
+            }}
+          >
+            <LogOut className="h-4 w-4" aria-hidden /> ออกจากระบบ
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Header() {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const cartCount = useCartStore((s) => s.items.reduce((sum, i) => sum + (i.quantity || 0), 0));
+  const fetchCart = useCartStore((s) => s.fetchCartFromBackend);
+
+  useEffect(() => setMounted(true), []);
+
+  // The badge reflects the server cart for signed-in users.
   useEffect(() => {
-    setMounted(true);
+    if (user) fetchCart();
+  }, [user, fetchCart]);
+
+  useEffect(() => {
+    categoriesAPI
+      .getAllCategories()
+      .then((res) => {
+        const list = res?.categories ?? res?.data ?? res;
+        setCategories(Array.isArray(list) ? list.filter((c) => !c.parentId).slice(0, 4) : []);
+      })
+      .catch(() => setCategories([]));
   }, []);
-  console.log("Header rendering user:", user?.email, "role:", user?.role);
-  const cartItems = useCartStore((state) => state.totalItems);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false); // New state for profile dropdown
 
+  // Close overlays on navigation.
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    setMenuOpen(false);
+    setSearchOpen(false);
+  }, [pathname]);
 
-  // Close mobile menu when a link is clicked
-  const closeMobileMenu = () => setMobileMenuOpen(false);
+  if (pathname?.startsWith("/admin")) return null;
 
-  // Toggle profile dropdown
-  const toggleProfileDropdown = () =>
-    setProfileDropdownOpen(!profileDropdownOpen);
-
-  // Close profile dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        profileDropdownOpen &&
-        event.target.closest(".profile-dropdown-container") === null
-      ) {
-        setProfileDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [profileDropdownOpen]);
+  const navLink = (active) =>
+    `relative px-1 py-2 text-sm font-medium transition-colors hover:text-fg ${
+      active ? "text-fg after:absolute after:inset-x-1 after:-bottom-0.5 after:h-0.5 after:bg-brand" : "text-fg-muted"
+    }`;
+  const count = mounted ? cartCount : 0;
 
   return (
-    <>
-      <header
-        className={`fixed top-0 left-0 right-0 w-full z-[100] transition-all duration-300 ${
-          scrolled
-            ? "bg-white/95 backdrop-blur-xl shadow-md border-b border-gray-100"
-            : "bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100/60"
-        }`}
-        style={{ WebkitBackdropFilter: "blur(14px)" }}
-      >
-        <nav className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-12">
-          <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
-            <Link
-              href="/"
-              className="flex items-center space-x-3 shrink-0 group"
-              onClick={closeMobileMenu}
-              aria-label="Home page"
-            >
-              {/* <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-700 rounded-xl flex items-center justify-center shadow group-hover:scale-105 transition-transform"> */}
-              <Image
-                src="/favicon.png"
-                alt="Challenge change your dream"
-                width={40}
-                height={40}
-              />
-              {/* </div> */}
-              <span className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-purple-700 bg-clip-text text-transparent tracking-tight group-hover:opacity-80 transition-opacity">
-                C H A L L E N G E
-              </span>
-            </Link>
-
-            {/* Desktop Navigation & User Actions */}
-            <div className="hidden md:flex items-center space-x-7">
-              <Link
-                href="/products"
-                className="text-sm font-medium text-gray-700 hover:text-blue-600 flex items-center space-x-1 group transition duration-200"
-              >
-                <FiPackage className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                <span>สินค้า</span>
-              </Link>
-              <Link
-                href="/cart"
-                className="relative text-sm font-medium text-gray-700 hover:text-blue-600 flex items-center space-x-1 group transition duration-200"
-              >
-                <FiShoppingCart className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                {cartItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center ring-2 ring-white animate-bounce-once">
-                    {cartItems > 99 ? "99+" : cartItems}
-                  </span>
-                )}
-                <span>ตะกร้า</span>
-              </Link>
-              {mounted && (user?.role === "admin" || user?.role === "super_admin") && (
-                <Link
-                  href="/admin"
-                  className="text-sm font-medium text-red-600 hover:text-red-700 flex items-center space-x-1 group transition duration-200"
-                >
-                  <FiShield className="w-5 h-5 text-red-500 group-hover:text-red-600 animate-pulse" />
-                  <span className="font-bold">จัดการระบบ (Admin)</span>
-                </Link>
-              )}
-              {/* Conditional User Section */}
-              {mounted && user ? (
-                <div className="relative profile-dropdown-container">
-                  <button
-                    onClick={toggleProfileDropdown}
-                    className="flex items-center space-x-1 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full pr-0.5 py-0.5 hover:bg-gray-100/60 transition"
-                    aria-expanded={profileDropdownOpen}
-                    aria-controls="profile-menu"
-                  >
-                    <div className="w-9 h-9 rounded-full overflow-hidden border border-blue-300 shadow-md">
-                      <Image
-                        src={user.avatar || "/default-avatar.png"}
-                        alt="User avatar"
-                        width={36}
-                        height={36}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
-                    <span className="text-base font-medium text-gray-700 truncate max-w-[120px] hidden lg:inline-block">
-                      {user.name || user.email?.split("@")[0]}
-                    </span>
-                    <FiUser className="w-5 h-5 text-gray-400 lg:hidden" />
-                  </button>
-                  {profileDropdownOpen && (
-                    <div
-                      id="profile-menu"
-                      className="absolute right-0 mt-3 w-56 bg-white/95 rounded-2xl shadow-2xl border border-gray-100 animate-fade-in-down origin-top-right overflow-hidden"
-                      role="menu"
-                      aria-orientation="vertical"
-                      aria-labelledby="profile-button"
-                    >
-                      <Link
-                        href="/profile"
-                        className="flex items-center space-x-3 px-5 py-3 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition rounded-t-2xl"
-                        onClick={() => setProfileDropdownOpen(false)}
-                        role="menuitem"
-                      >
-                        <FiSettings className="w-4 h-4 text-blue-500" />
-                        <span>โปรไฟล์</span>
-                      </Link>
-                      {mounted && (user?.role === "admin" || user?.role === "super_admin") && (
-                        <Link
-                          href="/admin"
-                          className="flex items-center space-x-3 px-5 py-3 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition"
-                          onClick={() => setProfileDropdownOpen(false)}
-                          role="menuitem"
-                        >
-                          <FiShield className="w-4 h-4 text-blue-500" />
-                          <span>จัดการระบบ (Admin)</span>
-                        </Link>
-                      )}
-                      <Link
-                        href="/orders"
-                        className="flex items-center space-x-3 px-5 py-3 text-base text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition"
-                        onClick={() => setProfileDropdownOpen(false)}
-                        role="menuitem"
-                      >
-                        <FiClipboard className="w-4 h-4 text-blue-500" />
-                        <span>คำสั่งซื้อของฉัน</span>
-                      </Link>
-                      <div className="border-t border-gray-100 my-1"></div>
-                      <button
-                        onClick={() => {
-                          logout();
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full text-left flex items-center space-x-3 px-5 py-3 text-base text-red-600 hover:bg-red-50 hover:text-red-700 transition rounded-b-2xl"
-                        role="menuitem"
-                      >
-                        <FiLogOut className="w-4 h-4" />
-                        <span>ออกจากระบบ</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex space-x-3">
-                  <Link href="/auth/login" onClick={closeMobileMenu}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-700 hover:bg-blue-50 hover:text-blue-700 px-5 font-semibold text-base"
-                    >
-                      เข้าสู่ระบบ
-                    </Button>
-                  </Link>
-                  <Link href="/auth/register" onClick={closeMobileMenu}>
-                    <Button
-                      size="sm"
-                      className="bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 transition shadow-lg px-5 font-semibold text-white text-base"
-                    >
-                      สมัครสมาชิก
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
-            {/* Mobile Menu Toggle & Cart Icon (Mobile Only) */}
-            <div className="md:hidden flex items-center space-x-4">
-              <Link
-                href="/cart"
-                className="relative p-1.5 rounded-md hover:bg-blue-50 transition"
-                aria-label="View shopping cart"
-                onClick={closeMobileMenu}
-              >
-                <FiShoppingCart className="w-6 h-6 text-blue-600" />
-                {cartItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center ring-2 ring-white animate-bounce-once">
-                    {cartItems > 99 ? "99+" : cartItems}
-                  </span>
-                )}
-              </Link>
-              <button
-                className="p-2 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-                aria-expanded={mobileMenuOpen}
-              >
-                {mobileMenuOpen ? (
-                  <FiX className="w-6 h-6 text-blue-600" />
-                ) : (
-                  <FiMenu className="w-6 h-6 text-blue-600" />
-                )}
-              </button>
-            </div>
-          </div>
-        </nav>
-        {/* Mobile Menu Overlay */}
-        {mobileMenuOpen && (
-          <div
-            className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-            onClick={closeMobileMenu}
-            aria-hidden="true"
-          ></div>
-        )}
-        {/* Mobile Menu Content */}
-        <div
-          className={`md:hidden fixed top-0 right-0 w-72 h-full bg-white rounded-t-xl  shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
-            mobileMenuOpen ? "translate-x-0" : "translate-x-full"
-          }`}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="mobile-menu-heading"
+    <header className="sticky top-0 z-[100] border-b border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/85">
+      <Container className="flex h-16 items-center gap-3 lg:gap-8">
+        <button
+          type="button"
+          className="-ml-2 inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-fg/5 md:hidden"
+          onClick={() => setMenuOpen(true)}
+          aria-label="เปิดเมนู"
         >
-          <div className="flex items-center justify-between h-16 px-6 border-b">
-            <h2
-              id="mobile-menu-heading"
-              className="text-lg font-bold text-blue-700"
+          <Menu className="h-5 w-5" aria-hidden />
+        </button>
+
+        <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="CHALLENGE หน้าแรก">
+          <Image src="/favicon.png" alt="" width={32} height={32} className="h-8 w-8" priority />
+          <Wordmark />
+        </Link>
+
+        <nav aria-label="หมวดหมู่หลัก" className="hidden items-center gap-5 md:flex">
+          <Link href="/products" className={navLink(pathname === "/products")}>
+            สินค้าทั้งหมด
+          </Link>
+          {categories.map((c) => (
+            <Link key={c.id} href={`/products?category=${c.id}`} className={`${navLink(false)} hidden lg:inline`}>
+              {c.name}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <SearchForm className="hidden w-56 md:block lg:w-72" />
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-fg/5 md:hidden"
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-label="ค้นหา"
+            aria-expanded={searchOpen}
+          >
+            <Search className="h-5 w-5" aria-hidden />
+          </button>
+
+          {mounted && user ? (
+            <div className="hidden md:block">
+              <AccountMenu user={user} logout={logout} />
+            </div>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="hidden h-10 items-center rounded-full px-3 text-sm font-medium text-fg hover:bg-fg/5 md:inline-flex"
             >
-              เมนู
-            </h2>
+              เข้าสู่ระบบ
+            </Link>
+          )}
+
+          <Link
+            href="/cart"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-fg/5"
+            aria-label={count > 0 ? `ตะกร้าสินค้า ${count} ชิ้น` : "ตะกร้าสินค้า"}
+          >
+            <ShoppingBag className="h-5 w-5" aria-hidden />
+            {count > 0 && (
+              <span className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-ink ring-2 ring-surface">
+                {count > 99 ? "99+" : count}
+              </span>
+            )}
+          </Link>
+        </div>
+      </Container>
+
+      {searchOpen && (
+        <div className="border-t border-border bg-surface md:hidden">
+          <Container className="py-3">
+            <SearchForm autoFocus onDone={() => setSearchOpen(false)} />
+          </Container>
+        </div>
+      )}
+
+      <Dialog open={menuOpen} onClose={setMenuOpen} className="relative z-[120] md:hidden">
+        <DialogBackdrop className="fixed inset-0 bg-black/40 transition-opacity duration-200 data-[closed]:opacity-0" transition />
+        <DialogPanel
+          transition
+          className="fixed inset-y-0 left-0 flex w-[85%] max-w-sm flex-col bg-surface shadow-xl transition-transform duration-200 ease-out data-[closed]:-translate-x-full"
+        >
+          <div className="flex h-16 items-center justify-between border-b border-border px-4">
+            <Wordmark />
             <button
-              className="p-2 rounded-md hover:bg-gray-200"
-              onClick={closeMobileMenu}
-              aria-label="Close menu"
+              type="button"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-fg/5"
+              aria-label="ปิดเมนู"
             >
-              <FiX className="w-6 h-6 text-blue-600" />
+              <X className="h-5 w-5" aria-hidden />
             </button>
           </div>
-          <div className="py-4 space-y-2 px-4 bg-slate-50 rounded-b-xl ">
-            <Link
-              href="/"
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition"
-              onClick={closeMobileMenu}
-            >
-              <FiHome className="w-5 h-5 text-blue-500" />
-              <span className="text-gray-800 text-base">หน้าหลัก</span>
-            </Link>
-            <Link
-              href="/products"
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition"
-              onClick={closeMobileMenu}
-            >
-              <FiPackage className="w-5 h-5 text-blue-500" />
-              <span className="text-gray-800 text-base">สินค้าทั้งหมด</span>
-            </Link>
-            <Link
-              href="/cart"
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition relative"
-              onClick={closeMobileMenu}
-            >
-              <FiShoppingCart className="w-5 h-5 text-blue-500" />
-              <span className="text-gray-800 text-base">ตะกร้าสินค้า</span>
-              {cartItems > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {cartItems > 99 ? "99+" : cartItems}
-                </span>
-              )}
-            </Link>
-
-            {mounted && user && (
-              <>
-                <Link
-                  href="/profile"
-                  className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition"
-                  onClick={closeMobileMenu}
-                >
-                  <FiSettings className="w-5 h-5 text-blue-500" />
-                  <span className="text-gray-800 text-base">โปรไฟล์</span>
+          <nav aria-label="เมนูมือถือ" className="flex-1 overflow-y-auto px-2 py-4">
+            <p className="px-3 pb-2 text-sm font-semibold text-fg-subtle">เลือกซื้อ</p>
+            {[{ id: "all", name: "สินค้าทั้งหมด", href: "/products" }, { id: "new", name: "สินค้ามาใหม่", href: "/products?sort=newest" }]
+              .concat(categories.map((c) => ({ id: c.id, name: c.name, href: `/products?category=${c.id}` })))
+              .map((l) => (
+                <Link key={l.id} href={l.href} className="flex items-center rounded-lg px-3 py-3 text-base font-medium hover:bg-fg/5">
+                  {l.name}
                 </Link>
-                {mounted && (user?.role === "admin" || user?.role === "super_admin") && (
-                  <Link
-                    href="/admin"
-                    className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition"
-                    onClick={closeMobileMenu}
-                  >
-                    <FiShield className="w-5 h-5 text-blue-500" />
-                    <span className="text-gray-800 text-base font-semibold">จัดการระบบ (Admin)</span>
+              ))}
+            <div className="my-3 border-t border-border" />
+            {mounted && user ? (
+              <>
+                <Link href="/profile" className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fg/5">
+                  <User className="h-5 w-5" aria-hidden /> บัญชีของฉัน
+                </Link>
+                <Link href="/orders" className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fg/5">
+                  <ClipboardList className="h-5 w-5" aria-hidden /> คำสั่งซื้อของฉัน
+                </Link>
+                {isAdmin(user) && (
+                  <Link href="/admin" className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fg/5">
+                    <Shield className="h-5 w-5" aria-hidden /> จัดการระบบ
                   </Link>
                 )}
-                <Link
-                  href="/orders"
-                  className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-100 transition"
-                  onClick={closeMobileMenu}
-                >
-                  <FiClipboard className="w-5 h-5 text-blue-500" />
-                  <span className="text-gray-800 text-base">
-                    คำสั่งซื้อของฉัน
-                  </span>
-                </Link>
-                <div className="border-t my-2"></div>
                 <button
+                  type="button"
                   onClick={() => {
+                    setMenuOpen(false);
                     logout();
-                    closeMobileMenu();
                   }}
-                  className="w-full text-left flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-red-100 text-red-600 hover:text-red-700 transition"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-danger hover:bg-danger/5"
                 >
-                  <FiLogOut className="w-5 h-5" />
-                  <span className="text-base">ออกจากระบบ</span>
+                  <LogOut className="h-5 w-5" aria-hidden /> ออกจากระบบ
                 </button>
               </>
+            ) : (
+              <div className="grid gap-2 px-3">
+                <Link href="/auth/login" className="flex h-11 items-center justify-center rounded-full bg-fg text-sm font-semibold text-canvas">
+                  เข้าสู่ระบบ
+                </Link>
+                <Link href="/auth/register" className="flex h-11 items-center justify-center rounded-full border border-fg/25 text-sm font-semibold">
+                  สมัครสมาชิก
+                </Link>
+              </div>
             )}
-          </div>
-        </div>
-      </header>
-      <div className="h-16"></div>
-    </>
+          </nav>
+        </DialogPanel>
+      </Dialog>
+    </header>
   );
 }

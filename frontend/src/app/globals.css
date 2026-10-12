@@ -3,19 +3,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens — use these instead of hardcoded colors in components */
+/* Design tokens — use these instead of hardcoded colors in components.
+   Storefront identity: near-black ink, white, restrained neutrals and ONE
+   energetic accent (electric lime) reserved for primary actions, selected
+   states and highlights. Text on the accent is always ink. */
 @layer base {
   :root {
     --primary: 14 165 233;
     --primary-foreground: 255 255 255;
-    --canvas: 210 20% 98%;
+    --canvas: 0 0% 97%;
     --surface: 0 0% 100%;
-    --surface-muted: 210 20% 96%;
-    --fg: 222 47% 11%;
-    --fg-muted: 215 19% 35%;
-    --fg-subtle: 215 16% 45%;
-    --border: 214 32% 88%;
+    --surface-muted: 0 0% 94%;
+    --fg: 0 0% 8%;
+    --fg-muted: 0 0% 30%;
+    --fg-subtle: 0 0% 42%;
+    --border: 0 0% 87%;
     --background: 0 0% 100%;
+    --brand: 77 96% 56%;
+    --brand-hover: 77 90% 49%;
+    --brand-ink: 0 0% 8%;
     --success: 142 72% 25%;
     --success-soft: 141 79% 94%;
     --info: 201 90% 32%;
@@ -26,18 +32,23 @@
     --accent-soft: 270 95% 96%;
     --danger: 0 72% 42%;
     --danger-soft: 0 86% 95%;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --header-h: 4rem;
     color-scheme: light;
   }
 
   .dark {
-    --canvas: 222 47% 7%;
-    --surface: 222 41% 11%;
-    --surface-muted: 217 33% 17%;
-    --fg: 210 40% 98%;
-    --fg-muted: 213 20% 80%;
-    --fg-subtle: 215 16% 70%;
-    --border: 217 27% 24%;
-    --background: 222 47% 7%;
+    --canvas: 0 0% 6%;
+    --surface: 0 0% 9%;
+    --surface-muted: 0 0% 14%;
+    --fg: 0 0% 96%;
+    --fg-muted: 0 0% 76%;
+    --fg-subtle: 0 0% 64%;
+    --border: 0 0% 21%;
+    --background: 0 0% 6%;
+    --brand: 77 96% 56%;
+    --brand-hover: 77 100% 64%;
+    --brand-ink: 0 0% 8%;
     --success: 142 70% 64%;
     --success-soft: 144 50% 16%;
     --info: 199 90% 68%;
@@ -49,6 +60,31 @@
     --danger: 0 90% 72%;
     --danger-soft: 0 50% 16%;
     color-scheme: dark;
+  }
+
+  html {
+    scroll-padding-top: calc(var(--header-h) + 1rem);
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  /* One visible focus style for the storefront (keyboard users only). */
+  :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid hsl(var(--fg));
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

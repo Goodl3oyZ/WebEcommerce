@@ -1,587 +1,414 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react"; // Fragment added
-import Link from "next/link";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { productsAPI } from "@/lib/api/products";
 import { categoriesAPI } from "@/lib/api/categories";
-import { checkServerConnection } from "@/lib/api/axiosInstance";
-import ProductCard from "@/components/ProductCard";
-import CategoryFilter from "@/components/CategoryFilter";
-import PriceFilter from "@/components/PriceFilter";
-import SortFilter from "@/components/SortFilter";
+import { brandsAPI } from "@/lib/api/brands";
+import ProductCard, { ProductCardSkeleton, ProductGrid } from "@/components/ProductCard";
 import Pagination from "@/components/Pagination";
-import LoadingSpinner from "@/components/LoadingSpinner";
-import EmptyState from "@/components/EmptyState";
-import ErrorState from "@/components/ErrorState";
-import {
-  FiFilter,
-  FiX,
-  FiRefreshCw,
-  FiChevronRight,
-  FiGrid,
-  FiList,
-} from "react-icons/fi"; // Added more icons if needed
-import { Dialog, Transition } from "@headlessui/react";
-import { Button } from "@/components/ui/Button";
-import Image from "next/image";
+import Container from "@/components/shop/Container";
+import Breadcrumbs from "@/components/shop/Breadcrumbs";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { formatTHB } from "@/lib/format";
 
-export default function ProductsPage() {
-  const [products, setProducts] = useState([]);
+const PAGE_SIZE = 12;
+const SORTS = [
+  { value: "newest", label: "มาใหม่ล่าสุด" },
+  { value: "price_asc", label: "ราคา: ต่ำ → สูง" },
+  { value: "price_desc", label: "ราคา: สูง → ต่ำ" },
+  { value: "name_asc", label: "ชื่อ: ก → ฮ / A → Z" },
+  { value: "name_desc", label: "ชื่อ: ฮ → ก / Z → A" },
+];
+const FILTER_KEYS = ["category", "brand", "minPrice", "maxPrice", "inStock", "search"];
+
+const listOf = (res, key) => {
+  const list = res?.[key] ?? res?.data ?? res;
+  return Array.isArray(list) ? list : [];
+};
+
+function OptionList({ legend, name, options, value, onChange }) {
+  if (options.length === 0) return null;
+  return (
+    <fieldset>
+      <legend className="mb-3 text-sm font-semibold text-fg">{legend}</legend>
+      <div className="space-y-1">
+        {[{ id: "", name: "ทั้งหมด" }, ...options].map((o) => {
+          const checked = (value || "") === o.id;
+          return (
+            <label
+              key={o.id || "all"}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-fg/5 ${
+                checked ? "font-semibold text-fg" : "text-fg-muted"
+              }`}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={o.id}
+                checked={checked}
+                onChange={() => onChange(o.id)}
+                className="h-4 w-4 border-border text-fg focus:ring-fg"
+              />
+              {o.name}
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function PriceRange({ minPrice, maxPrice, onApply }) {
+  const [min, setMin] = useState(minPrice ?? "");
+  const [max, setMax] = useState(maxPrice ?? "");
+  useEffect(() => {
+    setMin(minPrice ?? "");
+    setMax(maxPrice ?? "");
+  }, [minPrice, maxPrice]);
+  const invalid = min !== "" && max !== "" && Number(min) > Number(max);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!invalid) onApply(min, max);
+      }}
+    >
+      <fieldset>
+        <legend className="mb-3 text-sm font-semibold text-fg">ช่วงราคา (บาท)</legend>
+        <div className="flex items-center gap-2">
+          <label className="sr-only" htmlFor="price-min">ราคาต่ำสุด</label>
+          <input
+            id="price-min"
+            type="number"
+            inputMode="numeric"
+            min="0"
+            placeholder="ต่ำสุด"
+            value={min}
+            onChange={(e) => setMin(e.target.value)}
+            className="h-10 w-full rounded-lg border-border bg-surface px-3 text-sm focus:border-fg focus:ring-fg"
+          />
+          <span className="text-fg-subtle" aria-hidden>–</span>
+          <label className="sr-only" htmlFor="price-max">ราคาสูงสุด</label>
+          <input
+            id="price-max"
+            type="number"
+            inputMode="numeric"
+            min="0"
+            placeholder="สูงสุด"
+            value={max}
+            onChange={(e) => setMax(e.target.value)}
+            aria-invalid={invalid}
+            aria-describedby={invalid ? "price-error" : undefined}
+            className="h-10 w-full rounded-lg border-border bg-surface px-3 text-sm focus:border-fg focus:ring-fg"
+          />
+        </div>
+        {invalid && (
+          <p id="price-error" className="mt-2 text-xs text-danger">ราคาต่ำสุดต้องไม่มากกว่าราคาสูงสุด</p>
+        )}
+        <Button type="submit" variant="outline" size="sm" className="mt-3 w-full" disabled={invalid}>
+          ใช้ช่วงราคานี้
+        </Button>
+      </fieldset>
+    </form>
+  );
+}
+
+function Filters({ params, categories, brands, update }) {
+  return (
+    <div className="space-y-8">
+      <OptionList
+        legend="หมวดหมู่"
+        name="category"
+        options={categories}
+        value={params.get("category")}
+        onChange={(v) => update({ category: v })}
+      />
+      <OptionList
+        legend="แบรนด์"
+        name="brand"
+        options={brands}
+        value={params.get("brand")}
+        onChange={(v) => update({ brand: v })}
+      />
+      <PriceRange
+        minPrice={params.get("minPrice")}
+        maxPrice={params.get("maxPrice")}
+        onApply={(minPrice, maxPrice) => update({ minPrice, maxPrice })}
+      />
+      <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-fg">
+        <input
+          type="checkbox"
+          checked={params.get("inStock") === "true"}
+          onChange={(e) => update({ inStock: e.target.checked ? "true" : "" })}
+          className="h-4 w-4 rounded border-border text-fg focus:ring-fg"
+        />
+        แสดงเฉพาะสินค้าที่มีของ
+      </label>
+    </div>
+  );
+}
+
+function ProductsView() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
   const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [serverStatus, setServerStatus] = useState("checking");
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    category: "",
-    minPrice: "",
-    maxPrice: "",
-    sort: "newest",
-  });
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 12,
-    total: 0,
-  });
-  const [search, setSearch] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Check server connection on initial load
+  const page = Math.max(1, parseInt(params.get("page") || "1", 10) || 1);
+  const sort = SORTS.some((s) => s.value === params.get("sort")) ? params.get("sort") : "newest";
+  const queryKey = params.toString();
+
   useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const isConnected = await checkServerConnection();
-        setServerStatus(isConnected ? "connected" : "disconnected");
-      } catch (error) {
-        setServerStatus("disconnected");
-      }
-    };
-    checkConnection();
+    Promise.allSettled([categoriesAPI.getAllCategories(), brandsAPI.getAllBrands()]).then(([c, b]) => {
+      if (c.status === "fulfilled") setCategories(listOf(c.value, "categories"));
+      if (b.status === "fulfilled") setBrands(listOf(b.value, "brands").filter((x) => x.isActive !== false));
+    });
   }, []);
 
-  const fetchData = useCallback(async () => {
-    if (serverStatus === "disconnected") {
-      setError("Server is not running. Please start the server and try again.");
-      setLoading(false);
-      return;
-    }
-
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const query = { page, limit: PAGE_SIZE, sort };
+    FILTER_KEYS.forEach((k) => {
+      const v = params.get(k);
+      if (v) query[k] = v;
+    });
     try {
-      setLoading(true);
-      setError(null);
-
-      const [productsData, categoriesData] = await Promise.all([
-        productsAPI.getAllProducts({
-          page: pagination.page,
-          limit: pagination.limit,
-          ...filters,
-        }),
-        categoriesAPI.getAllCategories(),
-      ]);
-
-      setProducts(productsData.products);
-      setPagination((prev) => ({
-        ...prev,
-        // Ensure that productsData.pagination exists and has these properties
-        // Provide fallbacks in case the API response structure is inconsistent
-        total:
-          productsData.pagination?.total !== undefined
-            ? productsData.pagination.total
-            : 0,
-        page: parseInt(productsData.pagination?.page || "1", 10), // Default to '1' if undefined
-        limit: parseInt(productsData.pagination?.limit || "12", 10), // Default to '12' if undefined
-      }));
-      setCategories(categoriesData.categories || []);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-      setError(err.message || "Failed to fetch data. Please try again.");
+      const res = await productsAPI.getAllProducts(query);
+      setProducts(res.products ?? []);
+      setTotal(res.pagination?.total ?? res.total ?? 0);
+    } catch (e) {
+      setError(e.message || "โหลดสินค้าไม่สำเร็จ");
       setProducts([]);
-      setPagination((prev) => ({ ...prev, total: 0, page: 1, limit: 12 }));
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.page, pagination.limit, serverStatus]);
+    // queryKey captures every search param.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey]);
 
   useEffect(() => {
-    if (serverStatus !== "checking") {
-      fetchData();
+    load();
+  }, [load]);
+
+  /** Merge changes into the URL; any filter change returns to page 1. */
+  const update = useCallback(
+    (changes, { resetPage = true } = {}) => {
+      const next = new URLSearchParams(params.toString());
+      Object.entries(changes).forEach(([k, v]) => (v ? next.set(k, String(v)) : next.delete(k)));
+      if (resetPage) next.delete("page");
+      const qs = next.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [params, pathname, router]
+  );
+
+  const categoryName = categories.find((c) => c.id === params.get("category"))?.name;
+  const brandName = brands.find((b) => b.id === params.get("brand"))?.name;
+  const search = params.get("search");
+  const title = search ? `ผลการค้นหา “${search}”` : categoryName || brandName || "สินค้าทั้งหมด";
+
+  const chips = useMemo(() => {
+    const list = [];
+    if (search) list.push({ key: "search", label: `ค้นหา: ${search}` });
+    if (categoryName) list.push({ key: "category", label: categoryName });
+    if (brandName) list.push({ key: "brand", label: brandName });
+    const min = params.get("minPrice");
+    const max = params.get("maxPrice");
+    if (min || max) {
+      list.push({
+        key: "price",
+        label: min && max ? `${formatTHB(min)} – ${formatTHB(max)}` : min ? `ตั้งแต่ ${formatTHB(min)}` : `ไม่เกิน ${formatTHB(max)}`,
+        clear: { minPrice: "", maxPrice: "" },
+      });
     }
-  }, [fetchData, serverStatus]);
+    if (params.get("inStock") === "true") list.push({ key: "inStock", label: "มีของ" });
+    return list;
+  }, [search, categoryName, brandName, params]);
 
-  const handleFilterChange = useCallback((newFilters) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }));
-    setPagination((prev) => ({ ...prev, page: 1 }));
-  }, []);
+  const clearAll = () => router.push(sort !== "newest" ? `${pathname}?sort=${sort}` : pathname, { scroll: false });
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, total);
 
-  const handlePageChange = useCallback((newPage) => {
-    setPagination((prev) => ({ ...prev, page: newPage }));
-  }, []);
-
-  const handleRetry = useCallback(async () => {
-    setServerStatus("checking");
-    const isConnected = await checkServerConnection();
-    setServerStatus(isConnected ? "connected" : "disconnected");
-    if (isConnected) {
-      fetchData();
-    }
-  }, [fetchData]);
-
-  const resetFilters = useCallback(() => {
-    setFilters({
-      category: "",
-      minPrice: "",
-      maxPrice: "",
-      sort: "newest",
-    });
-    setPagination((prev) => ({ ...prev, page: 1 }));
-  }, []);
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.category) count++;
-    if (filters.minPrice) count++;
-    if (filters.maxPrice) count++;
-    return count;
-  }, [filters.category, filters.minPrice, filters.maxPrice]);
-
-  // Search products (autocomplete)
-  useEffect(() => {
-    if (!search) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      return;
-    }
-    let active = true;
-    setSearchLoading(true);
-    productsAPI
-      .searchProducts(search, { limit: 8 })
-      .then((res) => {
-        if (active) {
-          setSearchResults(res.products || []);
-          setShowDropdown(true);
-        }
-      })
-      .catch(() => setSearchResults([]))
-      .finally(() => setSearchLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [search]);
-
-  // --- Initial Loading / Error States ---
-  if (loading && products.length === 0 && serverStatus === "checking") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-indigo-100">
-        <LoadingSpinner size="large" className="text-indigo-600" />
-        <p className="mt-4 text-lg font-medium text-gray-700">
-          กำลังเชื่อมต่อและโหลดสินค้า...
-        </p>
-      </div>
-    );
-  }
-
-  if (error || serverStatus === "disconnected") {
-    return (
-      <ErrorState
-        title={
-          serverStatus === "disconnected"
-            ? "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"
-            : "เกิดข้อผิดพลาดในการโหลดสินค้า"
-        }
-        message={
-          serverStatus === "disconnected"
-            ? "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบให้แน่ใจว่าเซิร์ฟเวอร์ทำงานอยู่ และลองใหม่อีกครั้ง"
-            : error
-        }
-        actionText="ลองอีกครั้ง"
-        onAction={handleRetry}
+  return (
+    <Container className="py-8 sm:py-10">
+      <Breadcrumbs
+        items={[
+          { label: "หน้าแรก", href: "/" },
+          { label: "สินค้า", href: "/products" },
+          ...(categoryName ? [{ label: categoryName }] : []),
+        ]}
       />
-    );
-  }
-
-  // Calculate start and end indices for display message
-  const startIndex = Math.min(
-    pagination.limit * (pagination.page - 1) + 1,
-    pagination.total
-  );
-  const endIndex = Math.min(
-    pagination.limit * pagination.page,
-    pagination.total
-  );
-  const displayRange =
-    pagination.total === 0 ? "0" : `${startIndex} - ${endIndex}`;
-
-  return (
-    <div className="bg-gradient-to-br from-gray-50 to-indigo-100 min-h-screen">
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 md:py-8">
-        {/* /* Search Bar + Filters (compact, sidebar only) */}
-        <div className="flex justify-center mb-4 gap-1">
-          <div className="w-full max-w-md relative">
-            <div className="flex items-center bg-white border border-gray-200 rounded-xl shadow px-2 py-1  focus-within:ring-2 focus-within:ring-indigo-400">
-              <span className="text-gray-400 mr-1">
-                <svg
-                  width="18"
-                  height="18"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-              <input
-                type="text"
-                className="w-full border-0 outline-none text-base bg-transparent placeholder-gray-400 px-1 py-0.5"
-                placeholder="ค้นหาสินค้า..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onFocus={() => search && setShowDropdown(true)}
-                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                style={{ minHeight: 32 }}
-              />
-              <button
-                className="ml-1 px-2 py-1 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition text-sm"
-                onClick={() => search && setShowDropdown(true)}
-                tabIndex={-1}
-                style={{ minHeight: 28 }}
-              >
-                ค้นหา
-              </button>
-            </div>
-            {showDropdown && (
-              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-30 max-h-72 overflow-y-auto text-sm">
-                {searchLoading && (
-                  <div className="px-4 py-3 text-gray-400">กำลังค้นหา...</div>
-                )}
-                {searchResults.length === 0 && !searchLoading && (
-                  <div className="px-4 py-3 text-gray-400">ไม่พบสินค้า</div>
-                )}
-                {searchResults.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-2 px-4 py-3 hover:bg-blue-50 cursor-pointer transition"
-                    onMouseDown={() => {
-                      setShowDropdown(false);
-                      setSearch("");
-                      window.location.href = `/products/${item.id}`;
-                    }}
-                  >
-                    <Image
-                      src={
-                        (() => {
-                          const url = Array.isArray(item.imageUrl)
-                            ? item.imageUrl.find((u) => u && u.trim() !== "")
-                            : item.imageUrl;
-                          return url && url.trim() !== ""
-                            ? url
-                            : "/images/placeholder.svg";
-                        })()
-                      }
-                      alt={item.name}
-                      width={32}
-                      height={32}
-                      style={{ objectFit: "cover", borderRadius: "4px" }}
-                    />
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-semibold text-gray-900 truncate text-sm">
-                        {item.name}
-                      </span>
-                      <span className="text-xs text-gray-500 truncate">
-                        {item.brand || item.categoryName}
-                      </span>
-                    </div>
-                    <span className="ml-auto text-blue-600 font-bold text-xs">
-                      ฿{item.price}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
+          <p className="mt-2 text-sm text-fg-muted" aria-live="polite">
+            {loading ? "กำลังโหลด…" : `${total.toLocaleString("th-TH")} รายการ`}
+          </p>
         </div>
-        {/* Breadcrumbs */}
-        <nav className="flex mb-3" aria-label="Breadcrumb">
-          <ol className="flex items-center space-x-2 text-sm md:text-base text-gray-500">
-            <li>
-              <Link href="/" className="hover:text-gray-700 transition-colors">
-                หน้าแรก
-              </Link>
-            </li>
-            <li>
-              <FiChevronRight className="h-4 w-4 text-gray-400" />
-            </li>
-            <li>
-              <span className="font-semibold text-gray-800">สินค้าทั้งหมด</span>
-            </li>
-          </ol>
-        </nav>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6">
-          {/* Sidebar filters only (no filter bar above grid) */}
-          <div className="hidden md:block md:col-span-1">
-            <div className="bg-white p-5 rounded-xl shadow border border-gray-100 sticky top-8 space-y-6">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-bold text-gray-900 tracking-tight">
-                  ตัวกรอง
-                </h2>
-                {activeFilterCount > 0 && (
-                  <Button
-                    onClick={resetFilters}
-                    variant="ghost"
-                    className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 p-1 rounded-md hover:bg-gray-50 transition-colors duration-200"
-                    aria-label="รีเซ็ตตัวกรองทั้งหมด"
-                  >
-                    <FiRefreshCw className="h-3 w-3" />
-                    <span>รีเซ็ต</span>
-                  </Button>
-                )}
-              </div>
-              <div className="space-y-5">
-                <CategoryFilter
-                  categories={categories}
-                  selectedCategory={filters.category}
-                  onCategoryChange={(category) =>
-                    handleFilterChange({ category })
-                  }
-                  titleClassName="text-sm font-semibold text-gray-700 mb-1"
-                  itemClassName="text-sm"
-                />
-                <hr className="border-gray-200" />
-                <PriceFilter
-                  minPrice={filters.minPrice}
-                  maxPrice={filters.maxPrice}
-                  onPriceChange={(min, max) =>
-                    handleFilterChange({ minPrice: min, maxPrice: max })
-                  }
-                  titleClassName="text-sm font-semibold text-gray-700 mb-1"
-                  inputClassName="text-sm px-2 py-1 rounded border border-gray-200 w-20"
-                />
-                <SortFilter
-                  value={filters.sort}
-                  onChange={(sort) => handleFilterChange({ sort })}
-                  className="mt-2"
-                  titleClassName="text-sm font-semibold text-gray-700 mb-1"
-                  selectClassName="text-sm px-2 py-1 rounded border border-gray-200"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Product grid and controls */}
-          <div className="md:col-span-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-              <p className="text-sm text-gray-700">
-                แสดงผลสินค้า
-                <span className="font-semibold text-gray-800">
-                  {" "}
-                  {displayRange}{" "}
-                </span>
-                จากทั้งหมด
-                <span className="font-semibold text-gray-900">
-                  {" "}
-                  {pagination.total.toLocaleString("th-TH")}{" "}
-                </span>
-                รายการ
-              </p>
-            </div>
-
-            {activeFilterCount > 0 && (
-              <div className="flex flex-wrap items-center gap-1 mb-4 p-2 bg-white rounded-xl shadow border border-gray-100 text-xs">
-                <span className="text-xs text-gray-600 font-medium mr-1">
-                  ตัวกรองที่ใช้งาน:
-                </span>
-                {filters.category && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 ring-1 ring-indigo-200">
-                    {categories.find((c) => c.id === filters.category)?.name ||
-                      filters.category}
-                    <button
-                      onClick={() => handleFilterChange({ category: "" })}
-                      className="ml-1 h-3 w-3 text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-full"
-                      aria-label="ลบตัวกรองหมวดหมู่"
-                    >
-                      <FiX className="h-full w-full" />
-                    </button>
-                  </span>
-                )}
-                {filters.minPrice && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ring-1 ring-green-200">
-                    ราคาต่ำสุด:{" "}
-                    {parseFloat(filters.minPrice).toLocaleString("th-TH")}
-                    <button
-                      onClick={() => handleFilterChange({ minPrice: "" })}
-                      className="ml-1 h-3 w-3 text-green-600 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded-full"
-                      aria-label="ลบตัวกรองราคาต่ำสุด"
-                    >
-                      <FiX className="h-full w-full" />
-                    </button>
-                  </span>
-                )}
-                {filters.maxPrice && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ring-1 ring-green-200">
-                    ราคาสูงสุด:{" "}
-                    {parseFloat(filters.maxPrice).toLocaleString("th-TH")}
-                    <button
-                      onClick={() => handleFilterChange({ maxPrice: "" })}
-                      className="ml-1 h-3 w-3 text-green-600 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 rounded-full"
-                      aria-label="ลบตัวกรองราคาสูงสุด"
-                    >
-                      <FiX className="h-full w-full" />
-                    </button>
-                  </span>
-                )}
-              </div>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className={buttonClasses({ variant: "outline", size: "md", className: "flex-1 sm:flex-none lg:hidden" })}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden />
+            ตัวกรอง
+            {chips.length > 0 && (
+              <span className="rounded-full bg-fg px-1.5 text-xs text-canvas">{chips.length}</span>
             )}
-
-            {/* Product Grid or Empty State */}
-            {products.length === 0 && !loading ? (
-              <EmptyState
-                title="ไม่พบสินค้า"
-                description="ลองปรับตัวกรองของคุณ หรือรีเซ็ตตัวกรองทั้งหมด"
-                actionText="รีเซ็ตตัวกรอง"
-                onAction={resetFilters}
-              />
-            ) : (
-              <>
-                <ProductGrid products={products} loading={loading} />
-                <div className="mt-6 flex justify-center">
-                  <Pagination
-                    currentPage={pagination.page}
-                    totalPages={Math.ceil(pagination.total / pagination.limit)}
-                    onPageChange={handlePageChange}
-                  />
-                </div>
-              </>
-            )}
-          </div>
+          </button>
+          <label htmlFor="sort" className="sr-only">เรียงตาม</label>
+          <select
+            id="sort"
+            value={sort}
+            onChange={(e) => update({ sort: e.target.value === "newest" ? "" : e.target.value })}
+            className="h-11 flex-1 rounded-full border-border bg-surface pl-4 pr-10 text-sm font-medium focus:border-fg focus:ring-fg sm:flex-none"
+          >
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                เรียง: {s.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-      {/* Mobile Filters Dialog (using Headless UI Dialog for better accessibility/control) */}
-      <Transition appear show={mobileFiltersOpen} as={Fragment}>
-        <Dialog
-          as="div"
-          className="relative z-40 md:hidden"
-          onClose={() => setMobileFiltersOpen(false)}
-        >
-          <Transition.Child
-            as={Fragment}
-            enter="transition-opacity ease-linear duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="transition-opacity ease-linear duration-300"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-black bg-opacity-40" />{" "}
-            {/* Darker overlay */}
-          </Transition.Child>
 
-          <div className="fixed inset-0 flex">
-            <Transition.Child
-              as={Fragment}
-              enter="transition ease-in-out duration-300 transform"
-              enterFrom="-translate-x-full"
-              enterTo="translate-x-0"
-              leave="transition ease-in-out duration-300 transform"
-              leaveFrom="translate-x-0"
-              leaveTo="-translate-x-full"
-            >
-              <Dialog.Panel className="relative flex w-full max-w-xs flex-col overflow-y-auto bg-white pb-12 shadow-xl">
-                <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-                  <Dialog.Title className="text-2xl font-semibold text-gray-900">
-                    ตัวกรอง
-                  </Dialog.Title>
-                  <button
-                    type="button"
-                    className="-mr-2 flex h-10 w-10 items-center justify-center rounded-md bg-white p-2 text-gray-400 hover:text-gray-500"
-                    onClick={() => setMobileFiltersOpen(false)}
-                    aria-label="ปิดเมนูตัวกรอง"
-                  >
-                    <FiX className="h-6 w-6" aria-hidden="true" />
-                  </button>
-                </div>
-
-                <div className="p-4 space-y-8 flex-grow">
-                  <CategoryFilter
-                    categories={categories}
-                    selectedCategory={filters.category}
-                    onCategoryChange={(category) =>
-                      handleFilterChange({ category })
-                    }
-                  />
-                  <PriceFilter
-                    minPrice={filters.minPrice}
-                    maxPrice={filters.maxPrice}
-                    onPriceChange={(min, max) =>
-                      handleFilterChange({ minPrice: min, maxPrice: max })
-                    }
-                  />
-                </div>
-
-                <div className="sticky bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-md">
-                  <Button
-                    onClick={() => setMobileFiltersOpen(false)}
-                    className="w-full bg-indigo-600 text-white px-4 py-2.5 rounded-lg hover:bg-indigo-700 font-medium transition-colors duration-200"
-                  >
-                    แสดงผลลัพธ์ ({pagination.total})
-                  </Button>
-                  {activeFilterCount > 0 && (
-                    <Button
-                      onClick={resetFilters}
-                      variant="ghost"
-                      className="w-full mt-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors duration-200"
-                    >
-                      รีเซ็ตตัวกรอง
-                    </Button>
-                  )}
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition>
-    </div>
-  );
-}
-
-// Product Grid Component
-function ProductGrid({ products, loading }) {
-  const showSkeleton = loading && products.length === 0;
-
-  return (
-    <div className="relative">
-      {/* Overlay for "soft" loading state when filters change */}
-      {loading && products.length > 0 && (
-        <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10 rounded-lg backdrop-blur-sm">
-          <LoadingSpinner size="medium" className="text-indigo-600" />
-        </div>
+      {chips.length > 0 && (
+        <ul className="mt-4 flex flex-wrap items-center gap-2" aria-label="ตัวกรองที่ใช้อยู่">
+          {chips.map((c) => (
+            <li key={c.key}>
+              <button
+                type="button"
+                onClick={() => update(c.clear ?? { [c.key]: "" })}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-muted pl-3 pr-2 text-xs font-medium text-fg hover:bg-fg/10"
+              >
+                {c.label}
+                <X className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">ลบตัวกรองนี้</span>
+              </button>
+            </li>
+          ))}
+          <li>
+            <button type="button" onClick={clearAll} className="px-2 text-xs font-semibold underline underline-offset-4">
+              ล้างทั้งหมด
+            </button>
+          </li>
+        </ul>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4  gap-3 md:gap-4">
-        {showSkeleton
-          ? Array.from({ length: 8 }).map((_, idx) => (
-              <ProductCardSkeleton key={idx} />
-            ))
-          : products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+      <div className="mt-8 grid gap-10 lg:grid-cols-[15rem_1fr]">
+        <aside aria-label="ตัวกรองสินค้า" className="hidden lg:block">
+          <div className="sticky top-24">
+            <Filters params={params} categories={categories} brands={brands} update={update} />
+          </div>
+        </aside>
+
+        <section aria-label="รายการสินค้า">
+          {error ? (
+            <div className="rounded-card border border-border p-10 text-center">
+              <p className="font-semibold">โหลดสินค้าไม่สำเร็จ</p>
+              <p className="mt-1 text-sm text-fg-muted">{error}</p>
+              <Button variant="outline" size="sm" className="mt-5" onClick={load}>
+                ลองอีกครั้ง
+              </Button>
+            </div>
+          ) : !loading && products.length === 0 ? (
+            <div className="rounded-card border border-dashed border-border px-6 py-16 text-center">
+              <p className="font-display text-xl font-semibold">ไม่พบสินค้าที่ตรงกับเงื่อนไข</p>
+              <p className="mt-2 text-sm text-fg-muted">ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองบางอย่าง</p>
+              {chips.length > 0 && (
+                <Button variant="default" size="md" className="mt-6" onClick={clearAll}>
+                  ล้างตัวกรองทั้งหมด
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <ProductGrid columns={3}>
+                {loading
+                  ? Array.from({ length: 6 }).map((_, i) => <ProductCardSkeleton key={i} />)
+                  : products.map((p, i) => <ProductCard key={p.id} product={p} priority={i < 3} />)}
+              </ProductGrid>
+              {!loading && total > 0 && (
+                <div className="mt-12 flex flex-col items-center gap-4">
+                  <p className="text-xs text-fg-subtle">
+                    แสดง {from}–{to} จาก {total.toLocaleString("th-TH")} รายการ
+                  </p>
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={(p) => {
+                      update({ page: p > 1 ? p : "" }, { resetPage: false });
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </section>
       </div>
-    </div>
+
+      <Dialog open={filtersOpen} onClose={setFiltersOpen} className="relative z-[120] lg:hidden">
+        <DialogBackdrop transition className="fixed inset-0 bg-black/40 transition-opacity duration-200 data-[closed]:opacity-0" />
+        <DialogPanel
+          transition
+          className="fixed inset-y-0 right-0 flex w-[88%] max-w-sm flex-col bg-surface shadow-xl transition-transform duration-200 ease-out data-[closed]:translate-x-full"
+        >
+          <div className="flex h-16 items-center justify-between border-b border-border px-5">
+            <h2 className="text-base font-semibold">ตัวกรอง</h2>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-fg/5"
+              aria-label="ปิดตัวกรอง"
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-6">
+            <Filters params={params} categories={categories} brands={brands} update={update} />
+          </div>
+          <div className="grid grid-cols-2 gap-2 border-t border-border p-4">
+            <Button variant="outline" onClick={clearAll} disabled={chips.length === 0}>
+              ล้างทั้งหมด
+            </Button>
+            <Button variant="default" onClick={() => setFiltersOpen(false)}>
+              ดู {loading ? "…" : total} รายการ
+            </Button>
+          </div>
+        </DialogPanel>
+      </Dialog>
+    </Container>
   );
 }
 
-// --- Skeleton Component (compact version) ---
-const ProductCardSkeleton = () => (
-  <div className="group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm animate-pulse p-2 min-h-[270px]">
-    <div className="aspect-[4/5] bg-gray-200 w-full rounded-md"></div>
-    <div className="mt-2 space-y-2 flex-grow">
-      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-      <div className="h-8 bg-gray-200 rounded w-full mt-2"></div>
-    </div>
-  </div>
-);
+export default function ProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <Container className="py-10">
+          <ProductGrid columns={3}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </ProductGrid>
+        </Container>
+      }
+    >
+      <ProductsView />
+    </Suspense>
+  );
+}

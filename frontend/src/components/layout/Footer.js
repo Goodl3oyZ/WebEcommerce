@@ -1,140 +1,96 @@
+"use client";
+
 import Link from "next/link";
-import React from "react";
+import { usePathname } from "next/navigation";
 import { FiFacebook, FiGithub, FiInstagram } from "react-icons/fi";
+import Container from "@/components/shop/Container";
+
+const columns = [
+  {
+    title: "เลือกซื้อ",
+    links: [
+      { href: "/products", label: "สินค้าทั้งหมด" },
+      { href: "/products?sort=newest", label: "สินค้ามาใหม่" },
+      { href: "/cart", label: "ตะกร้าสินค้า" },
+    ],
+  },
+  {
+    title: "ช่วยเหลือ",
+    links: [
+      { href: "/shipping", label: "การจัดส่ง" },
+      { href: "/faq", label: "คำถามที่พบบ่อย" },
+      { href: "/contact", label: "ติดต่อเรา" },
+      { href: "/orders", label: "ติดตามคำสั่งซื้อ" },
+    ],
+  },
+  {
+    title: "เกี่ยวกับเรา",
+    links: [
+      { href: "/about", label: "เรื่องราวของเรา" },
+      { href: "/blog", label: "บทความ" },
+      { href: "/careers", label: "ร่วมงานกับเรา" },
+    ],
+  },
+];
+
+const socials = [
+  { href: "https://www.facebook.com/panudet.fluke/", label: "Facebook", Icon: FiFacebook },
+  { href: "https://www.instagram.com/fluke_psd/", label: "Instagram", Icon: FiInstagram },
+  { href: "https://github.com/Goodl3oyZ", label: "GitHub", Icon: FiGithub },
+];
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/admin")) return null;
+
   return (
-    <footer className="bg-gray-800 text-white py-12">
-      <div className="container mx-auto px-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+    <footer className="mt-20 bg-[#0f0f0f] text-white">
+      <Container className="py-14">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
-            <h3 className="text-2xl font-extrabold mb-4 tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              CHALLENGE
-            </h3>
-            <p className="text-gray-300 mb-6 max-w-xs">
-              Empowering your transformation through quality products and
-              inspiration.
+            <p className="font-display text-2xl font-bold italic uppercase tracking-tight">Challenge</p>
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/65">
+              อุปกรณ์วิ่ง ฟิตเนส และเทรนนิ่ง สำหรับคนที่ไม่หยุดพัฒนาตัวเอง
             </p>
-            <div className="flex space-x-4 mt-4">
-              <a
-                href="https://www.facebook.com/panudet.fluke/"
-                aria-label="Facebook"
-                className="hover:text-blue-400 transition-colors text-2xl"
-              >
-                <FiFacebook />
-              </a>
-              <a
-                href="https://www.instagram.com/fluke_psd/"
-                aria-label="Instagram"
-                className="hover:text-pink-400 transition-colors text-2xl"
-              >
-                <FiInstagram />
-              </a>
-              <a
-                href="https://github.com/Goodl3oyZ"
-                aria-label="Github"
-                className="hover:text-slate-900 transition-colors text-2xl"
-              >
-                <FiGithub />
-              </a>
-            </div>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4 text-lg">Shop</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/products"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  All Products
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/products/new"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  New Arrivals
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/products/sale"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  Sale Items
-                </Link>
-              </li>
+            <ul className="mt-6 flex gap-2">
+              {socials.map(({ href, label, Icon }) => (
+                <li key={label}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white/80 transition-colors hover:border-brand hover:text-brand focus-visible:outline-white"
+                  >
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
-          <div>
-            <h4 className="font-semibold mb-4 text-lg">Company</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/about"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/blog"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  Blog
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/careers"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  Careers
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4 text-lg">Help</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/contact"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/faq"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  FAQs
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/shipping"
-                  className="text-gray-300 hover:text-white transition-colors"
-                >
-                  Shipping & Returns
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {columns.map((col) => (
+            <nav key={col.title} aria-label={col.title}>
+              <h2 className="text-sm font-semibold text-white/55">{col.title}</h2>
+              <ul className="mt-4 space-y-2.5">
+                {col.links.map((l) => (
+                  <li key={l.href}>
+                    <Link
+                      href={l.href}
+                      className="text-sm text-white/80 transition-colors hover:text-white hover:underline underline-offset-4 focus-visible:outline-white"
+                    >
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
-        <div className="border-t border-gray-700 mt-12 pt-8 text-center text-gray-400 text-sm">
-          <p>
-            © {new Date().getFullYear()} CHALLENGE. All rights reserved. |
-            Designed with <span className="text-pink-400">♥</span>
-          </p>
+        <div className="mt-12 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/50 sm:flex-row sm:justify-between">
+          <p>© {new Date().getFullYear()} CHALLENGE. สงวนลิขสิทธิ์</p>
+          <p>ราคาสินค้ายังไม่รวม VAT 7% ซึ่งคำนวณในขั้นตอนชำระเงิน</p>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }
-// This is a simple footer component for a React application.
