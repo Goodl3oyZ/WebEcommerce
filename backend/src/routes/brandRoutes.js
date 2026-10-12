@@ -1,41 +1,28 @@
 import express from "express";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
-import { brandController } from "../controllers/brandController.js";
+import { authMiddleware, optionalAuth } from "../middlewares/authMiddleware.js";
 import { requireRole, ROLES } from "../middlewares/authorizationMiddleware.js";
+import { brandController } from "../controllers/brandController.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { brandDto } from "../dtos/brand.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("id", uuidParam("Brand not found"));
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all brand routes
 router.use(apiRateLimiter);
 
-// Public routes
-router.get("/", brandController.getBrands);
-router.get("/:id", brandController.getBrandById);
-router.get("/:id/products", brandController.getBrandProducts);
+// Public (admins additionally see disabled brands).
+router.get("/", optionalAuth, validationMiddleware(brandDto.listQuery, "query"), brandController.getBrands);
+router.get("/:id", optionalAuth, brandController.getBrandById);
+router.get("/:id/products", optionalAuth, validationMiddleware(brandDto.listQuery, "query"), brandController.getBrandProducts);
 
-// Admin only routes
 router.use(authMiddleware);
-router.post(
-  "/",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(brandDto.createBrand),
-  brandController.createBrand
-);
-router.put(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(brandDto.updateBrand),
-  brandController.updateBrand
-);
-router.patch(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(brandDto.updateBrand),
-  brandController.updateBrand
-);
-router.delete("/:id", requireRole(ROLES.ADMIN), brandController.deleteBrand);
+
+router.post("/", requireAdmin, validationMiddleware(brandDto.createBrand), brandController.createBrand);
+router.put("/:id", requireAdmin, validationMiddleware(brandDto.updateBrand), brandController.updateBrand);
+router.patch("/:id", requireAdmin, validationMiddleware(brandDto.updateBrand), brandController.updateBrand);
+router.delete("/:id", requireAdmin, brandController.deleteBrand);
 
 export default router;

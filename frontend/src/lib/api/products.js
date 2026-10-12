@@ -156,10 +156,12 @@ const productsAPI = {
   // User routes (requires auth)
   createReview: async (productId, reviewData) => {
     try {
-      const response = await axiosInstance.post(
-        `/products/${productId}/review`,
-        reviewData
-      );
+      // The API only accepts these fields (the author is the logged-in user).
+      const { rating, comment } = reviewData;
+      const response = await axiosInstance.post(`/products/${productId}/review`, {
+        rating,
+        comment,
+      });
       return {
         status: response.status,
         data: response.data, // จะเป็น undefined ใน 204 แต่ไม่เป็นไร
@@ -171,9 +173,10 @@ const productsAPI = {
 
   updateReview: async (productId, reviewId, reviewData) => {
     try {
+      const { rating, comment } = reviewData;
       const response = await axiosInstance.put(
         `/products/${productId}/review/${reviewId}`,
-        reviewData
+        { rating, comment }
       );
       return {
         status: response.status,

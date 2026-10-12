@@ -1,123 +1,44 @@
 import { categoryService } from "../services/categoryService.js";
-import { ApiError } from "../utils/ApiError.js";
+import { parsePagination } from "../utils/pagination.js";
+import { isAdminRole } from "../utils/roles.js";
 
 export const categoryController = {
-  // Get all categories
-  async getCategories(req, res, next) {
-    try {
-      const categories = await categoryService.getCategories();
-      res.json(categories);
-    } catch (error) {
-      next(error);
-    }
+  async getCategories(req, res) {
+    res.json(await categoryService.getCategories());
   },
 
-  // Get category by ID
-  async getCategoryById(req, res, next) {
-    try {
-      const { id } = req.params;
-      const category = await categoryService.getCategoryById(id);
-      res.json(category);
-    } catch (error) {
-      next(error);
-    }
+  async getCategoryById(req, res) {
+    res.json(await categoryService.getCategoryById(req.params.id));
   },
 
-  // Get products in a category
-  async getCategoryProducts(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { page, limit } = req.query;
-      const products = await categoryService.getCategoryProducts(id, {
-        page,
-        limit,
-      });
-      res.json(products);
-    } catch (error) {
-      next(error);
-    }
+  async getCategoryProducts(req, res) {
+    const { sort, minPrice, maxPrice, search, inStock, includeInactive } = req.query;
+    res.json(
+      await categoryService.getCategoryProducts(
+        req.params.id,
+        {
+          sort,
+          minPrice,
+          maxPrice,
+          search,
+          inStock: inStock === "true",
+          includeInactive: isAdminRole(req.user?.role) && includeInactive !== "false",
+        },
+        parsePagination(req.query)
+      )
+    );
   },
 
-  // Create new category (Admin only)
-  async createCategory(req, res, next) {
-    try {
-      const categoryData = req.body;
-      const newCategory = await categoryService.createCategory(categoryData);
-      res.status(201).json(newCategory);
-    } catch (error) {
-      next(error);
-    }
+  async createCategory(req, res) {
+    res.status(201).json(await categoryService.createCategory(req.body));
   },
 
-  // Update category (Admin only)
-  async updateCategory(req, res, next) {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      const updatedCategory = await categoryService.updateCategory(id, updates);
-      res.json(updatedCategory);
-    } catch (error) {
-      next(error);
-    }
+  async updateCategory(req, res) {
+    res.json(await categoryService.updateCategory(req.params.id, req.body));
   },
 
-  // Delete category (Admin only)
-  async deleteCategory(req, res, next) {
-    try {
-      const { id } = req.params;
-      await categoryService.deleteCategory(id);
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async getCategoryTree(req, res) {
-    try {
-      const tree = await categoryService.getCategoryTree();
-      res.json(tree);
-    } catch (error) {
-      res.status(500).json({
-        message: "Error fetching category tree",
-        error: error.message,
-      });
-    }
-  },
-
-  async updateCategoryOrder(req, res) {
-    try {
-      const { id } = req.params;
-      const { order } = req.body;
-      const category = await categoryService.updateCategoryOrder(id, order);
-      res.json(category);
-    } catch (error) {
-      if (error.message === "Category not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error updating category order",
-        error: error.message,
-      });
-    }
-  },
-
-  async updateCategoryVisibility(req, res) {
-    try {
-      const { id } = req.params;
-      const { isVisible } = req.body;
-      const category = await categoryService.updateCategoryVisibility(
-        id,
-        isVisible
-      );
-      res.json(category);
-    } catch (error) {
-      if (error.message === "Category not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error updating category visibility",
-        error: error.message,
-      });
-    }
+  async deleteCategory(req, res) {
+    await categoryService.deleteCategory(req.params.id);
+    res.json({ success: true, message: "ลบหมวดหมู่แล้ว" });
   },
 };

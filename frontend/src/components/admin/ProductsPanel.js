@@ -480,6 +480,33 @@ export function ProductsPanel() {
           }
         }
 
+        // Editing: save changed variants, add new ones, delete removed ones
+        // (previously variant edits were silently discarded).
+        if (isEdit) {
+          const keptIds = new Set(variants.filter((v) => v.id).map((v) => v.id));
+          for (const variant of variants) {
+            const body = {
+              color: variant.color || "Default",
+              size: variant.size || "Default",
+              sku: variant.sku || generateSKU(productData.name, "Variant"),
+              price: Number(variant.price) || 0,
+              stock: Number(variant.stock) || 0,
+            };
+            if (variant.id) await mockAPI.variants.update(productId, variant.id, body);
+            else await productsAPI.createVariant(productId, body);
+          }
+          for (const original of editingProduct.variants || []) {
+            if (keptIds.has(original.id)) continue;
+            try {
+              await mockAPI.variants.delete(productId, original.id);
+            } catch {
+              toast.error(
+                `ลบตัวเลือก ${original.sku} ไม่ได้ เพราะมีคำสั่งซื้ออ้างอิงอยู่ ตั้งสต็อกเป็น 0 แทน`
+              );
+            }
+          }
+        }
+
         // Upload images
         if (uploadedImages.length > 0) {
           try {

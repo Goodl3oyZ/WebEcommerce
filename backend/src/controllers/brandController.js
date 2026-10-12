@@ -1,108 +1,44 @@
 import { brandService } from "../services/brandService.js";
-import { ApiError } from "../utils/ApiError.js";
+import { parsePagination } from "../utils/pagination.js";
+import { isAdminRole } from "../utils/roles.js";
+
+/** Admins see disabled brands (and their products); everyone else does not. */
+const adminView = (req) => isAdminRole(req.user?.role);
 
 export const brandController = {
-  // Get all brands
-  async getBrands(req, res, next) {
-    try {
-      const { page, limit, search } = req.query;
-      const brands = await brandService.getBrands({ page, limit, search });
-      res.json(brands);
-    } catch (error) {
-      next(error);
-    }
+  async getBrands(req, res) {
+    res.json(
+      await brandService.getBrands(
+        { search: req.query.search, includeInactive: adminView(req) },
+        parsePagination(req.query)
+      )
+    );
   },
 
-  // Get brand by ID
-  async getBrandById(req, res, next) {
-    try {
-      const { id } = req.params;
-      const brand = await brandService.getBrandById(id);
-      res.json(brand);
-    } catch (error) {
-      next(error);
-    }
+  async getBrandById(req, res) {
+    res.json(await brandService.getBrandById(req.params.id, { includeInactive: adminView(req) }));
   },
 
-  // Get products by brand
-  async getBrandProducts(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { page, limit } = req.query;
-      const products = await brandService.getBrandProducts(id, {
-        page,
-        limit,
-      });
-      res.json(products);
-    } catch (error) {
-      next(error);
-    }
+  async getBrandProducts(req, res) {
+    res.json(
+      await brandService.getBrandProducts(
+        req.params.id,
+        { includeInactive: adminView(req) },
+        parsePagination(req.query)
+      )
+    );
   },
 
-  // Create new brand (Admin only)
-  async createBrand(req, res, next) {
-    try {
-      const brandData = req.body;
-      const newBrand = await brandService.createBrand(brandData);
-      res.status(201).json(newBrand);
-    } catch (error) {
-      next(error);
-    }
+  async createBrand(req, res) {
+    res.status(201).json(await brandService.createBrand(req.body));
   },
 
-  // Update brand (Admin only)
-  async updateBrand(req, res, next) {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      const updatedBrand = await brandService.updateBrand(id, updates);
-      res.json(updatedBrand);
-    } catch (error) {
-      next(error);
-    }
+  async updateBrand(req, res) {
+    res.json(await brandService.updateBrand(req.params.id, req.body));
   },
 
-  // Delete brand (Admin only)
-  async deleteBrand(req, res, next) {
-    try {
-      const { id } = req.params;
-      await brandService.deleteBrand(id);
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async updateBrandLogo(req, res) {
-    try {
-      const { id } = req.params;
-      const { logoUrl } = req.body;
-      const brand = await brandService.updateBrandLogo(id, logoUrl);
-      res.json(brand);
-    } catch (error) {
-      if (error.message === "Brand not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error updating brand logo", error: error.message });
-    }
-  },
-
-  async updateBrandVisibility(req, res) {
-    try {
-      const { id } = req.params;
-      const { isVisible } = req.body;
-      const brand = await brandService.updateBrandVisibility(id, isVisible);
-      res.json(brand);
-    } catch (error) {
-      if (error.message === "Brand not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error updating brand visibility",
-        error: error.message,
-      });
-    }
+  async deleteBrand(req, res) {
+    const brand = await brandService.deleteBrand(req.params.id);
+    res.json({ success: true, data: brand, message: "ปิดการใช้งานแบรนด์แล้ว" });
   },
 };

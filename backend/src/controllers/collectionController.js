@@ -1,134 +1,52 @@
 import { collectionService } from "../services/collectionService.js";
-import { ApiError } from "../utils/ApiError.js";
+import { parsePagination } from "../utils/pagination.js";
+import { isAdminRole } from "../utils/roles.js";
+
+/** Admins see hidden collections and products; everyone else does not. */
+const adminView = (req) => isAdminRole(req.user?.role);
 
 export const collectionController = {
-  // Get all collections
-  async getCollections(req, res, next) {
-    try {
-      const { page, limit, search } = req.query;
-      const collections = await collectionService.getCollections({
-        page,
-        limit,
-        search,
-      });
-      res.json(collections);
-    } catch (error) {
-      next(error);
-    }
+  async getCollections(req, res) {
+    res.json(
+      await collectionService.getCollections(
+        { search: req.query.search, includeInactive: adminView(req) },
+        parsePagination(req.query)
+      )
+    );
   },
 
-  // Get collection by ID
-  async getCollectionById(req, res, next) {
-    try {
-      const { id } = req.params;
-      const collection = await collectionService.getCollectionById(id);
-      res.json(collection);
-    } catch (error) {
-      next(error);
-    }
+  async getCollectionById(req, res) {
+    res.json(await collectionService.getCollectionById(req.params.id, { includeInactive: adminView(req) }));
   },
 
-  // Get products in a collection
-  async getCollectionProducts(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { page, limit } = req.query;
-      const products = await collectionService.getCollectionProducts(id, {
-        page,
-        limit,
-      });
-      res.json(products);
-    } catch (error) {
-      next(error);
-    }
+  async getCollectionProducts(req, res) {
+    res.json(
+      await collectionService.getCollectionProducts(
+        req.params.id,
+        { includeInactive: adminView(req) },
+        parsePagination(req.query)
+      )
+    );
   },
 
-  // Create new collection (Admin only)
-  async createCollection(req, res, next) {
-    try {
-      const collectionData = req.body;
-      const newCollection = await collectionService.createCollection(
-        collectionData
-      );
-      res.status(201).json(newCollection);
-    } catch (error) {
-      next(error);
-    }
+  async createCollection(req, res) {
+    res.status(201).json(await collectionService.createCollection(req.body));
   },
 
-  // Update collection (Admin only)
-  async updateCollection(req, res, next) {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      const updatedCollection = await collectionService.updateCollection(
-        id,
-        updates
-      );
-      res.json(updatedCollection);
-    } catch (error) {
-      next(error);
-    }
+  async updateCollection(req, res) {
+    res.json(await collectionService.updateCollection(req.params.id, req.body));
   },
 
-  // Delete collection (Admin only)
-  async deleteCollection(req, res, next) {
-    try {
-      const { id } = req.params;
-      await collectionService.deleteCollection(id);
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
+  async deleteCollection(req, res) {
+    await collectionService.deleteCollection(req.params.id);
+    res.json({ success: true, message: "Collection deleted" });
   },
 
-  // Add products to collection (Admin only)
-  async addProducts(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { productIds } = req.body;
-      const updatedCollection = await collectionService.addProducts(
-        id,
-        productIds
-      );
-      res.json(updatedCollection);
-    } catch (error) {
-      next(error);
-    }
+  async addProducts(req, res) {
+    res.json(await collectionService.addProducts(req.params.id, req.body.productIds));
   },
 
-  // Remove products from collection (Admin only)
-  async removeProducts(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { productIds } = req.body;
-      const updatedCollection = await collectionService.removeProducts(
-        id,
-        productIds
-      );
-      res.json(updatedCollection);
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async updateCollectionVisibility(req, res) {
-    try {
-      const { id } = req.params;
-      const { isVisible } = req.body;
-      const collection = await collectionService.updateCollectionVisibility(
-        id,
-        isVisible
-      );
-      res.json(collection);
-    } catch (error) {
-      if (error.message === "Collection not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res.status(500).json({
-        message: "Error updating collection visibility",
-        error: error.message,
-      });
-    }
+  async removeProducts(req, res) {
+    res.json(await collectionService.removeProducts(req.params.id, req.body.productIds));
   },
 };

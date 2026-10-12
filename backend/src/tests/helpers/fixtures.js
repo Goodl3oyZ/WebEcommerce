@@ -26,11 +26,11 @@ export async function createOrder(userId, overrides = {}) {
 }
 
 /** A product with one variant. */
-export async function createProduct({ price = "100.00", stock = 10, isActive = true } = {}) {
+export async function createProduct({ price = "100.00", stock = 10, isActive = true, ...extra } = {}) {
   const { db, schema } = await load();
   const [product] = await db
     .insert(schema.products)
-    .values({ name: `Product ${unique()}`, price, isActive })
+    .values({ name: `Product ${unique()}`, price, isActive, ...extra })
     .returning();
   const [variant] = await db
     .insert(schema.productVariants)
@@ -136,3 +136,27 @@ export async function getVariantStock(variantId) {
   });
   return variant.stock;
 }
+
+export async function createCategory(overrides = {}) {
+  const { db, schema } = await load();
+  const [category] = await db
+    .insert(schema.categories)
+    .values({ name: `Category ${unique()}`, ...overrides })
+    .returning();
+  return category;
+}
+
+export async function createBrand(overrides = {}) {
+  const { db, schema } = await load();
+  const [brand] = await db
+    .insert(schema.brands)
+    .values({ name: `Brand ${unique()}`, isActive: true, ...overrides })
+    .returning();
+  return brand;
+}
+
+/** Smallest valid PNG (1x1), for upload tests. */
+export const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64"
+);

@@ -14,6 +14,7 @@ export const BUCKETS = {
   PROFILES: "profiles",
   STORES: "stores",
   REVIEWS: "reviews",
+  BRANDS: "brands",
 };
 
 // Ensure all required buckets exist
@@ -88,5 +89,16 @@ export const getFileUrl = (bucket, fileName) => {
   return `${protocol}://${host}:${port}/${bucket}/${fileName}`;
 };
 
+
+/**
+ * Inverse of getFileUrl: turn one of our public URLs back into the object key,
+ * so the database stores keys (portable across domains) rather than URLs.
+ * Anything else (an external URL or an existing key) is returned unchanged.
+ */
+export const toStoredKey = (bucket, value) => {
+  if (typeof value !== "string") return value;
+  const prefix = getFileUrl(bucket, "");
+  return value.startsWith(prefix) ? decodeURIComponent(value.slice(prefix.length)) : value;
+};
 
 export default minioClient;

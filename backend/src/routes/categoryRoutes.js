@@ -1,45 +1,33 @@
 import express from "express";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
-import { categoryController } from "../controllers/categoryController.js";
+import { authMiddleware, optionalAuth } from "../middlewares/authMiddleware.js";
 import { requireRole, ROLES } from "../middlewares/authorizationMiddleware.js";
+import { categoryController } from "../controllers/categoryController.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { categoryDto } from "../dtos/category.dto.js";
+import { productDto } from "../dtos/product.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("id", uuidParam("Category not found"));
+const requireAdmin = requireRole(ROLES.ADMIN);
 
-// Apply rate limiter to all category routes
 router.use(apiRateLimiter);
 
-// Public routes
 router.get("/", categoryController.getCategories);
 router.get("/:id", categoryController.getCategoryById);
-router.get("/:id/products", categoryController.getCategoryProducts);
+router.get(
+  "/:id/products",
+  optionalAuth,
+  validationMiddleware(productDto.listQuery, "query"),
+  categoryController.getCategoryProducts
+);
 
-// Admin only routes
 router.use(authMiddleware);
-router.post(
-  "/",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(categoryDto.createCategory),
-  categoryController.createCategory
-);
-router.put(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(categoryDto.updateCategory),
-  categoryController.updateCategory
-);
-router.patch(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  validationMiddleware(categoryDto.updateCategory),
-  categoryController.updateCategory
-);
-router.delete(
-  "/:id",
-  requireRole(ROLES.ADMIN),
-  categoryController.deleteCategory
-);
+
+router.post("/", requireAdmin, validationMiddleware(categoryDto.createCategory), categoryController.createCategory);
+router.put("/:id", requireAdmin, validationMiddleware(categoryDto.updateCategory), categoryController.updateCategory);
+router.patch("/:id", requireAdmin, validationMiddleware(categoryDto.updateCategory), categoryController.updateCategory);
+router.delete("/:id", requireAdmin, categoryController.deleteCategory);
 
 export default router;

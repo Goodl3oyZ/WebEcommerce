@@ -1,131 +1,110 @@
+import { validate as isUuid } from "uuid";
 import { FileService } from "../services/fileService.js";
-import { BUCKETS } from "../config/minio.js";
-import { db } from "../config/db.js";
-import { users } from "../models/schema.js";
-import { eq } from "drizzle-orm";
+import { userService } from "../services/userService.js";
+import { ApiError } from "../utils/ApiError.js";
 
-// ฟังก์ชันช่วยสำหรับอัปโหลดไฟล์
-const handleUpload = async (req, res, type, idFieldName, updateDbFunc) => {
-  try {
-    console.log("==== UPLOAD DEBUG ====");
-    console.log("req.file:", req.file);
-    console.log("req.body:", req.body);
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
-    const id = req.user?.id || req.body[idFieldName];
-    if (!id)
-      return res.status(400).json({ message: `${idFieldName} is required` });
-
-    const fileName = await FileService.uploadByType(req.file, type, id);
-    const url = FileService.getFileUrl(BUCKETS[type.toUpperCase()], fileName);
-
-    if (updateDbFunc) {
-      const updatedRecord = await updateDbFunc(id, url);
-      if (!updatedRecord)
-        return res
-          .status(404)
-          .json({ message: "Record not found or not updated" });
-      return res.status(200).json({ url, user: updatedRecord });
-    }
-
-    return res.status(200).json({ url, fileName, imageUrl: url });
-  } catch (error) {
-    console.error(`Error uploading file for ${type}:`, error);
-    res.status(500).json({ message: `Error uploading file for ${type}` });
-  }
+const requireFile = (req) => {
+  if (!req.file) throw ApiError.badRequest('No file uploaded (use the "image" field)');
 };
 
-// ฟังก์ชันช่วยสำหรับลบไฟล์
-const handleDelete = async (req, res, type) => {
-  try {
-    const { fileName } = req.body;
-    if (!fileName)
-      return res.status(400).json({ message: "No fileName provided" });
+/** Optional entity id from the body (e.g. productId); files are grouped under it. */
+function entityFolderId(req, idField) {
+  const id = req.body?.[idField];
+  if (id === undefined || id === "") return "unassigned";
+  if (!isUuid(id)) throw ApiError.badRequest(`${idField} must be a UUID`);
+  return id;
+}
 
-    await FileService.deleteFile(BUCKETS[type.toUpperCase()], fileName);
+const fileResponse = (type, fileName) => {
+  const url = FileService.getFileUrl(FileService.bucketFor(type), fileName);
+  return { url, imageUrl: url, fileName };
+};
+
+/**
+ * Delete a stored file. `ownerId` restricts customers to files under their own
+ * folder; admins pass null and may delete any file in the bucket.
+ */
+async function deleteStoredFile(type, value, ownerId) {
+  if (!value) throw ApiError.badRequest("fileName is required");
+  const key = FileService.toKey(type, value);
+  if (/^https?:\/\//.test(key) || key.includes("..")) {
+    throw ApiError.badRequest("fileName is not a file in our storage");
+  }
+  if (ownerId && !key.startsWith(`${FileService.folderFor(type, ownerId)}/`)) {
+    throw ApiError.forbidden("You can only delete your own files");
+  }
+  await FileService.deleteFile(FileService.bucketFor(type), key);
+}
+
+/** Customer-owned images (review photos): stored under the uploader's folder. */
+const ownImage = (type) => ({
+  async upload(req, res) {
+    requireFile(req);
+    const fileName = await FileService.uploadByType(req.file, type, req.user.id);
+    res.status(201).json(fileResponse(type, fileName));
+  },
+  async update(req, res) {
+    requireFile(req);
+    if (req.body?.oldFileName) await deleteStoredFile(type, req.body.oldFileName, req.user.id);
+    const fileName = await FileService.uploadByType(req.file, type, req.user.id);
+    res.json(fileResponse(type, fileName));
+  },
+  async remove(req, res) {
+    await deleteStoredFile(type, req.body?.fileName, req.user.id);
     res.json({ message: "File deleted" });
-  } catch (error) {
-    console.error(`Error deleting file for ${type}:`, error);
-    res.status(500).json({ message: `Error deleting file for ${type}` });
-  }
-};
+  },
+});
 
-// ฟังก์ชันช่วยสำหรับอัปเดตไฟล์ (ลบไฟล์เก่า + อัปโหลดไฟล์ใหม่ + อัปเดต DB ถ้ามี)
-const handleUpdate = async (req, res, type, idFieldName, updateDbFunc) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+/** Admin-managed images (products, brands, stores). */
+const adminImage = (type, idField) => ({
+  async upload(req, res) {
+    requireFile(req);
+    const fileName = await FileService.uploadByType(req.file, type, entityFolderId(req, idField));
+    res.status(201).json(fileResponse(type, fileName));
+  },
+  async update(req, res) {
+    requireFile(req);
+    if (req.body?.oldFileName) await deleteStoredFile(type, req.body.oldFileName, null);
+    const fileName = await FileService.uploadByType(req.file, type, entityFolderId(req, idField));
+    res.json(fileResponse(type, fileName));
+  },
+  async remove(req, res) {
+    await deleteStoredFile(type, req.body?.fileName, null);
+    res.json({ message: "File deleted" });
+  },
+});
 
-    const id = req.user?.id || req.body[idFieldName];
-    if (!id)
-      return res.status(400).json({ message: `${idFieldName} is required` });
-
-    if (req.body.oldFileName) {
-      await FileService.deleteFile(
-        BUCKETS[type.toUpperCase()],
-        req.body.oldFileName
-      );
-    }
-
-    const fileName = await FileService.uploadByType(req.file, type, id);
-    const url = FileService.getFileUrl(BUCKETS[type.toUpperCase()], fileName);
-
-    if (updateDbFunc) {
-      const updatedRecord = await updateDbFunc(id, url);
-      if (!updatedRecord)
-        return res
-          .status(404)
-          .json({ message: "Record not found or not updated" });
-      return res
-        .status(200)
-        .json({ url, fileName, imageUrl: url, user: updatedRecord });
-    }
-
-    return res.status(200).json({ url, fileName, imageUrl: url });
-  } catch (error) {
-    console.error(`Error updating file for ${type}:`, error);
-    res.status(500).json({ message: `Error updating file for ${type}` });
-  }
-};
-
-// ตัวอย่างฟังก์ชันอัปเดต DB สำหรับ avatar (user)
-const updateUserAvatar = async (userId, url) => {
-  const [updatedUser] = await db
-    .update(users)
-    .set({ avatar: url })
-    .where(eq(users.id, userId))
-    .returning();
-  return updatedUser;
-};
+const review = ownImage("reviews");
+const product = adminImage("products", "productId");
+const brand = adminImage("brands", "brandId");
+const store = adminImage("stores", "storeId");
 
 export const uploadController = {
-  // Avatar (Profile Image)
-  uploadAvatar: (req, res) =>
-    handleUpload(req, res, "profiles", "userId", updateUserAvatar),
-  updateAvatar: (req, res) =>
-    handleUpdate(req, res, "profiles", "userId", updateUserAvatar),
-  deleteAvatar: (req, res) => handleDelete(req, res, "profiles"),
+  // Avatar: same behaviour as PUT /api/users/profile with only an avatar.
+  async uploadAvatar(req, res) {
+    requireFile(req);
+    const user = await userService.updateProfile(req.user.id, {}, req.file);
+    res.status(200).json({ url: user.avatar, imageUrl: user.avatar, user });
+  },
+  updateAvatar: (req, res) => uploadController.uploadAvatar(req, res),
+  async deleteAvatar(req, res) {
+    const user = await userService.deleteAvatar(req.user.id);
+    res.json({ message: "Avatar removed", user });
+  },
 
-  // Product Image
-  uploadProductImage: (req, res) =>
-    handleUpload(req, res, "products", "productId"),
-  updateProductImage: (req, res) =>
-    handleUpdate(req, res, "products", "productId"),
-  deleteProductImage: (req, res) => handleDelete(req, res, "products"),
+  uploadReviewImage: review.upload,
+  updateReviewImage: review.update,
+  deleteReviewImage: review.remove,
 
-  // Brand Logo
-  uploadBrandLogo: (req, res) => handleUpload(req, res, "brands", "brandId"),
-  updateBrandLogo: (req, res) => handleUpdate(req, res, "brands", "brandId"),
-  deleteBrandLogo: (req, res) => handleDelete(req, res, "brands"),
+  uploadProductImage: product.upload,
+  updateProductImage: product.update,
+  deleteProductImage: product.remove,
 
-  // Store Image
-  uploadStoreImage: (req, res) => handleUpload(req, res, "stores", "storeId"),
-  updateStoreImage: (req, res) => handleUpdate(req, res, "stores", "storeId"),
-  deleteStoreImage: (req, res) => handleDelete(req, res, "stores"),
+  uploadBrandLogo: brand.upload,
+  updateBrandLogo: brand.update,
+  deleteBrandLogo: brand.remove,
 
-  // Review Image
-  uploadReviewImage: (req, res) =>
-    handleUpload(req, res, "reviews", "reviewId"),
-  updateReviewImage: (req, res) =>
-    handleUpdate(req, res, "reviews", "reviewId"),
-  deleteReviewImage: (req, res) => handleDelete(req, res, "reviews"),
+  uploadStoreImage: store.upload,
+  updateStoreImage: store.update,
+  deleteStoreImage: store.remove,
 };

@@ -54,23 +54,23 @@ export const uploadAPI = {
     return res.data;
   },
 
-  deleteProductImage: async () => {
-    const res = await axiosInstance.delete("/uploads/product");
+  deleteProductImage: async (fileName) => {
+    const res = await axiosInstance.delete("/uploads/product", { data: { fileName } });
     return res.data;
   },
 
-  deleteBrandLogo: async () => {
-    const res = await axiosInstance.delete("/uploads/brand");
+  deleteBrandLogo: async (fileName) => {
+    const res = await axiosInstance.delete("/uploads/brand", { data: { fileName } });
     return res.data;
   },
 
-  deleteStoreImage: async () => {
-    const res = await axiosInstance.delete("/uploads/store");
+  deleteStoreImage: async (fileName) => {
+    const res = await axiosInstance.delete("/uploads/store", { data: { fileName } });
     return res.data;
   },
 
-  deleteReviewImage: async () => {
-    const res = await axiosInstance.delete("/uploads/review");
+  deleteReviewImage: async (fileName) => {
+    const res = await axiosInstance.delete("/uploads/review", { data: { fileName } });
     return res.data;
   },
 };

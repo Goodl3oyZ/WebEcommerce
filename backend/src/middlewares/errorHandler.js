@@ -48,7 +48,10 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  if (err.code === "23505") {
+  // Drizzle wraps driver errors (DrizzleQueryError); the Postgres code is on the cause.
+  const pgCode = err.cause?.code ?? err.code;
+
+  if (pgCode === "23505") {
     return res.status(409).json({
       success: false,
       status: "error",
@@ -56,7 +59,7 @@ const errorHandler = (err, req, res, next) => {
       code: "DUPLICATE_ENTRY",
     });
   }
-  if (err.code === "23503") {
+  if (pgCode === "23503") {
     return res.status(400).json({
       success: false,
       status: "error",

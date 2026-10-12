@@ -4,907 +4,344 @@ import {
   productVariants,
   productAttributes,
   productReviews,
-  categories,
-  brands,
-  orderItems,
 } from "../models/schema.js";
-import {
-  eq,
-  ilike,
-  and,
-  or,
-  desc,
-  asc,
-  sql,
-  gte,
-  lte,
-  not,
-  inArray,
-} from "drizzle-orm";
+import { eq, ilike, and, or, desc, asc, sql, gte, lte, inArray, exists } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
-import { getFileUrl, BUCKETS } from "../config/minio.js";
+import { getFileUrl, toStoredKey, BUCKETS } from "../config/minio.js";
+import { paginationMeta } from "../utils/pagination.js";
+
+const reviewer = { columns: { id: true, name: true, avatar: true } };
+
+/** Product images are stored as keys; responses carry public URLs. */
+export function resolveImages(value) {
+  const url = (img) => (img ? getFileUrl(BUCKETS.PRODUCTS, img) : null);
+  if (Array.isArray(value)) return value.map(url);
+  if (typeof value === "string") return url(value);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, Array.isArray(v) ? v.map(url) : typeof v === "string" ? url(v) : v])
+    );
+  }
+  return value ?? null;
+}
+
+/** Inverse of resolveImages: our public URLs become keys before saving. */
+function toStoredImages(value) {
+  const key = (img) => toStoredKey(BUCKETS.PRODUCTS, img);
+  if (Array.isArray(value)) return value.filter(Boolean).map(key);
+  if (typeof value === "string") return key(value);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, Array.isArray(v) ? v.map(key) : typeof v === "string" ? key(v) : v])
+    );
+  }
+  return value ?? null;
+}
+
+/** Response shape: image URLs, total stock and rating summary. */
+export function presentProduct(product, ratings) {
+  if (!product) return product;
+  const variants = product.variants ?? [];
+  const summary = ratings?.get(product.id);
+  const reviews = product.reviews;
+  return {
+    ...product,
+    imageUrl: resolveImages(product.imageUrl),
+    stock: variants.reduce((sum, v) => sum + (v.stock ?? 0), 0),
+    rating: summary ? summary.rating : reviews?.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0,
+    reviewCount: summary ? summary.count : reviews?.length ?? 0,
+  };
+}
+
+/** Kept for callers that only need image URLs. */
+export const withPresignedImageUrl = async (product) =>
+  product && { ...product, imageUrl: resolveImages(product.imageUrl) };
+
+async function ratingSummaries(productIds) {
+  if (productIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      productId: productReviews.productId,
+      rating: sql`avg(${productReviews.rating})::float`,
+      count: sql`count(*)::int`,
+    })
+    .from(productReviews)
+    .where(inArray(productReviews.productId, productIds))
+    .groupBy(productReviews.productId);
+  return new Map(rows.map((r) => [r.productId, { rating: Number(r.rating.toFixed(2)), count: r.count }]));
+}
+
+const SORTS = {
+  newest: desc(products.createdAt),
+  oldest: asc(products.createdAt),
+  price_asc: asc(products.price),
+  price_desc: desc(products.price),
+  name_asc: asc(products.name),
+  name_desc: desc(products.name),
+};
+
+/**
+ * The one product listing query (catalog, search, category, brand, collection).
+ * Inactive products are only included when the caller is an admin.
+ */
+export async function listProducts(filters, pagination) {
+  const conditions = [];
+  if (!filters.includeInactive) conditions.push(eq(products.isActive, true));
+  if (filters.categoryId) conditions.push(eq(products.categoryId, filters.categoryId));
+  if (filters.brandId) conditions.push(eq(products.brandId, filters.brandId));
+  if (filters.productIds) conditions.push(inArray(products.id, filters.productIds));
+  if (filters.minPrice != null) conditions.push(gte(products.price, String(filters.minPrice)));
+  if (filters.maxPrice != null) conditions.push(lte(products.price, String(filters.maxPrice)));
+  if (filters.search) {
+    conditions.push(or(ilike(products.name, `%${filters.search}%`), ilike(products.description, `%${filters.search}%`)));
+  }
+  if (filters.inStock) {
+    conditions.push(
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(productVariants)
+          .where(and(eq(productVariants.productId, products.id), sql`${productVariants.stock} > 0`))
+      )
+    );
+  }
+  const where = conditions.length ? and(...conditions) : undefined;
+
+  const [rows, total] = await Promise.all([
+    db.query.products.findMany({
+      where,
+      with: { category: true, brand: true, variants: true },
+      orderBy: [SORTS[filters.sort] ?? SORTS.newest, asc(products.id)],
+      limit: pagination.limit,
+      offset: pagination.offset,
+    }),
+    db.select({ count: sql`count(*)::int` }).from(products).where(where),
+  ]);
+  const ratings = await ratingSummaries(rows.map((p) => p.id));
+  return {
+    products: rows.map((p) => presentProduct(p, ratings)),
+    pagination: paginationMeta(total[0].count, pagination),
+  };
+}
+
+async function getVisibleProduct(id, { includeInactive = false } = {}) {
+  const product = await db.query.products.findFirst({ where: eq(products.id, id) });
+  if (!product || (!product.isActive && !includeInactive)) {
+    throw new ApiError("Product not found", 404, null, "PRODUCT_NOT_FOUND");
+  }
+  return product;
+}
+
+async function replaceAttributes(tx, productId, attributes) {
+  await tx.delete(productAttributes).where(eq(productAttributes.productId, productId));
+  const rows = Object.entries(attributes ?? {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([name, value]) => ({ productId, name, value: String(value) }));
+  if (rows.length) await tx.insert(productAttributes).values(rows);
+}
 
 export const productService = {
-  async getProducts({
-    page = 1,
-    limit = 10,
-    sort,
-    category,
-    minPrice,
-    maxPrice,
-    search,
-    includeInactive = false,
-  }) {
-    const offset = (page - 1) * limit;
-    const whereConditions = [];
+  resolveImages,
+  presentProduct,
+  withPresignedImageUrl,
+  listProducts,
 
-    if (!includeInactive) {
-      whereConditions.push(eq(products.isActive, true));
-    }
-
-    if (category) {
-      whereConditions.push(eq(products.categoryId, category));
-    }
-
-    if (minPrice) {
-      whereConditions.push(gte(products.price, minPrice));
-    }
-
-    if (maxPrice) {
-      whereConditions.push(lte(products.price, maxPrice));
-    }
-
-    if (search) {
-      whereConditions.push(
-        or(
-          ilike(products.name, `%${search}%`),
-          ilike(products.description, `%${search}%`)
-        )
-      );
-    }
-
-    // Map sort values to column names and directions
-    const sortMap = {
-      newest: { column: "createdAt", direction: "desc" },
-      oldest: { column: "createdAt", direction: "asc" },
-      price_asc: { column: "price", direction: "asc" },
-      price_desc: { column: "price", direction: "desc" },
-      name_asc: { column: "name", direction: "asc" },
-      name_desc: { column: "name", direction: "desc" },
-    };
-
-    const sortConfig = sortMap[sort] || {
-      column: "createdAt",
-      direction: "desc",
-    };
-    const orderBy =
-      sortConfig.direction === "desc"
-        ? [desc(products[sortConfig.column])]
-        : [asc(products[sortConfig.column])];
-
-    const [productsList, total] = await Promise.all([
-      db.query.products.findMany({
-        where: whereConditions.length > 0 ? and(...whereConditions) : undefined,
-        with: {
-          category: true,
-          variants: true,
-          reviews: {
-            with: {
-              user: {
-                columns: {
-                  id: true,
-                  username: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy,
-        limit,
-        offset,
-      }),
-      db
-        .select({ count: sql`count(*)` })
-        .from(products)
-        .where(
-          whereConditions.length > 0 ? and(...whereConditions) : undefined
-        ),
-    ]);
-
-    // Generate fresh presigned URLs for product images
-    const productsWithPresignedUrls = await Promise.all(
-      productsList.map(async (product) => {
-        if (product.imageUrl) {
-          if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = product.imageUrl.map((img) =>
-              img
-                ? img.startsWith("http")
-                  ? img
-                  : getFileUrl(BUCKETS.PRODUCTS, img)
-                : null
-            );
-          } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
-          } else if (
-            typeof product.imageUrl === "object" &&
-            product.imageUrl !== null
-          ) {
-            // If imageUrl is an object (e.g., { main: ..., gallery: [...] })
-            const newObj = {};
-            for (const [key, val] of Object.entries(product.imageUrl)) {
-              if (Array.isArray(val)) {
-                newObj[key] = val.map((img) =>
-                  img
-                    ? img.startsWith("http")
-                      ? img
-                      : getFileUrl(BUCKETS.PRODUCTS, img)
-                    : null
-                );
-              } else if (typeof val === "string") {
-                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
-              } else {
-                newObj[key] = val;
-              }
-            }
-            product.imageUrl = newObj;
-          }
-        }
-        return product;
-      })
-    );
-
-    return {
-      products: productsWithPresignedUrls,
-      pagination: {
-        total: Number(total[0].count),
-        page,
-        limit,
-        pages: Math.ceil(Number(total[0].count) / limit),
-      },
-    };
+  async getProducts(filters, pagination) {
+    return listProducts(filters, pagination);
   },
 
-  async getProductById(id) {
+  async searchProducts(query, filters, pagination) {
+    return listProducts({ ...filters, search: query }, pagination);
+  },
+
+  async getProductsByCategory(categoryId, filters, pagination) {
+    return listProducts({ ...filters, categoryId }, pagination);
+  },
+
+  async getProductById(id, { includeInactive = false } = {}) {
+    await getVisibleProduct(id, { includeInactive });
     const product = await db.query.products.findFirst({
       where: eq(products.id, id),
       with: {
         category: true,
-        variants: true,
-        reviews: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                username: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!product) {
-      throw new ApiError("Product not found", 404);
-    }
-
-    // Generate fresh presigned URLs for product images
-    if (product.imageUrl) {
-      if (Array.isArray(product.imageUrl)) {
-        product.imageUrl = product.imageUrl.map((img) =>
-          img
-            ? img.startsWith("http")
-              ? img
-              : getFileUrl(BUCKETS.PRODUCTS, img)
-            : null
-        );
-      } else if (typeof product.imageUrl === "string") {
-        product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
-      } else if (
-        typeof product.imageUrl === "object" &&
-        product.imageUrl !== null
-      ) {
-        const newObj = {};
-        for (const [key, val] of Object.entries(product.imageUrl)) {
-          if (Array.isArray(val)) {
-            newObj[key] = val.map((img) =>
-              img
-                ? img.startsWith("http")
-                  ? img
-                  : getFileUrl(BUCKETS.PRODUCTS, img)
-                : null
-            );
-          } else if (typeof val === "string") {
-            newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
-          } else {
-            newObj[key] = val;
-          }
-        }
-        product.imageUrl = newObj;
-      }
-    }
-
-    return product;
-  },
-
-  async getProductsByCategory(categoryId, { page = 1, limit = 10 }) {
-    const offset = (page - 1) * limit;
-
-    const [productsList, total] = await Promise.all([
-      db.query.products.findMany({
-        where: and(
-          eq(products.categoryId, categoryId),
-          eq(products.isActive, true)
-        ),
-        with: {
-          category: true,
-          variants: true,
-        },
-        orderBy: [desc(products.createdAt)],
-        limit,
-        offset,
-      }),
-      db
-        .select({ count: sql`count(*)` })
-        .from(products)
-        .where(
-          and(
-            eq(products.categoryId, categoryId),
-            eq(products.isActive, true)
-          )
-        ),
-    ]);
-
-    // Generate fresh presigned URLs for product images
-    const productsWithPresignedUrls = await Promise.all(
-      productsList.map(async (product) => {
-        if (product.imageUrl) {
-          if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = product.imageUrl.map((img) =>
-              img
-                ? img.startsWith("http")
-                  ? img
-                  : getFileUrl(BUCKETS.PRODUCTS, img)
-                : null
-            );
-          } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
-          } else if (
-            typeof product.imageUrl === "object" &&
-            product.imageUrl !== null
-          ) {
-            const newObj = {};
-            for (const [key, val] of Object.entries(product.imageUrl)) {
-              if (Array.isArray(val)) {
-                newObj[key] = val.map((img) =>
-                  img
-                    ? img.startsWith("http")
-                      ? img
-                      : getFileUrl(BUCKETS.PRODUCTS, img)
-                    : null
-                );
-              } else if (typeof val === "string") {
-                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
-              } else {
-                newObj[key] = val;
-              }
-            }
-            product.imageUrl = newObj;
-          }
-        }
-        return product;
-      })
-    );
-
-    return {
-      products: productsWithPresignedUrls,
-      pagination: {
-        total: Number(total[0].count),
-        page,
-        limit,
-        pages: Math.ceil(Number(total[0].count) / limit),
-      },
-    };
-  },
-
-  async searchProducts(query, { page = 1, limit = 10 }) {
-    if (!query) {
-      throw new ApiError("Search query is required", 400);
-    }
-
-    const offset = (page - 1) * limit;
-    const searchCondition = and(
-      or(
-        ilike(products.name, `%${query}%`),
-        ilike(products.description, `%${query}%`)
-      ),
-      eq(products.isActive, true)
-    );
-
-    const [productsList, total] = await Promise.all([
-      db.query.products.findMany({
-        where: searchCondition,
-        with: {
-          category: true,
-          variants: true,
-        },
-        orderBy: [desc(products.createdAt)],
-        limit,
-        offset,
-      }),
-      db
-        .select({ count: sql`count(*)` })
-        .from(products)
-        .where(searchCondition),
-    ]);
-
-    // Generate fresh presigned URLs for product images
-    const productsWithPresignedUrls = await Promise.all(
-      productsList.map(async (product) => {
-        if (product.imageUrl) {
-          if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = product.imageUrl.map((img) =>
-              img
-                ? img.startsWith("http")
-                  ? img
-                  : getFileUrl(BUCKETS.PRODUCTS, img)
-                : null
-            );
-          } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
-          } else if (
-            typeof product.imageUrl === "object" &&
-            product.imageUrl !== null
-          ) {
-            const newObj = {};
-            for (const [key, val] of Object.entries(product.imageUrl)) {
-              if (Array.isArray(val)) {
-                newObj[key] = val.map((img) =>
-                  img
-                    ? img.startsWith("http")
-                      ? img
-                      : getFileUrl(BUCKETS.PRODUCTS, img)
-                    : null
-                );
-              } else if (typeof val === "string") {
-                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
-              } else {
-                newObj[key] = val;
-              }
-            }
-            product.imageUrl = newObj;
-          }
-        }
-        return product;
-      })
-    );
-
-    return {
-      products: productsWithPresignedUrls,
-      pagination: {
-        total: Number(total[0].count),
-        page,
-        limit,
-        pages: Math.ceil(Number(total[0].count) / limit),
-      },
-    };
-  },
-
-  // Helper function to generate presigned URLs for imageUrl
-  async withPresignedImageUrl(product) {
-    if (!product || !product.imageUrl) return product;
-    if (Array.isArray(product.imageUrl)) {
-      product.imageUrl = product.imageUrl.map((img) =>
-        img
-          ? img.startsWith("http")
-            ? img
-            : getFileUrl(BUCKETS.PRODUCTS, img)
-          : null
-      );
-    } else if (typeof product.imageUrl === "string") {
-      product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
-    } else if (
-      typeof product.imageUrl === "object" &&
-      product.imageUrl !== null
-    ) {
-      const newObj = {};
-      for (const [key, val] of Object.entries(product.imageUrl)) {
-        if (Array.isArray(val)) {
-          newObj[key] = val.map((img) =>
-            img
-              ? img.startsWith("http")
-                ? img
-                : getFileUrl(BUCKETS.PRODUCTS, img)
-              : null
-          );
-        } else if (typeof val === "string") {
-          newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
-        } else {
-          newObj[key] = val;
-        }
-      }
-      product.imageUrl = newObj;
-    }
-    return product;
-  },
-
-  async createProduct(productData) {
-    const payload = {
-      name: String(productData.name || "").trim(),
-      description: productData.description?.trim() || null,
-      price: String(productData.price),
-      imageUrl: productData.imageUrl || null,
-      categoryId: productData.categoryId,
-      brandId: productData.brandId || null,
-      isActive: productData.isActive ?? true,
-    };
-    const [newProduct] = await db.insert(products).values(payload).returning();
-    return await this.withPresignedImageUrl(newProduct);
-  },
-
-  async updateProduct(id, updates) {
-    // First check if the product exists
-    const existingProduct = await db.query.products.findFirst({
-      where: eq(products.id, id),
-      with: {
-        variants: true,
+        brand: true,
+        variants: { orderBy: [asc(productVariants.size), asc(productVariants.color)] },
         attributes: true,
+        reviews: { with: { user: reviewer }, orderBy: [desc(productReviews.createdAt)] },
       },
     });
+    return {
+      ...presentProduct(product),
+      attributes: Object.fromEntries((product.attributes ?? []).map((a) => [a.name, a.value])),
+    };
+  },
 
-    if (!existingProduct) {
-      throw new ApiError("Product not found", 404);
-    }
-
-    // Start a transaction
-    return await db.transaction(async (tx) => {
-      // Update basic product info
-      const validUpdates = {
-        name: updates.name,
-        description: updates.description,
-        price: updates.price,
-        imageUrl: updates.imageUrl,
-        categoryId: updates.categoryId,
-        brandId: updates.brandId,
-        isActive: updates.isActive,
-      };
-
-      // Remove undefined values
-      Object.keys(validUpdates).forEach((key) => {
-        if (validUpdates[key] === undefined) {
-          delete validUpdates[key];
-        }
-      });
-
-      if (Object.keys(validUpdates).length === 0) {
-        throw new Error("No values to update");
-      }
-
-      const [updatedProduct] = await tx
-        .update(products)
-        .set(validUpdates)
-        .where(eq(products.id, id))
+  async createProduct(data) {
+    return db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(products)
+        .values({
+          name: data.name.trim(),
+          description: data.description?.trim() || null,
+          price: String(data.price),
+          imageUrl: toStoredImages(data.imageUrl) ?? null,
+          categoryId: data.categoryId,
+          brandId: data.brandId ?? null,
+          isActive: data.isActive ?? true,
+        })
         .returning();
+      if (data.attributes) await replaceAttributes(tx, created.id, data.attributes);
+      return presentProduct({ ...created, variants: [] });
+    });
+  },
 
-      // Update variants if provided
-      if (updates.variants) {
-        // Delete variants that are not in the update
-        const variantIds = updates.variants
-          .filter((v) => v.id)
-          .map((v) => v.id);
-
-        if (variantIds.length > 0) {
-          await tx
-            .delete(productVariants)
-            .where(
-              and(
-                eq(productVariants.productId, id),
-                not(inArray(productVariants.id, variantIds))
-              )
-            );
-        }
-
-        // Update or create variants
-        for (const variant of updates.variants) {
-          if (variant.id) {
-            // Update existing variant
-            await tx
-              .update(productVariants)
-              .set({
-                color: variant.color,
-                size: variant.size,
-                sku: variant.sku,
-                stock: variant.stock,
-              })
-              .where(
-                and(
-                  eq(productVariants.id, variant.id),
-                  eq(productVariants.productId, id)
-                )
-              );
-          } else {
-            // Create new variant
-            await tx.insert(productVariants).values({
-              productId: id,
-              color: variant.color,
-              size: variant.size,
-              sku: variant.sku,
-              stock: variant.stock,
-            });
-          }
-        }
+  /** Basic fields and attributes. Variants have their own endpoints. */
+  async updateProduct(id, updates) {
+    await getVisibleProduct(id, { includeInactive: true });
+    return db.transaction(async (tx) => {
+      const changes = {};
+      for (const key of ["name", "description", "categoryId", "brandId", "isActive"]) {
+        if (updates[key] !== undefined) changes[key] = updates[key];
       }
-
-      // Update attributes if provided
-      if (updates.attributes) {
-        if (existingProduct.attributes) {
-          // Update existing attributes
-          await tx
-            .update(productAttributes)
-            .set({
-              material: updates.attributes.material,
-              careInstructions: updates.attributes.careInstructions,
-              countryOfOrigin: updates.attributes.countryOfOrigin,
-              weight: updates.attributes.weight,
-              dimensions: updates.attributes.dimensions,
-            })
-            .where(eq(productAttributes.productId, id));
-        } else {
-          // Create new attributes
-          await tx.insert(productAttributes).values({
-            productId: id,
-            material: updates.attributes.material,
-            careInstructions: updates.attributes.careInstructions,
-            countryOfOrigin: updates.attributes.countryOfOrigin,
-            weight: updates.attributes.weight,
-            dimensions: updates.attributes.dimensions,
-          });
-        }
+      if (updates.price !== undefined) changes.price = String(updates.price);
+      if (updates.imageUrl !== undefined) changes.imageUrl = toStoredImages(updates.imageUrl);
+      if (Object.keys(changes).length) {
+        await tx.update(products).set(changes).where(eq(products.id, id));
       }
+      if (updates.attributes !== undefined) await replaceAttributes(tx, id, updates.attributes);
 
-      // Return updated product with relations and presigned imageUrl
       const updated = await tx.query.products.findFirst({
         where: eq(products.id, id),
-        with: {
-          category: true,
-          brand: true,
-          variants: true,
-          attributes: true,
-        },
+        with: { category: true, brand: true, variants: true, attributes: true },
       });
-      return await this.withPresignedImageUrl(updated);
+      return {
+        ...presentProduct(updated),
+        attributes: Object.fromEntries(updated.attributes.map((a) => [a.name, a.value])),
+      };
     });
   },
 
+  /** Soft delete: the product stays referenced by past orders. */
   async deleteProduct(id) {
-    const existing = await db.query.products.findFirst({
-      where: eq(products.id, id),
-    });
-    if (!existing) {
-      throw ApiError.notFound("ไม่พบสินค้า");
-    }
-
-    const [related] = await db
-      .select({ count: sql`count(*)::int` })
-      .from(orderItems)
-      .where(eq(orderItems.productId, id));
-
-    const [deletedProduct] = await db
-      .update(products)
-      .set({ isActive: false })
-      .where(eq(products.id, id))
-      .returning();
-
-    return {
-      ...deletedProduct,
-      relatedOrders: related?.count ?? 0,
-    };
+    await getVisibleProduct(id, { includeInactive: true });
+    const [deleted] = await db.update(products).set({ isActive: false }).where(eq(products.id, id)).returning();
+    return deleted;
   },
 
-  async createVariant(productId, variantData) {
-    const sku = String(variantData.sku || "").trim();
-    const duplicate = await db.query.productVariants.findFirst({
-      where: eq(productVariants.sku, sku),
+  async getProductVariants(productId, { includeInactive = false } = {}) {
+    await getVisibleProduct(productId, { includeInactive });
+    return db.query.productVariants.findMany({
+      where: eq(productVariants.productId, productId),
+      orderBy: [asc(productVariants.size), asc(productVariants.color)],
     });
-    if (duplicate) {
-      throw ApiError.conflict("SKU นี้ถูกใช้แล้ว");
-    }
-    const [newVariant] = await db
+  },
+
+  async createVariant(productId, data) {
+    await getVisibleProduct(productId, { includeInactive: true });
+    const [variant] = await db
       .insert(productVariants)
       .values({
-        ...variantData,
-        sku,
         productId,
+        color: data.color.trim(),
+        size: data.size.trim(),
+        sku: data.sku.trim(),
+        stock: data.stock,
+        price: String(data.price),
       })
       .returning();
-
-    return newVariant;
+    return variant;
   },
 
   async updateVariant(productId, variantId, updates) {
-    // First check if the variant exists
-    const existingVariant = await db.query.productVariants.findFirst({
-      where: and(
-        eq(productVariants.id, variantId),
-        eq(productVariants.productId, productId)
-      ),
-    });
-
-    if (!existingVariant) {
-      throw new ApiError("Variant not found", 404);
+    const changes = {};
+    for (const key of ["color", "size", "sku", "stock"]) {
+      if (updates[key] !== undefined) changes[key] = typeof updates[key] === "string" ? updates[key].trim() : updates[key];
     }
-
-    // Prepare valid updates
-    const validUpdates = {
-      color: updates.color,
-      size: updates.size,
-      sku: updates.sku,
-      stock: updates.stock,
-    };
-
-    // Remove undefined values
-    Object.keys(validUpdates).forEach((key) => {
-      if (validUpdates[key] === undefined) {
-        delete validUpdates[key];
-      }
-    });
-
-    const [updatedVariant] = await db
+    if (updates.price !== undefined) changes.price = String(updates.price);
+    const [variant] = await db
       .update(productVariants)
-      .set(validUpdates)
-      .where(
-        and(
-          eq(productVariants.id, variantId),
-          eq(productVariants.productId, productId)
-        )
-      )
+      .set(changes)
+      .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
       .returning();
-
-    return updatedVariant;
+    if (!variant) throw ApiError.notFound("Variant not found");
+    return variant;
   },
 
+  /** Variants that were ever ordered cannot be deleted (set stock to 0 instead). */
   async deleteVariant(productId, variantId) {
-    const [deletedVariant] = await db
+    const [deleted] = await db
       .delete(productVariants)
-      .where(
-        and(
-          eq(productVariants.id, variantId),
-          eq(productVariants.productId, productId)
-        )
-      )
+      .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
       .returning();
-
-    if (!deletedVariant) {
-      throw new ApiError("Variant not found", 404);
-    }
-
-    return deletedVariant;
+    if (!deleted) throw ApiError.notFound("Variant not found");
+    return deleted;
   },
 
-  async createReview(productId, userId, reviewData) {
-    const [newReview] = await db
-      .insert(productReviews)
-      .values({
-        ...reviewData,
-        productId,
-        userId,
-      })
-      .returning();
+  async getProductReviews(productId, pagination) {
+    await getVisibleProduct(productId);
+    const where = eq(productReviews.productId, productId);
+    const [reviews, total, [summary]] = await Promise.all([
+      db.query.productReviews.findMany({
+        where,
+        with: { user: reviewer },
+        limit: pagination.limit,
+        offset: pagination.offset,
+        orderBy: [desc(productReviews.createdAt)],
+      }),
+      db.select({ count: sql`count(*)::int` }).from(productReviews).where(where),
+      db.select({ rating: sql`coalesce(avg(${productReviews.rating}), 0)::float` }).from(productReviews).where(where),
+    ]);
+    return {
+      reviews,
+      averageRating: Number(summary.rating.toFixed(2)),
+      pagination: paginationMeta(total[0].count, pagination),
+    };
+  },
 
-    return newReview;
+  /** One review per customer per product. */
+  async createReview(productId, userId, { rating, comment }) {
+    await getVisibleProduct(productId);
+    const existing = await db.query.productReviews.findFirst({
+      where: and(eq(productReviews.productId, productId), eq(productReviews.userId, userId)),
+    });
+    if (existing) {
+      throw new ApiError("You have already reviewed this product. Edit your review instead.", 409, null, "REVIEW_EXISTS");
+    }
+    const [review] = await db
+      .insert(productReviews)
+      .values({ productId, userId, rating, comment: comment?.trim() || null })
+      .returning();
+    return review;
   },
 
   async updateReview(productId, reviewId, userId, updates) {
-    // First check if the review exists
-    const existingReview = await db.query.productReviews.findFirst({
-      where: and(
-        eq(productReviews.id, reviewId),
-        eq(productReviews.productId, productId)
-      ),
+    const review = await db.query.productReviews.findFirst({
+      where: and(eq(productReviews.id, reviewId), eq(productReviews.productId, productId)),
     });
+    if (!review) throw ApiError.notFound("Review not found");
+    if (review.userId !== userId) throw ApiError.forbidden("You can only edit your own review");
 
-    if (!existingReview) {
-      throw new ApiError("Review not found", 404);
-    }
-
-    // Check if the user owns the review
-    if (existingReview.userId !== userId) {
-      throw new ApiError("You are not authorized to update this review", 403);
-    }
-
-    // Validate rating if provided
-    if (updates.rating && (updates.rating < 1 || updates.rating > 5)) {
-      throw new ApiError("Rating must be between 1 and 5", 400);
-    }
-
-    // Ensure updates only contains valid fields
-    const validUpdates = {
-      rating: updates.rating,
-      comment: updates.comment,
-    };
-
-    const [updatedReview] = await db
+    const changes = {};
+    if (updates.rating !== undefined) changes.rating = updates.rating;
+    if (updates.comment !== undefined) changes.comment = updates.comment?.trim() || null;
+    const [updated] = await db
       .update(productReviews)
-      .set(validUpdates)
-      .where(
-        and(
-          eq(productReviews.id, reviewId),
-          eq(productReviews.productId, productId),
-          eq(productReviews.userId, userId)
-        )
-      )
+      .set(changes)
+      .where(eq(productReviews.id, reviewId))
       .returning();
-
-    return updatedReview;
+    return updated;
   },
 
-  async deleteReview(productId, reviewId, userId) {
-    const [deletedReview] = await db
-      .delete(productReviews)
-      .where(
-        and(
-          eq(productReviews.id, reviewId),
-          eq(productReviews.productId, productId),
-          eq(productReviews.userId, userId)
-        )
-      )
-      .returning();
-
-    if (!deletedReview) {
-      throw new ApiError("Review not found", 404);
-    }
-
-    return deletedReview;
-  },
-
-  async getProductVariants(productId) {
-    return await db.query.productVariants.findMany({
-      where: eq(productVariants.productId, productId),
+  /** Authors delete their own review; moderators and admins can remove any. */
+  async deleteReview(productId, reviewId, actor) {
+    const review = await db.query.productReviews.findFirst({
+      where: and(eq(productReviews.id, reviewId), eq(productReviews.productId, productId)),
     });
-  },
-
-  async getProductReviews(productId, { page = 1, limit = 10 }) {
-    const offset = (page - 1) * limit;
-
-    const [reviewsList, total] = await Promise.all([
-      db.query.productReviews.findMany({
-        where: eq(productReviews.productId, productId),
-        with: {
-          user: {
-            columns: {
-              id: true,
-              username: true,
-            },
-          },
-        },
-        limit,
-        offset,
-        orderBy: [desc(productReviews.createdAt)],
-      }),
-      db
-        .select({ count: sql`count(*)` })
-        .from(productReviews)
-        .where(eq(productReviews.productId, productId)),
-    ]);
-
-    return {
-      reviews: reviewsList,
-      pagination: {
-        total: Number(total[0].count),
-        page,
-        limit,
-        pages: Math.ceil(Number(total[0].count) / limit),
-      },
-    };
-  },
-
-  async filterProducts({
-    categories,
-    brands,
-    minPrice,
-    maxPrice,
-    colors,
-    sizes,
-    page = 1,
-    limit = 10,
-  }) {
-    const offset = (page - 1) * limit;
-    const whereConditions = [];
-
-    if (categories) {
-      whereConditions.push(products.categoryId.in(categories.split(",")));
+    if (!review) throw ApiError.notFound("Review not found");
+    const canModerate = ["moderator", "admin", "super_admin"].includes(actor.role);
+    if (review.userId !== actor.id && !canModerate) {
+      throw ApiError.forbidden("You can only delete your own review");
     }
-    if (brands) {
-      whereConditions.push(products.brandId.in(brands.split(",")));
-    }
-    if (minPrice) {
-      whereConditions.push(products.price >= parseFloat(minPrice));
-    }
-    if (maxPrice) {
-      whereConditions.push(products.price <= parseFloat(maxPrice));
-    }
-
-    const where =
-      whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-    const [filteredProducts, total] = await Promise.all([
-      db.query.products.findMany({
-        where,
-        with: {
-          category: true,
-          brand: true,
-          variants: true,
-        },
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-      }),
-      db
-        .select({ count: sql`count(*)` })
-        .from(products)
-        .where(where),
-    ]);
-
-    // Additional filtering for variants if needed
-    let finalProducts = filteredProducts;
-    if (colors || sizes) {
-      finalProducts = filteredProducts.filter((product) => {
-        return product.variants.some((variant) => {
-          if (colors && !colors.split(",").includes(variant.color))
-            return false;
-          if (sizes && !sizes.split(",").includes(variant.size)) return false;
-          return true;
-        });
-      });
-    }
-
-    // Generate fresh presigned URLs for product images
-    const productsWithPresignedUrls = await Promise.all(
-      finalProducts.map(async (product) => {
-        if (product.imageUrl) {
-          if (Array.isArray(product.imageUrl)) {
-            product.imageUrl = product.imageUrl.map((img) =>
-              img
-                ? img.startsWith("http")
-                  ? img
-                  : getFileUrl(BUCKETS.PRODUCTS, img)
-                : null
-            );
-          } else if (typeof product.imageUrl === "string") {
-            product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
-          } else if (
-            typeof product.imageUrl === "object" &&
-            product.imageUrl !== null
-          ) {
-            const newObj = {};
-            for (const [key, val] of Object.entries(product.imageUrl)) {
-              if (Array.isArray(val)) {
-                newObj[key] = val.map((img) =>
-                  img
-                    ? img.startsWith("http")
-                      ? img
-                      : getFileUrl(BUCKETS.PRODUCTS, img)
-                    : null
-                );
-              } else if (typeof val === "string") {
-                newObj[key] = getFileUrl(BUCKETS.PRODUCTS, val);
-              } else {
-                newObj[key] = val;
-              }
-            }
-            product.imageUrl = newObj;
-          }
-        }
-        return product;
-      })
-    );
-
-    return {
-      products: productsWithPresignedUrls,
-      pagination: {
-        total: Number(total[0].count),
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(Number(total[0].count) / limit),
-      },
-    };
+    await db.delete(productReviews).where(eq(productReviews.id, reviewId));
   },
 };

@@ -1,112 +1,28 @@
 import { z } from "zod";
 
-// Collection DTOs
-export const collectionDto = {
-  // Create collection
-  createCollection: z.object({
-    name: z.string().min(1),
-    description: z.string().optional(),
-    image: z.string().url().optional(),
-    isActive: z.boolean().default(true),
-    products: z.array(z.string().uuid()).optional(),
-    startDate: z.string().datetime().optional(),
-    endDate: z.string().datetime().optional(),
-    discount: z
-      .object({
-        type: z.enum(["percentage", "fixed"]),
-        value: z.number().min(0),
-      })
-      .optional(),
-  }),
+const productIds = z.array(z.string().uuid()).max(500);
 
-  // Update collection
+const fields = {
+  name: z.string().trim().min(1).max(255),
+  description: z.string().max(2000).optional().nullable(),
+  isActive: z.boolean(),
+  products: productIds.describe("Product ids; on update this replaces the whole list"),
+};
+
+export const collectionDto = {
+  createCollection: z.object({ ...fields, isActive: fields.isActive.default(true), products: fields.products.optional() }).strict(),
   updateCollection: z
-    .object({
-      name: z.string().min(1).optional(),
-      description: z.string().optional(),
-      image: z.string().url().optional(),
-      isActive: z.boolean().optional(),
-      products: z.array(z.string().uuid()).optional(),
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-      discount: z
-        .object({
-          type: z.enum(["percentage", "fixed"]),
-          value: z.number().min(0),
-        })
-        .optional(),
-    })
+    .object(fields)
+    .partial()
+    .strict()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
     }),
-
-  // Add products to collection
-  addProducts: z.object({
-    productIds: z.array(z.string().uuid()).min(1),
-  }),
-
-  // Remove products from collection
-  removeProducts: z.object({
-    productIds: z.array(z.string().uuid()).min(1),
-  }),
-};
-
-// Response DTOs
-export const collectionResponseDto = {
-  // Basic collection info
-  basic: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    image: z.string().url().optional(),
-    isActive: z.boolean(),
-  }),
-
-  // Detailed collection info
-  detailed: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    description: z.string().optional(),
-    image: z.string().url().optional(),
-    isActive: z.boolean(),
-    productCount: z.number(),
-    startDate: z.string().datetime().optional(),
-    endDate: z.string().datetime().optional(),
-    discount: z
-      .object({
-        type: z.string(),
-        value: z.number(),
-      })
-      .optional(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  }),
-
-  // Admin view of collection
-  admin: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    description: z.string().optional(),
-    image: z.string().url().optional(),
-    isActive: z.boolean(),
-    products: z.array(
-      z.object({
-        id: z.string().uuid(),
-        name: z.string(),
-        price: z.number(),
-        stock: z.number(),
-      })
-    ),
-    productCount: z.number(),
-    startDate: z.string().datetime().optional(),
-    endDate: z.string().datetime().optional(),
-    discount: z
-      .object({
-        type: z.string(),
-        value: z.number(),
-      })
-      .optional(),
-    viewCount: z.number(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
+  addProducts: z.object({ productIds: productIds.min(1) }).strict(),
+  removeProducts: z.object({ productIds: productIds.min(1) }).strict(),
+  listQuery: z.object({
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
+    search: z.string().trim().max(100).optional(),
   }),
 };

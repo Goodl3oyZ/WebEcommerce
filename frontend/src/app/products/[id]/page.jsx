@@ -525,7 +525,7 @@ export default function ProductDetailPage() {
                           ))}
                         </div>
                         <span className="text-sm font-semibold text-gray-800">
-                          {review.userName || "ผู้ใช้งาน"}
+                          {review.user?.name || "ผู้ใช้งาน"}
                         </span>
                       </div>
                       <span className="text-xs text-gray-400">

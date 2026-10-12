@@ -1,97 +1,17 @@
 import { z } from "zod";
 
-// Category DTOs
-export const categoryDto = {
-  // Create category
-  createCategory: z.object({
-    name: z.string().min(1).trim(),
-    description: z.string().optional(),
-  }),
-
-  updateCategory: z
-    .object({
-      name: z.string().min(1).optional(),
-      description: z.string().optional(),
-    })
-    .refine((data) => Object.keys(data).length > 0, {
-      message: "At least one field must be provided for update",
-    }),
-
-  // Add category attribute
-  addAttribute: z.object({
-    name: z.string(),
-    type: z.enum(["text", "number", "boolean", "select"]),
-    required: z.boolean().default(false),
-    options: z.array(z.string()).optional(),
-  }),
-
-  // Update category attribute
-  updateAttribute: z
-    .object({
-      name: z.string().optional(),
-      type: z.enum(["text", "number", "boolean", "select"]).optional(),
-      required: z.boolean().optional(),
-      options: z.array(z.string()).optional(),
-    })
-    .refine((data) => Object.keys(data).length > 0, {
-      message: "At least one field must be provided for update",
-    }),
+const fields = {
+  name: z.string().trim().min(1).max(255),
+  description: z.string().max(2000).optional().nullable(),
 };
 
-// Response DTOs
-export const categoryResponseDto = {
-  // Basic category info
-  basic: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    image: z.string().url().optional(),
-    isActive: z.boolean(),
-  }),
-
-  // Detailed category info
-  detailed: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    description: z.string().optional(),
-    parentId: z.string().uuid().optional(),
-    image: z.string().url().optional(),
-    isActive: z.boolean(),
-    attributes: z
-      .array(
-        z.object({
-          name: z.string(),
-          type: z.string(),
-          required: z.boolean(),
-          options: z.array(z.string()).optional(),
-        })
-      )
-      .optional(),
-    productCount: z.number(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  }),
-
-  // Admin view of category
-  admin: z.object({
-    id: z.string().uuid(),
-    name: z.string(),
-    description: z.string().optional(),
-    parentId: z.string().uuid().optional(),
-    image: z.string().url().optional(),
-    isActive: z.boolean(),
-    attributes: z
-      .array(
-        z.object({
-          name: z.string(),
-          type: z.string(),
-          required: z.boolean(),
-          options: z.array(z.string()).optional(),
-        })
-      )
-      .optional(),
-    productCount: z.number(),
-    viewCount: z.number(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  }),
+export const categoryDto = {
+  createCategory: z.object(fields).strict(),
+  updateCategory: z
+    .object(fields)
+    .partial()
+    .strict()
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field must be provided for update",
+    }),
 };
