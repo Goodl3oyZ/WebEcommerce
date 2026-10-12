@@ -84,6 +84,26 @@ const SORTS = {
  * The one product listing query (catalog, search, category, brand, collection).
  * Inactive products are only included when the caller is an admin.
  */
+/** Minimum pg_trgm word similarity for a typo to still match ("clasic" → "Classic"). */
+const FUZZY_THRESHOLD = 0.3;
+let trigramReady;
+
+/** pg_trgm powers typo-tolerant search; without it search falls back to substring matching. */
+function trigramAvailable() {
+  trigramReady ??= db
+    .execute(sql`create extension if not exists pg_trgm`)
+    .then(() => true)
+    .catch(async () => {
+      // Another process may have created it concurrently, or we lack the privilege.
+      const res = await db.execute(sql`select 1 from pg_extension where extname = 'pg_trgm'`).catch(() => null);
+      return Boolean((res?.rows ?? res ?? []).length);
+    });
+  return trigramReady;
+}
+
+/** Treat the user's text literally inside ILIKE (no % or _ wildcards). */
+const escapeLike = (text) => text.replace(/[\\%_]/g, (c) => `\\${c}`);
+
 export async function listProducts(filters, pagination) {
   const conditions = [];
   if (!filters.includeInactive) conditions.push(eq(products.isActive, true));
@@ -92,8 +112,22 @@ export async function listProducts(filters, pagination) {
   if (filters.productIds) conditions.push(inArray(products.id, filters.productIds));
   if (filters.minPrice != null) conditions.push(gte(products.price, String(filters.minPrice)));
   if (filters.maxPrice != null) conditions.push(lte(products.price, String(filters.maxPrice)));
-  if (filters.search) {
-    conditions.push(or(ilike(products.name, `%${filters.search}%`), ilike(products.description, `%${filters.search}%`)));
+  let relevance = null;
+  const term = filters.search?.trim();
+  if (term) {
+    const like = `%${escapeLike(term)}%`;
+    const brandLike = sql`${products.brandId} in (select id from brands where name ilike ${like})`;
+    const substring = or(ilike(products.name, like), ilike(products.description, like), brandLike);
+    if (await trigramAvailable()) {
+      const q = term.toLowerCase();
+      const nameScore = sql`word_similarity(${q}, lower(${products.name}))`;
+      const brandScore = sql`coalesce((select word_similarity(${q}, lower(b.name)) from brands b where b.id = ${products.brandId}), 0)`;
+      conditions.push(or(substring, sql`${nameScore} >= ${FUZZY_THRESHOLD}`, sql`${brandScore} >= ${FUZZY_THRESHOLD}`));
+      // Exact substring hits first, then the closest typo matches.
+      relevance = sql`greatest(case when ${products.name} ilike ${like} then 1 else 0 end, ${nameScore}, ${brandScore}) desc`;
+    } else {
+      conditions.push(substring);
+    }
   }
   if (filters.inStock) {
     conditions.push(
@@ -111,7 +145,8 @@ export async function listProducts(filters, pagination) {
     db.query.products.findMany({
       where,
       with: { category: true, brand: true, variants: true },
-      orderBy: [SORTS[filters.sort] ?? SORTS.newest, asc(products.id)],
+      // A search without an explicit sort is ordered by relevance.
+      orderBy: [...(relevance && !filters.sort ? [relevance] : []), SORTS[filters.sort] ?? SORTS.newest, asc(products.id)],
       limit: pagination.limit,
       offset: pagination.offset,
     }),

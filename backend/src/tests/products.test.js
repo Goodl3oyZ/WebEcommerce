@@ -72,6 +72,24 @@ describe("public catalogue", () => {
     expect((await admin.get("/api/orders/admin/all").query({ status: "", search: "" })).status).toBe(200);
   });
 
+  test("search tolerates typos, matches brands and ranks exact hits first", async () => {
+    const tag = randomUUID().slice(0, 4);
+    const brand = await createBrand({ name: `Hoverfoot ${tag}` });
+    const { product: shoe } = await createProduct({ name: `Velocity Trainer ${tag}`, brandId: brand.id });
+    const { product: exact } = await createProduct({ name: `Velocty ${tag}` });
+    const agent = await newAgent();
+    const ids = async (search) => (await agent.get("/api/products").query({ search, limit: 50 })).body.products.map((p) => p.id);
+
+    expect(await ids(`velocty trainr ${tag}`)).toContain(shoe.id); // two typos
+    expect(await ids(`hoverfot ${tag}`)).toContain(shoe.id); // brand name, misspelt
+    const ranked = await ids(`Velocty ${tag}`);
+    expect(ranked.indexOf(exact.id)).toBeLessThan(ranked.indexOf(shoe.id));
+
+    // The user's text is literal: "%" is not a wildcard that matches everything.
+    const percent = (await agent.get("/api/products").query({ search: "%", limit: 50 })).body.products;
+    expect(percent.every((p) => `${p.name} ${p.description ?? ""}`.includes("%"))).toBe(true);
+  });
+
   test("GET /search requires q and excludes inactive products", async () => {
     const name = tag();
     await createProduct({ name: `${name} shirt` });

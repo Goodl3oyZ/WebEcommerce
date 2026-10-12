@@ -177,7 +177,8 @@ function ProductsView() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const query = { page, limit: PAGE_SIZE, sort };
+    // No sort unless chosen: a search is then ordered by relevance on the server.
+    const query = { page, limit: PAGE_SIZE, ...(params.get("sort") ? { sort } : {}) };
     FILTER_KEYS.forEach((k) => {
       const v = params.get(k);
       if (v) query[k] = v;
@@ -278,7 +279,7 @@ function ProductsView() {
           >
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
-                เรียง: {s.label}
+                เรียง: {s.value === "newest" && search && !params.get("sort") ? "ตรงที่สุด" : s.label}
               </option>
             ))}
           </select>
