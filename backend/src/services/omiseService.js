@@ -52,11 +52,14 @@ export const omiseService = {
 
       return charge;
     } catch (error) {
-      console.error("Omise charge error:", error);
-      throw new ApiError(
-        error.message || "Failed to process payment",
-        error.status || 500
-      );
+      if (error instanceof ApiError) throw error; // e.g. not configured
+      console.error("Omise charge error:", error?.code || error?.message);
+      // Omise answered (declined, invalid card, auth): definite failure.
+      if (error?.object === "error") {
+        throw new ApiError(402, error.message || "Payment was rejected", null, "PAYMENT_REJECTED");
+      }
+      // No answer (network/timeout): the charge may or may not exist.
+      throw new ApiError(502, "The payment provider did not respond", null, "PAYMENT_UNCERTAIN");
     }
   },
 
@@ -89,6 +92,19 @@ export const omiseService = {
         error.status || 500
       );
     }
+  },
+
+  /**
+   * Find the charge created for an order when its id was never received
+   * (e.g. the create call timed out). Charges carry metadata.orderId.
+   */
+  async findChargeForOrder(orderId, since) {
+    const list = await omise.charges.list({
+      from: new Date(new Date(since).getTime() - 60_000).toISOString(),
+      order: "reverse_chronological",
+      limit: 100,
+    });
+    return (list?.data ?? []).find((c) => c.metadata?.orderId === orderId) ?? null;
   },
 
   // Create source (for credit card)

@@ -143,14 +143,26 @@ describe("POST /api/orders/checkout", () => {
     expect(order.status).toBe("cancelled");
   });
 
-  test("an Omise error cancels the order and gives the stock back", async () => {
+  test("an Omise rejection cancels the order and gives the stock back", async () => {
     const { agent, user } = await loginAs("user");
     const setup = await checkoutSetup(user, { stock: 2 });
-    omiseService.createCharge.mockRejectedValueOnce(new Error("Omise is down"));
+    omiseService.createCharge.mockRejectedValueOnce({ object: "error", code: "invalid_card", message: "invalid card" });
 
     const res = await agent.post("/api/orders/checkout").send(setup.body());
     expect(res.status).toBe(402);
     expect(await getVariantStock(setup.variant.id)).toBe(2);
+  });
+
+  test("a lost Omise response keeps the order and its stock while the payment is confirmed", async () => {
+    const { agent, user } = await loginAs("user");
+    const setup = await checkoutSetup(user, { stock: 2 });
+    omiseService.createCharge.mockRejectedValueOnce(Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }));
+
+    const res = await agent.post("/api/orders/checkout").send(setup.body());
+    expect(res.status).toBe(202);
+    expect(res.body.data).toMatchObject({ status: "pending", paymentStatus: "processing", paymentUncertain: true });
+    // Not released: the charge may have gone through.
+    expect(await getVariantStock(setup.variant.id)).toBe(1);
   });
 
   test("PromptPay leaves the order pending with a QR code", async () => {

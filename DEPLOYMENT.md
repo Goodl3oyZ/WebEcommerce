@@ -73,6 +73,19 @@ case, review the change and apply it by hand
   user and product. It is disabled in production unless `ALLOW_ADMIN_SEED=true`, is
   restricted to super admins, and needs a typed confirmation. Seed a fresh database
   from the command line instead (see First deploy).
+- **Orders, stock and payments:** stock is reserved atomically at checkout (a CHECK
+  constraint keeps it at zero or above; every reserve/release is in
+  `inventory_movements`). A payment worker runs every minute inside the API:
+  - unpaid orders past `payment_deadline` (`PAYMENT_DEADLINE_MINUTES`, default 30) are
+    checked with Omise first, then expired and their stock released;
+  - orders whose charge outcome was lost (`payment_status = 'processing'`) are matched
+    to their Omise charge by `metadata.orderId`;
+  - payments that succeeded after the order was cancelled, or paid an order twice, are
+    refunded automatically. After 5 failed attempts the payment is marked
+    `refundFailed` and the admin dashboard shows an alert: refund it in the Omise
+    dashboard. Every step is idempotent, so restarts or several API containers are safe.
+  - To investigate an order: `order_status_history`, `payment_transactions`
+    (`payment_details`), `inventory_movements` (by `order_id`).
 - **API docs:** these are disabled in production. To enable them, set
   `SWAGGER_ENABLED=true` with `SWAGGER_USER` / `SWAGGER_PASS` (basic auth).
 - **Storage capacity:** SeaweedFS holds up to `SEAWEEDFS_VOLUME_MAX` (default 100)

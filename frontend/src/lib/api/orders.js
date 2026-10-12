@@ -2,15 +2,16 @@ import { apiClient } from "./apiClient";
 
 export const orderAPI = {
   // Create order (checkout)
-  createOrder: async (data) => {
-    // data ต้องมี: shippingAddressId, billingAddressId, shippingMethodId, paymentMethodId, items
-    try {
-      const response = await apiClient.post("/orders/checkout", data);
-      return response.data;
-    } catch (error) {
-      // handle error เช่น stock ไม่พอ, ค่าจัดส่งไม่ตรง
-      throw error.response?.data || { message: "Order creation failed" };
-    }
+  /**
+   * Checkout. `idempotencyKey` makes a retried request (double click, network
+   * retry) return the first order instead of creating and charging again.
+   * Errors are rethrown as-is so callers can read error.response.data.code.
+   */
+  createOrder: async (data, { idempotencyKey } = {}) => {
+    const response = await apiClient.post("/orders/checkout", data, {
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
+    });
+    return response.data;
   },
 
   // Cancel order (ถ้ามี endpoint)

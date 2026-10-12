@@ -50,6 +50,46 @@ function dateRange(column, startDate, endDate) {
   return conditions;
 }
 
+/**
+ * Create a charge. A rejection from Omise (declined, invalid card, missing
+ * configuration) is definite. A network failure is not: the charge may exist,
+ * so it is reported as PAYMENT_UNCERTAIN and reconciled later, instead of
+ * being treated as failed (never cancel or charge again blindly).
+ */
+async function createChargeOrUncertain(params) {
+  try {
+    return await omiseService.createCharge(params);
+  } catch (error) {
+    const definite = error instanceof ApiError ? error.code !== "PAYMENT_UNCERTAIN" : error?.object === "error";
+    if (definite) throw error;
+    console.warn(`[payments] charge outcome unknown for order ${params.metadata?.orderId}: ${error?.message}`);
+    throw new ApiError(202, "Payment is being confirmed with the provider", null, "PAYMENT_UNCERTAIN");
+  }
+}
+
+/**
+ * A successful charge that could not be applied: the order was cancelled or
+ * expired first, or another payment already paid it. Flag it once; the
+ * payment worker refunds it (outside any transaction).
+ */
+async function flagRefundIfUnapplied(tx, payment, order, charge) {
+  const current = await tx.query.orders.findFirst({ where: eq(orders.id, order.id) });
+  const earlier = await tx.query.paymentTransactions.findFirst({
+    where: and(eq(paymentTransactions.orderId, order.id), eq(paymentTransactions.status, "completed")),
+    orderBy: [paymentTransactions.timestamp],
+  });
+  const duplicate = earlier && earlier.id !== payment.id;
+  if (current?.status !== "cancelled" && !duplicate) return;
+  const details = payment.paymentDetails ?? {};
+  if (details.refundDue || details.refundedLate) return;
+  const reason = current?.status === "cancelled" ? "order_cancelled" : "duplicate_payment";
+  await tx
+    .update(paymentTransactions)
+    .set({ paymentDetails: { ...details, refundDue: true, refundReason: reason }, updatedAt: new Date() })
+    .where(eq(paymentTransactions.id, payment.id));
+  console.warn(`[payments] charge ${charge.id} for order ${order.id} needs a refund (${reason})`);
+}
+
 export const paymentService = {
   /**
    * Create a payment record for an order the user owns. The amount is always
@@ -137,28 +177,45 @@ export const paymentService = {
     const order = await txOrDb.query.orders.findFirst({ where: eq(orders.id, payment.orderId) });
     if (!order) return payment;
 
-    if (status === "completed" && !UNPAYABLE_ORDER.includes(order.paymentStatus)) {
-      await txOrDb
+    if (status === "completed") {
+      // Compare-and-set, so webhook, polling and checkout reporting the same
+      // charge at the same time mark the order paid exactly once.
+      const [won] = await txOrDb
         .update(orders)
         .set({ paymentStatus: "completed", paidAt: new Date(), updatedAt: new Date() })
-        .where(eq(orders.id, order.id));
-      if (order.status === "pending") {
-        await setOrderStatus(txOrDb, order, "paid", { comment: `Payment ${charge.id} received` });
+        .where(
+          and(
+            eq(orders.id, order.id),
+            sql`${orders.paymentStatus} not in ('completed', 'refunded', 'partially_refunded')`,
+            sql`${orders.status} <> 'cancelled'`
+          )
+        )
+        .returning();
+      if (won) {
+        if (won.status === "pending") {
+          await setOrderStatus(txOrDb, won, "paid", { comment: `Payment ${charge.id} received` });
+        }
+        await loyaltyService.creditForOrder(txOrDb, won);
+      } else {
+        await flagRefundIfUnapplied(txOrDb, payment, order, charge);
       }
-      await loyaltyService.creditForOrder(txOrDb, order);
-    } else if (status === "failed" && order.paymentStatus === "pending") {
+    } else if (status === "failed") {
       // Card declined: the order stays open so the customer can try again.
       await txOrDb
         .update(orders)
         .set({ paymentStatus: "failed", updatedAt: new Date() })
-        .where(eq(orders.id, order.id));
+        .where(and(eq(orders.id, order.id), inArray(orders.paymentStatus, ["pending", "processing"])));
     } else if (status === "expired" && order.status === "pending" && order.paymentStatus !== "completed") {
-      // PromptPay QR expired unpaid: give the reserved stock back.
+      // PromptPay QR expired unpaid: give the reserved stock back (once).
       await txOrDb
         .update(orders)
         .set({ paymentStatus: "failed", updatedAt: new Date() })
-        .where(eq(orders.id, order.id));
-      await cancelOrder(txOrDb, order, { reason: "Payment expired" });
+        .where(and(eq(orders.id, order.id), sql`${orders.paymentStatus} <> 'completed'`));
+      try {
+        await cancelOrder(txOrDb, order, { reason: "Payment expired" });
+      } catch (error) {
+        if (error.code !== "ORDER_STATE_CHANGED") throw error; // handled by someone else
+      }
     }
     return payment;
   },
@@ -185,11 +242,11 @@ export const paymentService = {
     let charge;
     if (method === "credit_card" || method === "card") {
       if (!cardToken) throw ApiError.badRequest("Missing card token");
-      charge = await omiseService.createCharge({ amount, currency: "thb", card: cardToken, description, metadata });
+      charge = await createChargeOrUncertain({ amount, currency: "thb", card: cardToken, description, metadata });
     } else if (method === "promptpay") {
       const source = await omiseService.createSource({ type: "promptpay", amount, currency: "thb" });
       if (!source?.id) throw new ApiError("Omise source creation failed", 502);
-      charge = await omiseService.createCharge({ amount, currency: "thb", source: source.id, description, metadata });
+      charge = await createChargeOrUncertain({ amount, currency: "thb", source: source.id, description, metadata });
     } else {
       return { payment, charge: null }; // e.g. cash on delivery: nothing to charge now
     }

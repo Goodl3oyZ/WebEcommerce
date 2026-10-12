@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -135,6 +135,12 @@ export default function CheckoutPage() {
   const [qr, setQr] = useState(null); // { orderId, url, total }
   const [cancelling, setCancelling] = useState(false);
   const available = useAvailableCoupons();
+  // One key per checkout attempt: a resend after a network drop returns the same
+  // order on the server instead of creating (and charging) a second one.
+  const attemptKey = useRef(null);
+  const newAttemptKey = () => {
+    attemptKey.current = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  };
 
   // Initial data
   useEffect(() => {
@@ -266,6 +272,7 @@ export default function CheckoutPage() {
           return;
         }
       }
+      if (!attemptKey.current) newAttemptKey();
       const res = await orderAPI.createOrder({
         shippingAddressId: addressId,
         billingAddressId: addressId,
@@ -274,14 +281,23 @@ export default function CheckoutPage() {
         items: cart.items.map((i) => ({ productId: i.productId, variantId: i.variantId ?? null, quantity: i.quantity })),
         ...(coupon ? { couponCode: coupon.code } : {}),
         ...(omiseToken ? { omiseToken } : {}),
-      });
+      }, { idempotencyKey: attemptKey.current });
       const order = res?.data ?? res;
       refreshCartBadge();
+      attemptKey.current = null; // the next checkout is a new attempt
+
+      if (order?.paymentUncertain) {
+        // The bank/provider did not answer in time: the order is kept and
+        // confirmed automatically. Do not tell the customer it failed.
+        toast("กำลังยืนยันผลการชำระเงินกับธนาคาร ไม่ต้องชำระซ้ำ", { duration: 6000 });
+        router.push(`/orders/${order.id}`);
+        return;
+      }
 
       if (payKind === "promptpay") {
         const url = order?.charge?.qrCodeUrl || order?.charge?.source?.scannable_code?.image?.download_uri;
         if (url) {
-          setQr({ orderId: order.id, url, total: order.total });
+          setQr({ orderId: order.id, url, total: order.total, deadline: order.paymentDeadline });
           return;
         }
         toast("สร้างคำสั่งซื้อแล้ว ชำระเงินได้ที่หน้าคำสั่งซื้อ");
@@ -291,6 +307,9 @@ export default function CheckoutPage() {
       }
       router.push(`/orders/${order.id}`);
     } catch (e) {
+      // The server answered: this attempt is over, a retry is a new attempt.
+      // No answer (network drop): keep the key so a retry cannot double-order.
+      if (e?.response) attemptKey.current = null;
       const code = e?.response?.data?.code;
       // The server cancels an order whose payment fails; give the items back.
       if (code === "PAYMENT_FAILED" || code === "PAYMENT_DECLINED") await restoreCart();
@@ -692,6 +711,12 @@ export default function CheckoutPage() {
             {qr && (
               <>
                 <p className="mt-1 text-2xl font-semibold tabular-nums">{formatTHB(qr.total)}</p>
+                {qr.deadline && (
+                  <p className="mt-1 text-xs text-fg-muted">
+                    ชำระภายใน {new Date(qr.deadline).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
+                    หลังจากนั้นคำสั่งซื้อจะถูกยกเลิกอัตโนมัติ
+                  </p>
+                )}
                 <div className="relative mx-auto mt-4 aspect-square w-60 overflow-hidden rounded-lg border border-border bg-white">
                   <Image src={qr.url} alt="QR code PromptPay สำหรับคำสั่งซื้อนี้" fill unoptimized className="object-contain" />
                 </div>

@@ -1,11 +1,14 @@
 import { ENV } from "./src/config/loadENV.js";
 import { app, httpServer, io, redisClient } from "./src/app.js";
+import { startPaymentWorker } from "./src/workers/paymentWorker.js";
 
 const PORT = ENV.SERVER.PORT;
 if (process.env.NODE_ENV !== "test") {
   httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+  // Expires unpaid orders, confirms unknown charges, refunds unapplied payments.
+  const stopPaymentWorker = startPaymentWorker();
 
   // Graceful shutdown so in-flight requests finish during deploys/restarts.
   let shuttingDown = false;
@@ -20,6 +23,7 @@ if (process.env.NODE_ENV !== "test") {
     }, 10_000);
     forceExit.unref();
 
+    stopPaymentWorker();
     // Closes socket connections and the underlying HTTP server.
     io.close(async () => {
       try {

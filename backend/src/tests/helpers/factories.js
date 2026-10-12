@@ -40,7 +40,7 @@ export async function loginAs(role = "user", userOverrides = {}) {
     .post("/api/auth/login")
     .send({ email: user.email, password: user.plainPassword });
   if (res.status !== 200) {
-    throw new Error(`loginAs(${role}) failed: ${res.status} ${JSON.stringify(res.body)}`);
+    throw new Error(`loginAs(${role}) failed: ${res.status} ${JSON.stringify(res.body)} ${String(res.text).slice(0, 200)}`);
   }
   return { agent, user };
 }

@@ -41,6 +41,7 @@ const TRACKING_STATUS = {
 
 const PAYMENT_STATUS = {
   pending: "รอการชำระเงิน",
+  processing: "กำลังยืนยันการชำระเงิน",
   completed: "ชำระเงินแล้ว",
   failed: "ชำระเงินไม่สำเร็จ",
   refunded: "คืนเงินแล้ว",
@@ -539,13 +540,24 @@ export default function OrderDetailsPage() {
         </div>
       </div>
       {/* Pay again / order again */}
+      {order.status === "pending" && order.paymentStatus === "processing" && (
+        <div className="rounded-xl border border-info/30 bg-info-soft p-4 text-sm text-info" role="status">
+          กำลังยืนยันผลการชำระเงินกับธนาคาร ไม่ต้องชำระซ้ำ ระบบจะอัปเดตสถานะให้อัตโนมัติ
+        </div>
+      )}
       {order.status === "pending" &&
-        !["completed", "refunded", "partially_refunded"].includes(order.paymentStatus) && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="text-sm text-amber-800">
+        !["completed", "refunded", "partially_refunded", "processing"].includes(order.paymentStatus) && (
+          <div className="bg-warning-soft border border-warning/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-sm text-warning">
               {order.paymentStatus === "failed"
                 ? "การชำระเงินไม่สำเร็จ ลองชำระอีกครั้งได้"
                 : "คำสั่งซื้อนี้ยังไม่ได้ชำระเงิน"}
+              {order.paymentDeadline && (
+                <span className="mt-0.5 block text-xs">
+                  ชำระภายใน {new Date(order.paymentDeadline).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })} น.
+                  มิฉะนั้นคำสั่งซื้อจะถูกยกเลิกอัตโนมัติ
+                </span>
+              )}
             </div>
             <button
               className="bg-fg hover:bg-fg/85 text-canvas px-5 py-2 rounded-lg font-semibold shadow"

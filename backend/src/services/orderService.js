@@ -13,6 +13,7 @@ import {
   paymentMethods,
   shippingMethods,
   shipments,
+  paymentTransactions,
 } from "../models/schema.js";
 import { eq, and, desc, sql, gte, lte, ilike, or, inArray } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
@@ -22,7 +23,39 @@ import { shippingService } from "./shippingService.js";
 import { paymentService } from "./paymentService.js";
 import { settingsService } from "./settingsService.js";
 import { couponService } from "./couponService.js";
-import { setOrderStatus, cancelOrder } from "./orderLifecycle.js";
+import { setOrderStatus, cancelOrder, recordMovements } from "./orderLifecycle.js";
+
+/** Minutes a customer has to pay before an unpaid order expires (stock released). */
+export const PAYMENT_DEADLINE_MINUTES = Number(process.env.PAYMENT_DEADLINE_MINUTES) || 30;
+
+const RETRYABLE_PG_CODES = new Set(["40P01", "40001"]); // deadlock, serialization failure
+const pgCode = (error) => error?.cause?.code ?? error?.code;
+
+/** Run a transaction, retrying a few times on deadlocks/serialization conflicts. */
+async function withRetry(run, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= attempts || !RETRYABLE_PG_CODES.has(pgCode(error))) throw error;
+      console.warn(`[checkout] retrying after ${pgCode(error)} (attempt ${attempt})`);
+      await new Promise((r) => setTimeout(r, 25 * 2 ** attempt + Math.random() * 25));
+    }
+  }
+}
+
+/** Cancel unless someone else already moved the order on (exactly-once release). */
+async function cancelIfPending(orderId, reason) {
+  await db.transaction(async (tx) => {
+    const current = await tx.query.orders.findFirst({ where: eq(orders.id, orderId) });
+    if (!current || current.status !== "pending") return;
+    try {
+      await cancelOrder(tx, current, { reason });
+    } catch (error) {
+      if (error.code !== "ORDER_STATE_CHANGED") throw error;
+    }
+  });
+}
 import { getFileUrl, BUCKETS } from "../config/minio.js";
 import { toSatang, fromSatang, percentOf } from "../utils/money.js";
 import { paginationMeta } from "../utils/pagination.js";
@@ -122,10 +155,29 @@ export const orderService = {
     if (items.length === 0) {
       throw ApiError.badRequest("Order must contain at least one item");
     }
+    // Reserve rows in one global order (by variant id) so two checkouts with
+    // the same products can never deadlock on each other.
+    items.sort((a, b) => a.variantId.localeCompare(b.variantId));
     const shippingAddressId = orderData.shippingAddressId;
     const billingAddressId = orderData.billingAddressId ?? shippingAddressId;
 
-    const { order, payment, paymentCode } = await db.transaction(async (tx) => {
+    // Idempotency: a retried checkout (double click, network retry) with the
+    // same key returns the first order instead of creating and charging again.
+    const idempotencyKey = orderData.idempotencyKey?.trim() || null;
+    const replay = async () => {
+      const existing = await db.query.orders.findFirst({
+        where: and(eq(orders.userId, userId), eq(orders.idempotencyKey, idempotencyKey)),
+      });
+      return existing ? { ...(await this.getOrderById(userId, existing.id)), replayed: true } : null;
+    };
+    if (idempotencyKey) {
+      const previous = await replay();
+      if (previous) return previous;
+    }
+
+    let created;
+    try {
+      created = await withRetry(() => db.transaction(async (tx) => {
       const [shippingAddress, billingAddress] = await Promise.all([
         tx.query.addresses.findFirst({
           where: and(eq(addresses.id, shippingAddressId), eq(addresses.userId, userId)),
@@ -222,8 +274,15 @@ export const orderService = {
           shippingMethodId: shippingMethod.id,
           paymentMethodId: paymentMethod.id,
           notes: orderData.notes ?? null,
+          idempotencyKey,
+          // Database clock, like created_at, so the worker compares like with like.
+          paymentDeadline: sql`now() + make_interval(mins => ${PAYMENT_DEADLINE_MINUTES})`,
         })
         .returning();
+      await recordMovements(
+        tx,
+        lines.map((l) => ({ variantId: l.variantId, orderId: order.id, change: -l.quantity, reason: "order_reserve" }))
+      );
 
       await tx.insert(orderItems).values(
         lines.map((line) => ({
@@ -267,7 +326,16 @@ export const orderService = {
       const paymentCode = ONLINE_PAYMENT_CODES[paymentMethod.code?.toLowerCase()] ?? paymentMethod.code;
       const payment = await paymentService.createPayment(userId, order.id, paymentCode, null, tx);
       return { order, payment, paymentCode };
-    });
+      }));
+    } catch (error) {
+      // Two identical requests raced: the loser returns the winner's order.
+      if (idempotencyKey && pgCode(error) === "23505") {
+        const previous = await replay();
+        if (previous) return previous;
+      }
+      throw error;
+    }
+    const { order, payment, paymentCode } = created;
 
     // Charge after the order is committed, so money is never taken for an order
     // that rolled back. If the charge cannot start or is declined, the order is
@@ -281,22 +349,29 @@ export const orderService = {
           description: `Order ${order.orderNumber}`,
         }));
       } catch (error) {
-        await db.transaction(async (tx) => {
-          const current = await tx.query.orders.findFirst({ where: eq(orders.id, order.id) });
-          await tx
+        if (error.code === "PAYMENT_UNCERTAIN") {
+          // The charge may exist: keep the order and its stock, mark it as being
+          // confirmed; the payment worker reconciles it with Omise.
+          await db
             .update(orders)
-            .set({ paymentStatus: "failed", updatedAt: new Date() })
-            .where(eq(orders.id, order.id));
-          await cancelOrder(tx, current, { reason: `Payment error: ${error.message}` });
-        });
+            .set({ paymentStatus: "processing", updatedAt: new Date() })
+            .where(and(eq(orders.id, order.id), eq(orders.paymentStatus, "pending")));
+          await db
+            .update(paymentTransactions)
+            .set({ status: "processing", updatedAt: new Date() })
+            .where(and(eq(paymentTransactions.id, payment.id), eq(paymentTransactions.status, "pending")));
+          return { ...(await this.getOrderById(userId, order.id)), paymentUncertain: true };
+        }
+        await db
+          .update(orders)
+          .set({ paymentStatus: "failed", updatedAt: new Date() })
+          .where(and(eq(orders.id, order.id), inArray(orders.paymentStatus, ["pending", "processing"])));
+        await cancelIfPending(order.id, `Payment error: ${error.message}`);
         throw new ApiError(`Payment failed: ${error.message}`, 402, null, "PAYMENT_FAILED");
       }
       if (charge.status === "failed") {
         // Declined card: release the reservation; the customer can check out again.
-        await db.transaction(async (tx) => {
-          const current = await tx.query.orders.findFirst({ where: eq(orders.id, order.id) });
-          await cancelOrder(tx, current, { reason: `Payment declined: ${charge.failure_message ?? "card declined"}` });
-        });
+        await cancelIfPending(order.id, `Payment declined: ${charge.failure_message ?? "card declined"}`);
         throw new ApiError(
           `Payment declined: ${charge.failure_message ?? "card declined"}`,
           402,

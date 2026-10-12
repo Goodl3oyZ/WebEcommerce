@@ -9,8 +9,15 @@ import {
   orderStatusHistory,
   productVariants,
   paymentTransactions,
+  inventoryMovements,
 } from "../models/schema.js";
 import { assertOrderTransition } from "../utils/orderStatus.js";
+import { ApiError } from "../utils/ApiError.js";
+
+/** Audit trail for stock changes made by orders. */
+export async function recordMovements(tx, rows) {
+  if (rows.length) await tx.insert(inventoryMovements).values(rows);
+}
 
 /** Put an order's reserved stock back into inventory. */
 export async function releaseOrderStock(tx, orderId) {
@@ -18,23 +25,33 @@ export async function releaseOrderStock(tx, orderId) {
     .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
     .from(orderItems)
     .where(eq(orderItems.orderId, orderId));
-  for (const item of items) {
-    if (!item.variantId) continue;
+  // Same lock order as checkout (by variant id) to avoid deadlocks.
+  const lines = items.filter((i) => i.variantId).sort((a, b) => a.variantId.localeCompare(b.variantId));
+  for (const item of lines) {
     await tx
       .update(productVariants)
       .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
       .where(eq(productVariants.id, item.variantId));
   }
+  await recordMovements(
+    tx,
+    lines.map((i) => ({ variantId: i.variantId, orderId, change: i.quantity, reason: "order_release" }))
+  );
 }
 
 /** Move an order to a new status, recording history. Validates the transition. */
 export async function setOrderStatus(tx, order, status, { comment, actorId, extra = {} } = {}) {
   assertOrderTransition(order.status, status);
+  // Compare-and-set: only if nobody changed the status since `order` was read.
+  // Concurrent cancel / expire / payment therefore cannot both win.
   const [updated] = await tx
     .update(orders)
     .set({ status, ...extra, updatedAt: new Date() })
-    .where(eq(orders.id, order.id))
+    .where(and(eq(orders.id, order.id), eq(orders.status, order.status)))
     .returning();
+  if (!updated) {
+    throw new ApiError(409, "The order was changed by another action. Please refresh.", null, "ORDER_STATE_CHANGED");
+  }
   if (order.status !== status) {
     await tx.insert(orderStatusHistory).values({
       orderId: order.id,

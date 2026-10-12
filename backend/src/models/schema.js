@@ -180,7 +180,31 @@ export const productVariants = pgTable("product_variants", {
   sku: varchar("sku", { length: 100 }).unique().notNull(),
   stock: integer("stock").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-});
+}, (table) => ({
+  // Last line of defence against overselling: the database refuses negative stock.
+  stockNotNegative: check("product_variants_stock_not_negative", sql`${table.stock} >= 0`),
+}));
+
+// Every stock change made by orders (reserve / release), for auditing.
+export const inventoryMovements = pgTable(
+  "inventory_movements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    variantId: uuid("variant_id")
+      .notNull()
+      .references(() => productVariants.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    change: integer("change").notNull(),
+    // order_reserve | order_release
+    reason: varchar("reason", { length: 30 }).notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    variantIdx: index("inventory_movements_variant_idx").on(table.variantId, table.createdAt),
+    orderIdx: index("inventory_movements_order_idx").on(table.orderId),
+  })
+);
 
 export const productVariantsRelations = relations(
   productVariants,
@@ -459,9 +483,16 @@ export const orders = pgTable("orders", {
   carrier: varchar("carrier", { length: 100 }),
   estimatedDelivery: timestamp("estimated_delivery"),
   paidAt: timestamp("paid_at"),
+  // Client-supplied key: a repeated checkout with the same key returns the first order.
+  idempotencyKey: varchar("idempotency_key", { length: 100 }),
+  // Unpaid orders are expired (stock released) after this time.
+  paymentDeadline: timestamp("payment_deadline"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  idempotencyIdx: uniqueIndex("orders_user_idempotency_key_unique").on(table.userId, table.idempotencyKey),
+  deadlineIdx: index("orders_payment_deadline_idx").on(table.status, table.paymentDeadline),
+}));
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   user: one(users, {

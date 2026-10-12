@@ -34,6 +34,7 @@ jest.unstable_mockModule("../services/omiseService.js", () => ({
       amount,
     })),
     getCharge: jest.fn(async (chargeId) => ({ id: chargeId, status: "successful", paid: true })),
+    findChargeForOrder: jest.fn(async () => null),
     createToken: jest.fn(async () => ({ id: "tokn_test" })),
   },
 }));

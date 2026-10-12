@@ -25,6 +25,13 @@ export const orderDto = {
     couponCode: z.string().trim().min(1).max(50).optional(),
     notes: z.string().max(500).optional(),
     omiseToken: z.string().optional().describe("Card token from Omise.js (credit card only)"),
+    idempotencyKey: z
+      .string()
+      .trim()
+      .min(8)
+      .max(100)
+      .optional()
+      .describe("Same as the Idempotency-Key header: repeating a checkout with it returns the first order"),
     shippingCost: z.number().optional().describe("Ignored: computed by the server"),
     paymentAmount: z.number().optional().describe("Ignored: computed by the server"),
   }),

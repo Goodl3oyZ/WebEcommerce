@@ -10,17 +10,24 @@ export const isAppLoaded = () => Boolean(wrapped);
  * Load the real app once per test file (after mocks are registered) and wrap
  * it with a recorder for route coverage.
  */
-export async function getApp() {
-  if (!wrapped) {
+let loading;
+
+// One import for everyone: with Jest's VM modules, two concurrent import()s of
+// a module that is still evaluating can resolve before its routes are mounted
+// (seen as Express 404s when a test starts several requests at once).
+export function getApp() {
+  loading ??= (async () => {
     const { app } = await import("../../app.js");
-    wrapped = express();
-    wrapped.use((req, res, next) => {
+    const recorder = express();
+    recorder.use((req, res, next) => {
       recordedRequests.push({ method: req.method, url: req.originalUrl });
       next();
     });
-    wrapped.use(app);
-  }
-  return wrapped;
+    recorder.use(app);
+    wrapped = recorder;
+    return recorder;
+  })();
+  return loading;
 }
 
 // Each test file gets its own random 10.x.y.0/24-ish range, so the Redis-backed

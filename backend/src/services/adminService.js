@@ -136,6 +136,13 @@ export const adminService = {
     if (lowStock.length) notifications.push({ type: "low_stock", message: `${lowStock.length} variant(s) are running low on stock` });
     if (outOfStock.length) notifications.push({ type: "out_of_stock", message: `${outOfStock.length} variant(s) are out of stock` });
     if (newOrdersToday.count) notifications.push({ type: "new_order", message: `${newOrdersToday.count} new order(s) today` });
+    // Payments that need a person: refunds that kept failing, outcomes still unknown.
+    const [[refundFailed], [unconfirmed]] = await Promise.all([
+      db.execute(sql`select count(*)::int as n from payment_transactions where (payment_details->>'refundFailed') = 'true'`).then((r) => r.rows ?? r),
+      db.select({ n: sql`count(*)::int` }).from(orders).where(and(eq(orders.status, "pending"), eq(orders.paymentStatus, "processing"))),
+    ]);
+    if (refundFailed?.n) notifications.push({ type: "refund_failed", message: `${refundFailed.n} automatic refund(s) failed: refund them in the Omise dashboard` });
+    if (unconfirmed?.n) notifications.push({ type: "payment_unconfirmed", message: `${unconfirmed.n} order(s) waiting for payment confirmation from Omise` });
 
     return {
       salesSummary: { today, week, month, grossRevenue: Number(gross.total), statusCounts },

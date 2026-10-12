@@ -20,8 +20,14 @@ export const orderController = {
   },
 
   async createOrder(req, res) {
-    const order = await orderService.createOrder(req.user.id, req.body);
-    res.status(201).json({ success: true, data: order });
+    const order = await orderService.createOrder(req.user.id, {
+      ...req.body,
+      idempotencyKey: req.get("Idempotency-Key") ?? req.body.idempotencyKey,
+    });
+    // 202: the order exists but the payment outcome is still being confirmed.
+    // 200: a repeated request (same Idempotency-Key) returning the first order.
+    const status = order.paymentUncertain ? 202 : order.replayed ? 200 : 201;
+    res.status(status).json({ success: true, data: order });
   },
 
   async cancelOrder(req, res) {
