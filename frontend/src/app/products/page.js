@@ -36,8 +36,7 @@ export default function ProductsPage() {
     category: "",
     minPrice: "",
     maxPrice: "",
-    sort: "createdAt",
-    order: "desc",
+    sort: "newest",
   });
   const [pagination, setPagination] = useState({
     page: 1,
@@ -134,8 +133,7 @@ export default function ProductsPage() {
       category: "",
       minPrice: "",
       maxPrice: "",
-      sort: "createdAt",
-      order: "desc",
+      sort: "newest",
     });
     setPagination((prev) => ({ ...prev, page: 1 }));
   }, []);

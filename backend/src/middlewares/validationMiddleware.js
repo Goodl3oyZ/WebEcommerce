@@ -8,9 +8,11 @@ export const validationMiddleware = (schema, source = "body") => {
       }
 
       // Express 5 leaves req.body undefined when a request has no body.
+      // An empty query value (?category=) means "not set": forms send their
+      // blank filters, and they must not fail uuid/enum/number validation.
       const data =
         source === "query"
-          ? req.query
+          ? Object.fromEntries(Object.entries(req.query).filter(([, value]) => value !== ""))
           : source === "params"
             ? req.params
             : (req.body ?? {});

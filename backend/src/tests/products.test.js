@@ -50,6 +50,28 @@ describe("public catalogue", () => {
     expect((await agent.get("/api/products").query({ limit: 1000 })).body.pagination.limit).toBe(100);
   });
 
+  test("accepts what the storefront sends: blank filters and column-style sort", async () => {
+    const category = await createCategory();
+    const cheap = await createProduct({ price: "10.00", categoryId: category.id });
+    const dear = await createProduct({ price: "90.00", categoryId: category.id });
+    const agent = await newAgent();
+
+    // The exact query the products page sent on first load (was a 400).
+    const firstLoad = await agent.get(
+      "/api/products?page=1&limit=12&category=&minPrice=&maxPrice=&sort=createdAt&order=desc"
+    );
+    expect(firstLoad.status).toBe(200);
+
+    const byPrice = await agent.get("/api/products").query({ category: category.id, sort: "price", order: "asc" });
+    expect(byPrice.body.products.map((p) => p.id)).toEqual([cheap.product.id, dear.product.id]);
+    const byPriceDesc = await agent.get("/api/products").query({ category: category.id, sort: "price" });
+    expect(byPriceDesc.body.products.map((p) => p.id)).toEqual([dear.product.id, cheap.product.id]);
+
+    // Blank values are ignored on every validated query, not just products.
+    const { agent: admin } = await loginAs("admin");
+    expect((await admin.get("/api/orders/admin/all").query({ status: "", search: "" })).status).toBe(200);
+  });
+
   test("GET /search requires q and excludes inactive products", async () => {
     const name = tag();
     await createProduct({ name: `${name} shirt` });

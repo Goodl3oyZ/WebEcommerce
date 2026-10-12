@@ -22,10 +22,30 @@ const productFields = {
   isActive: z.boolean(),
 };
 
-export const listQuery = z.object({
+const SORTS = ["newest", "oldest", "price_asc", "price_desc", "name_asc", "name_desc"];
+
+/**
+ * Also accept the column style some clients send (sort=createdAt|price|name
+ * with order=asc|desc) and map it to the sort values above.
+ */
+function normaliseSort(query) {
+  if (!query || typeof query !== "object" || SORTS.includes(query.sort)) return query;
+  const descending = String(query.order ?? "desc").toLowerCase() !== "asc";
+  const legacy = {
+    createdAt: descending ? "newest" : "oldest",
+    created_at: descending ? "newest" : "oldest",
+    price: descending ? "price_desc" : "price_asc",
+    name: descending ? "name_desc" : "name_asc",
+  };
+  const { order: _order, ...rest } = query;
+  return legacy[query.sort] ? { ...rest, sort: legacy[query.sort] } : query;
+}
+
+const listFields = z.object({
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
-  sort: z.enum(["newest", "oldest", "price_asc", "price_desc", "name_asc", "name_desc"]).optional(),
+  sort: z.enum(SORTS).optional(),
+  order: z.enum(["asc", "desc"]).optional().describe("Only with the column-style sort (createdAt|price|name)"),
   category: z.string().uuid().optional().describe("Category id"),
   brand: z.string().uuid().optional().describe("Brand id"),
   minPrice: z.coerce.number().min(0).optional(),
@@ -34,6 +54,8 @@ export const listQuery = z.object({
   inStock: boolString().describe("Only products with at least one variant in stock"),
   includeInactive: boolString().describe("Admins see hidden products unless this is false; ignored for others"),
 });
+
+export const listQuery = z.preprocess(normaliseSort, listFields);
 
 const reviewFields = {
   rating: z.number().int().min(1).max(5),
@@ -52,7 +74,7 @@ const atLeastOne = { message: "At least one field must be provided for update" }
 
 export const productDto = {
   listQuery,
-  searchQuery: listQuery.extend({ q: z.string().trim().min(1).max(100) }),
+  searchQuery: z.preprocess(normaliseSort, listFields.extend({ q: z.string().trim().min(1).max(100) })),
   pageQuery: z.object({
     page: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).optional(),

@@ -108,7 +108,9 @@ services:
     networks:
       - backend-net
     restart: unless-stopped
-    command: ["sh", "-c", "npm run migrate && nodemon --watch src --ext js,json --exec \"node index.js\""]
+    # --legacy-watch polls for changes: file events from a Windows/macOS host
+    # folder do not reach the container, so plain watching never reloads.
+    command: ["sh", "-c", "npm run migrate && nodemon --legacy-watch --watch src --ext js,json --exec \"node index.js\""]
     healthcheck:
       test:
         [
@@ -129,6 +131,8 @@ services:
     container_name: frontend
     environment:
       NODE_ENV: development
+      # Poll for file changes (host file events do not reach the container).
+      WATCHPACK_POLLING: "true"
       JWT_SECRET: ${JWT_SECRET}
       BACKEND_URL: http://backend:5000
     ports:
