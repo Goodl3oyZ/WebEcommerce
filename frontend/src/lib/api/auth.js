@@ -101,7 +101,7 @@ export const authAPI = {
       return {
         success: true,
         user: response.data.data.user,
-        tokens: response.data.data.tokens,
+        tokens: response.data.tokens,
       };
     } catch (error) {
       console.error("Login error details:", {
@@ -112,7 +112,7 @@ export const authAPI = {
 
       // กรณี validation error (400)
       if (error.response?.status === 400) {
-        const serverMessage = error.response.data?.message;
+        const serverMessage = error.response.data?.message ?? "";
         if (serverMessage.includes("password")) {
           throw new APIError("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร", 400);
         }
@@ -221,41 +221,6 @@ export const authAPI = {
     }
   },
 
-  createProfile: async (profileData) => {
-    try {
-      const response = await api.post("/auth/profile", profileData);
-      console.log("Create profile response:", response.data);
-
-      // Check if response has the required structure
-      if (!response.data?.data) {
-        throw new APIError("Invalid response from server", 500);
-      }
-
-      return response;
-    } catch (error) {
-      console.log("Create profile error details:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
-
-      throw new APIError(
-        error.response?.data?.message || "Failed to create profile",
-        error.response?.status || 500
-      );
-    }
-  },
-
-  updateProfile: async (userData) => {
-    try {
-      const response = await api.put("/auth/profile", userData);
-      return response.data;
-    } catch (error) {
-      if (error instanceof APIError) throw error;
-      throw new APIError("Profile update failed", "PROFILE_UPDATE_FAILED", 500);
-    }
-  },
-
   changePassword: async (passwordData) => {
     try {
       const response = await api.post("/auth/change-password", passwordData);
@@ -273,7 +238,7 @@ export const authAPI = {
   logout: async () => {
     try {
       // Just call logout endpoint to clear cookies
-      await api.post("/api/auth/logout");
+      await api.post("/auth/logout");
 
       // Clear any local storage items if needed
       localStorage.removeItem("user");
@@ -303,7 +268,7 @@ export const authAPI = {
   logoutAllSessions: async () => {
     try {
       await api.post(
-        "/api/auth/logout-all",
+        "/auth/logout-all",
         {},
         {
           headers: {

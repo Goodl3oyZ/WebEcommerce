@@ -20,6 +20,18 @@ export const testEnv = {
   TRUST_PROXY: "1",
   OMISE_PUBLIC_KEY: "pkey_test_unit",
   OMISE_SECRET_KEY: "skey_test_unit",
+  // OAuth: GitHub/Google configured with fake credentials, Facebook not at all.
+  GITHUB_CLIENT_ID: "test-github-id",
+  GITHUB_CLIENT_SECRET: "test-github-secret",
+  GITHUB_CALLBACK_URL: "http://localhost:5000/oauth/github/callback",
+  GOOGLE_CLIENT_ID: "test-google-id",
+  GOOGLE_CLIENT_SECRET: "test-google-secret",
+  GOOGLE_CALLBACK_URL: "http://localhost:5000/oauth/google/callback",
+  FACEBOOK_CLIENT_ID: "",
+  FACEBOOK_CLIENT_SECRET: "",
+  API_URL: "http://localhost:5000/api",
+  MAX_LOGIN_ATTEMPTS: "5",
+  LOCKOUT_DURATION: "300",
   // Blank SMTP settings: emails are captured by a mock, never sent.
   EMAIL_HOST: "",
   EMAIL_USER: "",

@@ -1,16 +1,27 @@
+import { randomUUID } from "node:crypto";
 import { db } from "../config/db.js";
 import { users, userRoles, userSessions } from "../models/schema.js";
 import { hashPassword, comparePassword } from "../utils/hashPassword.js";
 import {
-  generateToken,
-  generateRefreshToken,
-  verifyToken,
-  verifyRefreshToken,
+  TOKEN_TYPES,
+  signTypedToken,
+  verifyTypedToken,
+  verifyTypedTokenAllowExpired,
 } from "../utils/jwt.js";
-import { eq, and, lt, gte } from "drizzle-orm";
+import { eq, and, lt, ne } from "drizzle-orm";
 import { redis } from "../config/redis.js";
 import { ENV } from "../config/loadENV.js";
 import { getHighestRole } from "../utils/roles.js";
+import { ApiError } from "../utils/ApiError.js";
+
+const JWT_ACCESS_EXPIRATION = ENV.JWT.ACCESS_EXPIRATION; // seconds
+const JWT_REFRESH_EXPIRATION = ENV.JWT.REFRESH_EXPIRATION; // seconds
+const VERIFY_EMAIL_EXPIRATION = "24h";
+const RESET_PASSWORD_EXPIRATION = "30m";
+const MAX_LOGIN_ATTEMPTS = ENV.SECURITY.MAX_LOGIN_ATTEMPTS;
+const LOCKOUT_DURATION = ENV.SECURITY.LOCKOUT_DURATION; // seconds
+
+const authError = (status, message, code) => new ApiError(status, message, null, code);
 
 async function getUserRole(userId) {
   const rows = await db
@@ -20,544 +31,409 @@ async function getUserRole(userId) {
   return getHighestRole(rows);
 }
 
-// Custom error classes
-class AuthError extends Error {
-  constructor(message, code) {
-    super(message);
-    this.name = "AuthError";
-    this.code = code;
-  }
-}
+/** Password-version claim: changes whenever the password changes, so reset links are single-use. */
+const passwordVersion = (user) => user.lastPasswordChange?.getTime() ?? 0;
 
-// Environment variables validation
-const JWT_REFRESH_SECRET = ENV.JWT.REFRESH_SECRET;
-const JWT_ACCESS_EXPIRATION = ENV.JWT.ACCESS_EXPIRATION;
-const JWT_REFRESH_EXPIRATION = ENV.JWT.REFRESH_EXPIRATION;
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_DURATION = 15 * 60; // 15 minutes in seconds
-
-if (
-  !ENV.JWT.SECRET ||
-  !JWT_REFRESH_SECRET ||
-  !JWT_ACCESS_EXPIRATION ||
-  !JWT_REFRESH_EXPIRATION
-) {
-  throw new Error(
-    "Missing required environment variables for JWT configuration"
-  );
+async function revokeSessions(userId, { exceptSessionId } = {}) {
+  await db
+    .update(userSessions)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userSessions.userId, userId),
+        eq(userSessions.isActive, true),
+        exceptSessionId ? ne(userSessions.id, exceptSessionId) : undefined
+      )
+    );
 }
 
 export const authService = {
-  async register({ email, password, name, deviceInfo = {} }) {
-    try {
-      // Check if user exists
-      const existingUser = await db.query.users.findFirst({
-        where: eq(users.email, email),
-      });
-
-      if (existingUser) {
-        throw new AuthError("Email already exists", "EMAIL_EXISTS");
-      }
-
-      // Hash password with strong algorithm
-      const hashedPassword = await hashPassword(password);
-
-      // Create user with additional security fields
-      const [newUser] = await db
-        .insert(users)
-        .values({
-          name,
-          email,
-          password: hashedPassword,
-          isVerified: false,
-          isActive: true,
-          lastPasswordChange: new Date(),
-        })
-        .returning();
-
-      // Create default user role
-
-      await db.insert(userRoles).values({
-        userId: newUser.id,
-        role: "user",
-      });
-
-      return newUser;
-    } catch (error) {
-      if (error instanceof AuthError) throw error;
-      throw new AuthError("Registration failed", "REGISTRATION_FAILED");
+  async register({ email, password, name }) {
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+    if (existingUser) {
+      throw authError(409, "Email already exists", "EMAIL_EXISTS");
     }
+
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        name,
+        email,
+        password: await hashPassword(password),
+        isVerified: false,
+        isActive: true,
+        lastPasswordChange: new Date(),
+      })
+      .returning();
+
+    await db.insert(userRoles).values({ userId: newUser.id, role: "user" });
+    return newUser;
+  },
+
+  createEmailVerificationToken(user) {
+    return signTypedToken(
+      TOKEN_TYPES.VERIFY_EMAIL,
+      { id: user.id, email: user.email },
+      VERIFY_EMAIL_EXPIRATION
+    );
+  },
+
+  /**
+   * Create a login session and its token pair. The session id (`sid`) is
+   * embedded in both tokens so the session can be revoked server-side.
+   */
+  async createSession(user, { ipAddress = null, userAgent = null, deviceInfo = {} } = {}) {
+    const sid = randomUUID();
+    const role = await getUserRole(user.id);
+    const accessToken = signTypedToken(
+      TOKEN_TYPES.ACCESS,
+      { id: user.id, email: user.email, role, sid },
+      JWT_ACCESS_EXPIRATION
+    );
+    const refreshToken = signTypedToken(
+      TOKEN_TYPES.REFRESH,
+      { id: user.id, email: user.email, sid },
+      JWT_REFRESH_EXPIRATION
+    );
+
+    await db.insert(userSessions).values({
+      id: sid,
+      userId: user.id,
+      refreshToken,
+      accessToken,
+      deviceInfo,
+      ipAddress,
+      userAgent,
+      expiresAt: new Date(Date.now() + JWT_REFRESH_EXPIRATION * 1000),
+      lastActivity: new Date(),
+    });
+
+    await db
+      .update(users)
+      .set({ lastLoginAt: new Date(), lastActivityAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+
+    return { accessToken, refreshToken, sessionId: sid, role };
   },
 
   async login(email, password, deviceInfo = {}) {
-    try {
-      // Find user
-      const user = await db.query.users.findFirst({
-        where: eq(users.email, email),
-      });
-
-      if (!user) {
-        throw new AuthError("User not found", "USER_NOT_FOUND");
-      }
-
-      // Check if account is locked
-      const lockoutKey = `lockout:${user.id}`;
-      const isLocked = await redis.get(lockoutKey);
-
-      if (isLocked) {
-        throw new AuthError("Account is temporarily locked", "ACCOUNT_LOCKED");
-      }
-
-      if (!user.isActive) {
-        throw new AuthError("Account is deactivated", "ACCOUNT_DEACTIVATED");
-      }
-
-      // Verify password
-      const isValidPassword = await comparePassword(password, user.password);
-
-      if (!isValidPassword) {
-        throw new AuthError("Invalid email or password", "INVALID_CREDENTIALS");
-      }
-
-      // Clean up expired sessions
-      await db
-        .delete(userSessions)
-        .where(lt(userSessions.expiresAt, new Date()));
-
-      const role = await getUserRole(user.id);
-
-      const accessToken = generateToken(
-        {
-          id: user.id,
-          email: user.email,
-          role,
-        },
-        JWT_ACCESS_EXPIRATION
-      );
-
-      const refreshToken = generateRefreshToken(
-        {
-          id: user.id,
-          email: user.email,
-        },
-        JWT_REFRESH_EXPIRATION
-      );
-
-      // Create session with enhanced tracking
-      const [session] = await db
-        .insert(userSessions)
-        .values({
-          userId: user.id,
-          refreshToken,
-          accessToken,
-          deviceInfo,
-          ipAddress: deviceInfo.ipAddress,
-          userAgent: deviceInfo.userAgent,
-          expiresAt: new Date(
-            Date.now() + parseInt(JWT_REFRESH_EXPIRATION) * 1000
-          ),
-          lastActivity: new Date(),
-        })
-        .returning();
-
-      // Update user's last login and activity
-      await db
-        .update(users)
-        .set({
-          lastLoginAt: new Date(),
-          lastActivityAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, user.id));
-
-      return { user: { ...user, role }, accessToken, refreshToken, session, role };
-    } catch (error) {
-      if (error instanceof AuthError) throw error;
-      throw new AuthError("Login failed", "LOGIN_FAILED");
-    }
-  },
-
-  async refreshToken(refreshToken, deviceInfo = {}) {
-    try {
-      const decoded = verifyToken(refreshToken, JWT_REFRESH_SECRET);
-
-      const role = await getUserRole(decoded.id);
-
-      const accessToken = generateToken(
-        {
-          id: decoded.id,
-          email: decoded.email,
-          role,
-        },
-        JWT_ACCESS_EXPIRATION
-      );
-
-      const newRefreshToken = generateRefreshToken(
-        {
-          id: decoded.id,
-          email: decoded.email,
-          role,
-        },
-        JWT_REFRESH_EXPIRATION
-      );
-
-      // Update session
-      const [updatedSession] = await db
-        .update(userSessions)
-        .set({
-          refreshToken: newRefreshToken,
-          accessToken,
-          deviceInfo,
-          ipAddress: deviceInfo.ipAddress,
-          userAgent: deviceInfo.userAgent,
-          expiresAt: new Date(
-            Date.now() + parseInt(JWT_REFRESH_EXPIRATION) * 1000
-          ),
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(userSessions.refreshToken, refreshToken),
-            eq(userSessions.isActive, true)
-          )
-        )
-        .returning();
-
-      if (!updatedSession) {
-        throw new AuthError("No active session found", "NO_ACTIVE_SESSION");
-      }
-
-      return { accessToken, newRefreshToken };
-    } catch (error) {
-      if (error instanceof AuthError) throw error;
-      throw new AuthError("Token refresh failed", "REFRESH_FAILED");
-    }
-  },
-
-  async logout(refreshToken, accessToken, userId) {
-    try {
-      if (!refreshToken && !accessToken) {
-        throw new AuthError("No tokens provided for logout", "NO_TOKENS");
-      }
-      let decodedRefresh = null;
-      if (refreshToken) {
-        decodedRefresh = verifyRefreshToken(refreshToken);
-      }
-
-      let decodedAccess = null;
-      if (accessToken) {
-        decodedAccess = verifyToken(accessToken, ENV.JWT.SECRET);
-      }
-
-      // กำหนด userId ถ้ายังไม่มี โดยดึงจาก token
-      if (!userId) {
-        userId = decodedRefresh?.id || decodedAccess?.id;
-      }
-
-      // Handle refresh token blacklisting
-      if (refreshToken) {
-        try {
-          const decodedRefresh = verifyRefreshToken(refreshToken);
-          const isBlacklisted = await redis.get(
-            `blacklist:${decodedRefresh.id}`
-          );
-
-          if (isBlacklisted) {
-            console.warn("Refresh token already revoked, ignoring");
-            // ไม่ throw error ให้ logout ผ่านไป
-          } else {
-            await redis.set(`blacklist:${decodedRefresh.id}`, "1", { EX: 60 });
-            await db
-              .update(userSessions)
-              .set({ isActive: false, updatedAt: new Date() })
-              .where(
-                and(
-                  eq(userSessions.refreshToken, refreshToken),
-                  eq(userSessions.userId, decodedRefresh.id)
-                )
-              );
-          }
-        } catch (error) {
-          console.warn("Invalid refresh token during logout:", error.message);
-          // อาจไม่ throw เพื่อให้ logout สำเร็จแม้ token invalid
-          // หรือจะ throw ก็ได้ถ้าต้องการ strict มาก
-        }
-      }
-
-      // Handle access token blacklisting
-      if (accessToken) {
-        try {
-          const decodedAccess = verifyToken(accessToken, ENV.JWT.SECRET);
-          const isBlacklisted = await redis.get(
-            `blacklist:${decodedAccess.id}`
-          );
-
-          if (isBlacklisted) {
-            console.warn("Access token already revoked, ignoring");
-          } else {
-            await redis.set(`blacklist:${decodedAccess.id}`, "1", { EX: 60 });
-          }
-        } catch (error) {
-          console.warn("Invalid access token during logout:", error.message);
-        }
-      }
-
-      if (userId) {
-        await db
-          .update(users)
-          .set({ lastLogoutAt: new Date(), updatedAt: new Date() })
-          .where(eq(users.id, userId));
-      }
-
-      return true;
-    } catch (error) {
-      if (error instanceof AuthError) throw error;
-      throw new AuthError("Logout failed", "LOGOUT_FAILED");
-    }
-  },
-  async logoutAllSessions(userId) {
-    try {
-      // Get all active sessions for the user
-      const sessions = await db.query.userSessions.findMany({
-        where: and(
-          eq(userSessions.userId, userId),
-          eq(userSessions.isActive, true)
-        ),
-      });
-
-      // Blacklist all tokens
-      for (const session of sessions) {
-        await redis.set(`blacklist:${session.userId}`, "1", { EX: 60 });
-      }
-
-      // Deactivate all sessions
-      await db
-        .update(userSessions)
-        .set({
-          isActive: false,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(eq(userSessions.userId, userId), eq(userSessions.isActive, true))
-        );
-
-      // Update user's last logout
-      await db
-        .update(users)
-        .set({
-          lastLogoutAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userId));
-
-      return true;
-    } catch (error) {
-      throw new AuthError("Failed to logout all sessions", "LOGOUT_ALL_FAILED");
-    }
-  },
-
-  async forgotPassword(email) {
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, email),
-    });
-
+    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user) {
-      throw new Error("User not found");
+      // Same response as a wrong password so emails cannot be enumerated.
+      throw authError(401, "Invalid email or password", "INVALID_CREDENTIALS");
     }
 
-    // Generate password reset token
-    const resetToken = generateToken({ id: user.id }, ENV.JWT.RESET_EXPIRATION);
+    const lockoutKey = `lockout:${user.id}`;
+    const failKey = `login_fail:${user.id}`;
+    if (await redis.get(lockoutKey)) {
+      throw authError(
+        429,
+        "Too many failed login attempts. Please try again later.",
+        "ACCOUNT_LOCKED"
+      );
+    }
 
-    return resetToken;
+    const isValidPassword =
+      Boolean(user.password) && (await comparePassword(password, user.password));
+    if (!isValidPassword) {
+      const attempts = await redis.incr(failKey);
+      if (attempts === 1) await redis.expire(failKey, LOCKOUT_DURATION);
+      if (attempts >= MAX_LOGIN_ATTEMPTS) {
+        await redis.set(lockoutKey, "1", { EX: LOCKOUT_DURATION });
+        await redis.del(failKey);
+      }
+      throw authError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+    }
+
+    // Only reveal account state after the password has been proven.
+    if (!user.isActive) {
+      throw authError(403, "Account is deactivated", "ACCOUNT_DEACTIVATED");
+    }
+    await redis.del(failKey);
+
+    await db.delete(userSessions).where(lt(userSessions.expiresAt, new Date()));
+
+    const session = await this.createSession(user, {
+      ipAddress: deviceInfo.ipAddress,
+      userAgent: deviceInfo.userAgent,
+      deviceInfo,
+    });
+    return { user: { ...user, role: session.role }, ...session };
+  },
+
+  /** Rotate the token pair for an active session (refresh token reuse revokes it). */
+  async refreshToken(refreshToken, deviceInfo = {}) {
+    let decoded;
+    try {
+      decoded = verifyTypedToken(TOKEN_TYPES.REFRESH, refreshToken);
+    } catch {
+      throw authError(401, "Invalid refresh token", "INVALID_REFRESH_TOKEN");
+    }
+
+    const session = await db.query.userSessions.findFirst({
+      where: and(eq(userSessions.id, decoded.sid ?? ""), eq(userSessions.isActive, true)),
+    });
+    if (!session || session.expiresAt < new Date()) {
+      throw authError(401, "No active session found", "NO_ACTIVE_SESSION");
+    }
+    if (session.refreshToken !== refreshToken) {
+      // An old refresh token was replayed: assume it leaked and end the session.
+      await db
+        .update(userSessions)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(eq(userSessions.id, session.id));
+      throw authError(401, "Refresh token has been revoked", "TOKEN_REVOKED");
+    }
+
+    const user = await db.query.users.findFirst({ where: eq(users.id, decoded.id) });
+    if (!user?.isActive) {
+      throw authError(401, "Account is not active", "ACCOUNT_DEACTIVATED");
+    }
+
+    const role = await getUserRole(user.id);
+    const accessToken = signTypedToken(
+      TOKEN_TYPES.ACCESS,
+      { id: user.id, email: user.email, role, sid: session.id },
+      JWT_ACCESS_EXPIRATION
+    );
+    const newRefreshToken = signTypedToken(
+      TOKEN_TYPES.REFRESH,
+      { id: user.id, email: user.email, sid: session.id },
+      JWT_REFRESH_EXPIRATION
+    );
+
+    await db
+      .update(userSessions)
+      .set({
+        refreshToken: newRefreshToken,
+        accessToken,
+        ipAddress: deviceInfo.ipAddress ?? session.ipAddress,
+        userAgent: deviceInfo.userAgent ?? session.userAgent,
+        lastActivity: new Date(),
+        expiresAt: new Date(Date.now() + JWT_REFRESH_EXPIRATION * 1000),
+        updatedAt: new Date(),
+      })
+      .where(eq(userSessions.id, session.id));
+
+    return { accessToken, refreshToken: newRefreshToken };
+  },
+
+  /** Is the session behind a token still usable? */
+  async isSessionActive(sessionId) {
+    if (!sessionId) return false;
+    const session = await db.query.userSessions.findFirst({
+      where: and(eq(userSessions.id, sessionId), eq(userSessions.isActive, true)),
+      columns: { expiresAt: true },
+    });
+    return Boolean(session && session.expiresAt > new Date());
+  },
+
+  /** End the session identified by any of the given credentials. Never throws for bad tokens. */
+  async logout({ refreshToken, accessToken, sessionId }) {
+    const sid =
+      sessionId ||
+      (refreshToken && verifyTypedTokenAllowExpired(TOKEN_TYPES.REFRESH, refreshToken)?.sid) ||
+      (accessToken && verifyTypedTokenAllowExpired(TOKEN_TYPES.ACCESS, accessToken)?.sid);
+    if (!sid) return false;
+
+    const [session] = await db
+      .update(userSessions)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(userSessions.id, sid))
+      .returning({ userId: userSessions.userId });
+    if (session) {
+      await db
+        .update(users)
+        .set({ lastLogoutAt: new Date(), updatedAt: new Date() })
+        .where(eq(users.id, session.userId));
+    }
+    return Boolean(session);
+  },
+
+  async logoutAllSessions(userId) {
+    await revokeSessions(userId);
+    await db
+      .update(users)
+      .set({ lastLogoutAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, userId));
+    return true;
+  },
+
+  /**
+   * Returns a reset token, or null when no active account has this email.
+   * Callers must respond identically in both cases.
+   */
+  async forgotPassword(email) {
+    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!user || !user.isActive) return null;
+    return signTypedToken(
+      TOKEN_TYPES.RESET_PASSWORD,
+      { id: user.id, pwv: passwordVersion(user) },
+      RESET_PASSWORD_EXPIRATION
+    );
   },
 
   async resetPassword(token, newPassword) {
-    // Verify token
-    const decoded = verifyToken(token, ENV.JWT.RESET_SECRET);
+    const invalid = () =>
+      authError(400, "Invalid or expired reset link", "INVALID_RESET_TOKEN");
+    let decoded;
+    try {
+      decoded = verifyTypedToken(TOKEN_TYPES.RESET_PASSWORD, token);
+    } catch {
+      throw invalid();
+    }
+    const user = await db.query.users.findFirst({ where: eq(users.id, decoded.id) });
+    // A token issued before the last password change has already been used.
+    if (!user || passwordVersion(user) !== decoded.pwv) throw invalid();
 
-    // Hash new password
-    const hashedPassword = await hashPassword(newPassword);
-
-    // Update password
     await db
       .update(users)
-      .set({ password: hashedPassword })
-      .where(eq(users.id, decoded.id));
+      .set({
+        password: await hashPassword(newPassword),
+        lastPasswordChange: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+    await revokeSessions(user.id);
+    await redis.del([`lockout:${user.id}`, `login_fail:${user.id}`]);
+    return true;
+  },
 
+  async changePassword(userId, currentPassword, newPassword, currentSessionId) {
+    const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    if (!user) throw authError(404, "User not found", "USER_NOT_FOUND");
+    if (!user.password) {
+      throw authError(
+        400,
+        "This account signs in with a social provider. Use 'forgot password' to set a password.",
+        "NO_PASSWORD_SET"
+      );
+    }
+    // 400, not 401: a wrong current password must not look like an expired login.
+    if (!(await comparePassword(currentPassword, user.password))) {
+      throw authError(400, "Current password is incorrect", "INVALID_CURRENT_PASSWORD");
+    }
+
+    await db
+      .update(users)
+      .set({
+        password: await hashPassword(newPassword),
+        lastPasswordChange: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    // Sign out every other device; keep the session that made the change.
+    await revokeSessions(userId, { exceptSessionId: currentSessionId });
     return true;
   },
 
   async verifyEmail(token) {
+    let decoded;
     try {
-      console.log("Verifying email with token:", token);
-      const decoded = verifyToken(token, ENV.JWT.SECRET);
-      console.log("Decoded token:", decoded);
-
-      if (!decoded) {
-        throw new AuthError("Invalid or expired token", "INVALID_TOKEN");
+      decoded = verifyTypedToken(TOKEN_TYPES.VERIFY_EMAIL, token);
+    } catch (error) {
+      if (error.code === "TOKEN_EXPIRED") {
+        throw authError(400, "Verification link has expired", "TOKEN_EXPIRED");
       }
+      throw authError(400, "Invalid verification link", "INVALID_TOKEN");
+    }
 
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, decoded.id),
-      });
-
-      if (!user) {
-        throw new AuthError("User not found", "USER_NOT_FOUND");
-      }
-
-      if (user.isVerified) {
-        return true; // Already verified
-      }
-
+    const user = await db.query.users.findFirst({ where: eq(users.id, decoded.id) });
+    // The link is bound to the address it was sent to.
+    if (!user || user.email !== decoded.email) {
+      throw authError(400, "Invalid verification link", "INVALID_TOKEN");
+    }
+    if (!user.isVerified) {
       await db
         .update(users)
-        .set({
-          isVerified: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, decoded.id));
-
-      return true;
-    } catch (error) {
-      console.error("Verify email error:", error);
-
-      if (error.name === "JWTError") {
-        throw new AuthError(error.message, error.code);
-      }
-
-      if (error instanceof AuthError) {
-        throw error;
-      }
-
-      throw new AuthError("Error verifying email", "VERIFICATION_ERROR");
+        .set({ isVerified: true, updatedAt: new Date() })
+        .where(eq(users.id, user.id));
     }
+    return true;
   },
 
-  async generateTokens(
-    user,
-    { userAgent = null, deviceInfo = {}, ipAddress = null } = {}
-  ) {
-    try {
-      const role = await getUserRole(user.id);
-
-      const accessToken = generateToken(
-        {
-          id: user.id,
-          email: user.email,
-          role,
-          provider: user.provider,
-          providerId: user.providerId,
-        },
-        JWT_ACCESS_EXPIRATION
-      );
-
-      const refreshToken = generateRefreshToken(
-        {
-          id: user.id,
-          email: user.email,
-          role,
-          provider: user.provider,
-          providerId: user.providerId,
-        },
-        JWT_REFRESH_EXPIRATION
-      );
-
-      const [session] = await db
-        .insert(userSessions)
-        .values({
-          userId: user.id,
-          refreshToken,
-          accessToken,
-          deviceInfo,
-          ipAddress,
-          userAgent,
-          expiresAt: new Date(
-            Date.now() + parseInt(JWT_REFRESH_EXPIRATION) * 1000
-          ),
-          lastActivity: new Date(),
-        })
-        .returning();
-
-      await db
-        .update(users)
-        .set({
-          lastLoginAt: new Date(),
-          lastActivityAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, user.id));
-
-      return { accessToken, refreshToken };
-    } catch (error) {
-      throw new AuthError(
-        "Failed to generate tokens",
-        "TOKEN_GENERATION_FAILED"
-      );
-    }
+  /** Used by the OAuth callback after passport has resolved the user. */
+  async generateTokens(user, { userAgent = null, deviceInfo = {}, ipAddress = null } = {}) {
+    const { accessToken, refreshToken, sessionId } = await this.createSession(user, {
+      userAgent,
+      deviceInfo,
+      ipAddress,
+    });
+    return { accessToken, refreshToken, sessionId };
   },
 
   async findUserById(id) {
-    try {
-      return await db.query.users.findFirst({
-        where: eq(users.id, id),
-      });
-    } catch (error) {
-      throw new AuthError("User lookup failed", "USER_LOOKUP_FAILED");
-    }
+    return db.query.users.findFirst({ where: eq(users.id, id) });
   },
 
+  /**
+   * Find or create the user for an OAuth profile.
+   * An existing account is only linked when the provider says the email is
+   * verified; otherwise anyone controlling an unverified provider email could
+   * take over the account.
+   */
   async findOrCreateOAuthUser(profile, provider) {
-    try {
-      const email = profile.emails?.[0]?.value;
-      if (!email)
-        throw new AuthError(`No email provided by ${provider}`, "NO_EMAIL");
+    const emailEntry =
+      profile.emails?.find((e) => e.primary && e.verified !== false) ?? profile.emails?.[0];
+    const email = emailEntry?.value?.trim().toLowerCase();
+    if (!email) {
+      throw authError(400, `No email provided by ${provider}`, "NO_EMAIL");
+    }
+    const emailVerified =
+      emailEntry.verified === true ||
+      profile._json?.email_verified === true ||
+      // Facebook only returns confirmed email addresses.
+      provider === "facebook";
 
-      const name =
-        profile.displayName || profile.username || email.split("@")?.[0];
-      const avatar = profile.photos?.[0]?.value || null;
-      const providerId = profile.id;
+    const name = profile.displayName || profile.username || email.split("@")[0];
+    const avatar = profile.photos?.[0]?.value || null;
+    const providerId = profile.id;
 
-      const existingUser = await db.query.users.findFirst({
-        where: eq(users.email, email),
-      });
-
-      if (existingUser) {
-        await db
-          .update(users)
-          .set({
-            lastLoginAt: new Date(),
-            lastActivityAt: new Date(),
-            provider,
-            providerId,
-          })
-          .where(eq(users.id, existingUser.id));
-        return { ...existingUser, provider, providerId };
+    const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (existingUser) {
+      const sameProvider =
+        existingUser.provider === provider && existingUser.providerId === providerId;
+      if (!sameProvider && !emailVerified) {
+        throw authError(
+          409,
+          "An account with this email already exists. Sign in with your password.",
+          "OAUTH_EMAIL_UNVERIFIED"
+        );
       }
-
-      const [newUser] = await db
-        .insert(users)
-        .values({
-          email,
-          name,
-          avatar: avatar,
-          password: "",
-          isVerified: true,
-          isActive: true,
+      if (!existingUser.isActive) {
+        throw authError(403, "Account is deactivated", "ACCOUNT_DEACTIVATED");
+      }
+      await db
+        .update(users)
+        .set({
           lastLoginAt: new Date(),
           lastActivityAt: new Date(),
           provider,
           providerId,
+          isVerified: existingUser.isVerified || emailVerified,
         })
-        .returning();
-
-      await db.insert(userRoles).values({
-        userId: newUser.id,
-        role: "user",
-      });
-
-      return newUser;
-    } catch (error) {
-      throw new AuthError("OAuth user handling failed", "OAUTH_USER_FAILED");
+        .where(eq(users.id, existingUser.id));
+      return { ...existingUser, provider, providerId };
     }
+
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        email,
+        name,
+        avatar,
+        password: "",
+        isVerified: emailVerified,
+        isActive: true,
+        lastLoginAt: new Date(),
+        lastActivityAt: new Date(),
+        provider,
+        providerId,
+      })
+      .returning();
+    await db.insert(userRoles).values({ userId: newUser.id, role: "user" });
+    return newUser;
   },
 };

@@ -4,7 +4,11 @@ import { v4 as uuidv4 } from "uuid";
 export class FileService {
   static async uploadFile(file, bucket, folder = "") {
     try {
-      const fileName = `${folder}/${uuidv4()}-${file.originalname}`;
+      // Keep only safe characters: object keys end up in public URLs.
+      const safeName = String(file.originalname || "file")
+        .replace(/[^A-Za-z0-9._-]/g, "_")
+        .slice(-100);
+      const fileName = `${folder}/${uuidv4()}-${safeName}`;
       await minioClient.putObject(bucket, fileName, file.buffer, {
         "Content-Type": file.mimetype,
       });

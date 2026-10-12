@@ -1,11 +1,15 @@
 import { z } from "zod";
 
+// Emails are stored lowercase; normalise input so lookups are case-insensitive.
+const email = () =>
+  z.string().trim().toLowerCase().pipe(z.string().email("Invalid email format"));
+
 // Auth DTOs for validation
 export const authDto = {
   // Login - only essential fields
   login: z
     .object({
-      email: z.string().email("Invalid email format"),
+      email: email(),
       password: z.string().min(6, "Password must be at least 6 characters"),
       deviceInfo: z
         .object({
@@ -21,7 +25,7 @@ export const authDto = {
   register: z
     .object({
       name: z.string().min(2, "Name must be at least 2 characters"),
-      email: z.string().email("Invalid email format"),
+      email: email(),
       password: z
         .string()
         .min(8, "Password must be at least 8 characters")
@@ -47,7 +51,7 @@ export const authDto = {
   // Password reset request
   forgotPassword: z
     .object({
-      email: z.string().email("Invalid email format"),
+      email: email(),
     })
     .strict(),
 
@@ -99,9 +103,10 @@ export const authDto = {
     .strict(),
 
   // Refresh token
+  // Body token is optional: browsers send it as an httpOnly cookie.
   refreshToken: z
     .object({
-    refreshToken: z.string(),
+    refreshToken: z.string().optional(),
     deviceInfo: z
       .object({
         userAgent: z.string().optional(),
@@ -112,8 +117,8 @@ export const authDto = {
     })
     .strict(),
 
-  // Logout
-  logout: z.object({}).strict(),
+  // Logout (API clients may pass their refresh token)
+  logout: z.object({ refreshToken: z.string().optional() }).strict(),
 };
 
 // Response DTOs

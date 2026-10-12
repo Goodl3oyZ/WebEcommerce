@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { randomUUID } from "node:crypto";
 import { ENV } from "../config/loadENV.js";
 
 // Custom error class for JWT errors
@@ -58,5 +59,49 @@ export const verifyRefreshToken = (token) => {
       "Error verifying refresh token",
       "REFRESH_TOKEN_VERIFICATION_ERROR"
     );
+  }
+};
+
+// --- Typed tokens ----------------------------------------------------------
+// Every token carries a `typ` claim so one kind can never be used as another
+// (e.g. an email-verification link as an access token).
+export const TOKEN_TYPES = {
+  ACCESS: "access",
+  REFRESH: "refresh",
+  VERIFY_EMAIL: "verify_email",
+  RESET_PASSWORD: "reset_password",
+};
+
+const secretFor = (type) =>
+  type === TOKEN_TYPES.REFRESH ? ENV.JWT.REFRESH_SECRET : ENV.JWT.SECRET;
+
+export const signTypedToken = (type, payload, expiresIn) => {
+  try {
+    // jwtid makes every token unique, even two issued in the same second
+    // (otherwise a rotated refresh token could equal the one it replaces).
+    return jwt.sign({ ...payload, typ: type }, secretFor(type), { expiresIn, jwtid: randomUUID() });
+  } catch (error) {
+    throw new JWTError("Error generating token", "TOKEN_GENERATION_ERROR");
+  }
+};
+
+export const verifyTypedToken = (type, token) => {
+  const decoded = verifyToken(token, secretFor(type));
+  if (decoded.typ !== type) {
+    throw new JWTError("Invalid token", "INVALID_TOKEN");
+  }
+  return decoded;
+};
+
+/**
+ * Verify signature and type but accept expired tokens. Used only by logout to
+ * find which session to revoke, so an expired cookie can still log out.
+ */
+export const verifyTypedTokenAllowExpired = (type, token) => {
+  try {
+    const decoded = jwt.verify(token, secretFor(type), { ignoreExpiration: true });
+    return decoded.typ === type ? decoded : null;
+  } catch {
+    return null;
   }
 };

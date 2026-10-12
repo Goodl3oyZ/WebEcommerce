@@ -71,6 +71,10 @@ case, review the change and apply it by hand
   (json-file driver, rotated at 5 × 10 MB per container).
 - **API docs:** these are disabled in production. To enable them, set
   `SWAGGER_ENABLED=true` with `SWAGGER_USER` / `SWAGGER_PASS` (basic auth).
+- **Storage capacity:** SeaweedFS holds up to `SEAWEEDFS_VOLUME_MAX` (default 100)
+  volumes of `SEAWEEDFS_VOLUME_SIZE_LIMIT_MB` (default 256 MB) each, so about 25 GB.
+  Disk is only used as files are written. To raise the limit, pass these variables to the
+  `seaweedfs` service.
 - **Backups:** back up these volumes regularly:
   - `postgres_data`: use `pg_dump` via `docker compose exec db pg_dump -U $POSTGRES_USER $POSTGRES_DB`
   - `seaweedfs_data`: uploaded images

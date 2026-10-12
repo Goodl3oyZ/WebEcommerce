@@ -1,4 +1,5 @@
 import axios from "axios";
+import { retryWithRefresh } from "./sessionRefresh";
 
 // Create axios instance with default config
 export const axiosInstance = axios.create({
@@ -33,7 +34,7 @@ axiosInstance.interceptors.request.use(
 // Response interceptor
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     // Handle connection refused errors
     if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
       throw new APIError(
@@ -50,14 +51,10 @@ axiosInstance.interceptors.response.use(
       );
     }
 
-    // Handle unauthorized errors
-    if (error.response?.status === 401) {
-      // Clear auth data and redirect to login
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("user");
-        window.location.href = "/auth/login";
-      }
-    }
+    // Expired session: refresh once and retry (auth endpoints are left alone,
+    // so a wrong password shows its error instead of reloading the page).
+    const retried = await retryWithRefresh(axiosInstance, error);
+    if (retried) return retried;
 
     // Handle other errors
     const status = error.response?.status;

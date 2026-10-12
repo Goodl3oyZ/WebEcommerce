@@ -154,6 +154,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      // End the server session (httpOnly cookies can only be cleared by the API).
+      await authAPI.logout().catch(() => {});
       // Clear cart and auth data
       clearCartStore();
       clearAuthData();

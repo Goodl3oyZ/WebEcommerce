@@ -26,14 +26,22 @@ cat > /tmp/s3.json <<JSON
 }
 JSON
 
+# Volume sizing, tuned for product images on a small server. SeaweedFS's
+# defaults derive the volume count from free disk and grow 7 x 1 GB volumes per
+# bucket, which exhausts small disks so every upload fails. Volumes are not
+# preallocated: disk is only used as files are written.
+VOLUME_SIZE_LIMIT_MB="${SEAWEEDFS_VOLUME_SIZE_LIMIT_MB:-256}"
+VOLUME_MAX="${SEAWEEDFS_VOLUME_MAX:-100}"
+export WEED_MASTER_VOLUME_GROWTH_COPY_1="${SEAWEEDFS_VOLUME_GROWTH:-1}"
+
 # The container joins two networks, so bind every interface (otherwise
 # SeaweedFS listens only on the first one it detects).
 exec weed server \
   -dir=/data \
   -ip=seaweedfs \
   -ip.bind=0.0.0.0 \
-  -master.volumeSizeLimitMB=1024 \
-  -volume.max=0 \
+  -master.volumeSizeLimitMB="$VOLUME_SIZE_LIMIT_MB" \
+  -volume.max="$VOLUME_MAX" \
   -s3 \
   -s3.port=8333 \
   -s3.config=/tmp/s3.json

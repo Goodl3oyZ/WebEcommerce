@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -22,6 +22,21 @@ export default function LoginPage() {
     formState: { errors },
     setError,
   } = useForm();
+
+  // Messages from the email-verification link (backend redirects here).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "1") {
+      toast.success("ยืนยันอีเมลเรียบร้อยแล้ว กรุณาเข้าสู่ระบบ", { duration: 5000 });
+    } else if (params.get("verifyError")) {
+      toast.error(
+        params.get("verifyError") === "TOKEN_EXPIRED"
+          ? "ลิงก์ยืนยันอีเมลหมดอายุแล้ว"
+          : "ลิงก์ยืนยันอีเมลไม่ถูกต้อง",
+        { duration: 5000 }
+      );
+    }
+  }, []);
 
   const onSubmit = async (data) => {
     try {
@@ -123,6 +138,15 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="flex justify-end text-sm">
+            <Link
+              href="/auth/forgot-password"
+              className="font-medium text-blue-600 hover:text-blue-500"
+            >
+              Forgot your password?
+            </Link>
           </div>
 
           <div>

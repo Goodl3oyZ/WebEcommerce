@@ -1,4 +1,5 @@
 import swaggerJSDoc from "swagger-jsdoc";
+import { buildPaths } from "../docs/index.js";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
@@ -49,6 +50,12 @@ const options = {
           scheme: "bearer",
           bearerFormat: "JWT",
           description: "ใส่ JWT Access Token เพื่อระบุตัวตนในการเรียกใช้งาน API",
+        },
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "accessToken",
+          description: "httpOnly cookie set by /api/auth/login (browsers send it automatically)",
         },
       },
       schemas: {
@@ -221,69 +228,6 @@ const options = {
       },
     },
     paths: {
-      "/api/auth/register": {
-        post: {
-          tags: ["Auth"],
-          summary: "ลงทะเบียนผู้ใช้งานใหม่",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["name", "email", "password"],
-                  properties: {
-                    name: { type: "string", example: "Somchai Jaidee" },
-                    email: { type: "string", format: "email", example: "somchai@example.com" },
-                    password: { type: "string", example: "Password123!" },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            201: { description: "ลงทะเบียนสำเร็จ" },
-            400: { description: "ข้อมูลไม่ถูกต้อง" },
-            409: { description: "อีเมลนี้ถูกใช้งานแล้ว" },
-          },
-        },
-      },
-      "/api/auth/login": {
-        post: {
-          tags: ["Auth"],
-          summary: "เข้าสู่ระบบ (รับ JWT Token)",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["email", "password"],
-                  properties: {
-                    email: { type: "string", format: "email", example: "somchai@example.com" },
-                    password: { type: "string", example: "Password123!" },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            200: { description: "เข้าสู่ระบบสำเร็จ คืนค่า JWT token" },
-            401: { description: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" },
-          },
-        },
-      },
-      "/api/auth/me": {
-        get: {
-          tags: ["Auth"],
-          summary: "ดูข้อมูลผู้ใช้งานปัจจุบัน",
-          security: [{ bearerAuth: [] }],
-          responses: {
-            200: { description: "ข้อมูลผู้ใช้งานปัจจุบัน" },
-            401: { description: "Unauthorized" },
-          },
-        },
-      },
       "/api/products": {
         get: {
           tags: ["Products"],
@@ -531,43 +475,6 @@ const options = {
           responses: { 400: { description: "ไม่สามารถลบข้อมูลคำสั่งซื้อได้ โปรดใช้การยกเลิกหรือคืนเงินแทน" } },
         },
       },
-      "/api/users": {
-        get: {
-          tags: ["Users"],
-          summary: "ดึงรายการผู้ใช้ในระบบ (Admin)",
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            { in: "query", name: "page", schema: { type: "integer", default: 1 } },
-            { in: "query", name: "limit", schema: { type: "integer", default: 10 } },
-            { in: "query", name: "search", schema: { type: "string" } },
-            { in: "query", name: "role", schema: { type: "string" } },
-          ],
-          responses: { 200: { description: "รายการผู้ใช้" } },
-        },
-      },
-      "/api/users/{userId}/status": {
-        patch: {
-          tags: ["Users"],
-          summary: "ระงับหรือปลดล็อกบัญชีผู้ใช้ (Admin)",
-          security: [{ bearerAuth: [] }],
-          parameters: [{ in: "path", name: "userId", required: true, schema: { type: "string" } }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["isActive"],
-                  properties: {
-                    isActive: { type: "boolean", example: false },
-                  },
-                },
-              },
-            },
-          },
-          responses: { 200: { description: "อัปเดตสถานะสำเร็จ" } },
-        },
-      },
       "/api/coupons": {
         get: {
           tags: ["Coupons"],
@@ -745,3 +652,9 @@ const options = {
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
+
+// Routes documented from their zod DTOs (src/docs) take precedence over the
+// hand-written entries above, which are migrated module by module.
+for (const [path, operations] of Object.entries(buildPaths())) {
+  swaggerSpec.paths[path] = { ...swaggerSpec.paths[path], ...operations };
+}

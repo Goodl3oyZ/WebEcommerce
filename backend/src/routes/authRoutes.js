@@ -1,6 +1,5 @@
 import express from "express";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
-import { requireRole, ROLES } from "../middlewares/authorizationMiddleware.js";
 import {
   apiRateLimiter,
   loginRateLimiter,
@@ -51,17 +50,8 @@ router.post(
 
 router.get("/verify-email", verifyEmailRateLimiter, authController.verifyEmail);
 
-// Protected routes
-router.use(authMiddleware);
-
-router.get("/me", userController.getProfile);
-
-router.post(
-  "/change-password",
-  validationMiddleware(authDto.changePassword),
-  authController.changePassword
-);
-
+// Work without a valid access token: refresh exists for when it has expired,
+// and logout must always be able to clear the session.
 router.post(
   "/refresh-token",
   refreshTokenRateLimiter,
@@ -76,10 +66,18 @@ router.post(
   authController.logout
 );
 
+// Protected routes
+router.use(authMiddleware);
+
+router.get("/me", userController.getProfile);
+
 router.post(
-  "/logout-all",
-  [requireRole(ROLES.ADMIN), logoutRateLimiter],
-  authController.logoutAllSessions
+  "/change-password",
+  validationMiddleware(authDto.changePassword),
+  authController.changePassword
 );
+
+// Signs the current user out of every device.
+router.post("/logout-all", logoutRateLimiter, authController.logoutAllSessions);
 
 export default router;

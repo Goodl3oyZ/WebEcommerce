@@ -28,6 +28,16 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Upload errors from multer (file too large, too many files, ...).
+  if (err.name === "MulterError") {
+    return res.status(err.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({
+      success: false,
+      status: "error",
+      message: err.code === "LIMIT_FILE_SIZE" ? "File is too large" : err.message,
+      code: err.code,
+    });
+  }
+
   if (err instanceof ApiError) {
     return res.status(err.statusCode).json({
       success: false,

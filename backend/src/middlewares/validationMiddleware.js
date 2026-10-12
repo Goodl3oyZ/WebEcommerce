@@ -7,17 +7,19 @@ export const validationMiddleware = (schema, source = "body") => {
         throw new Error("Invalid or missing validation schema");
       }
 
+      // Express 5 leaves req.body undefined when a request has no body.
       const data =
         source === "query"
           ? req.query
           : source === "params"
             ? req.params
-            : req.body;
+            : (req.body ?? {});
 
       const parsed = await schema.parseAsync(data);
 
       if (source === "query") {
-        req.query = parsed;
+        // req.query is a read-only getter in Express 5.
+        Object.defineProperty(req, "query", { value: parsed, writable: true, configurable: true });
       } else if (source === "params") {
         req.params = parsed;
       } else {

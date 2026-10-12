@@ -1,137 +1,68 @@
-import { verifyToken } from "../utils/jwt.js";
-import { ENV } from "../config/loadENV.js";
-import { users, userRoles } from "../models/schema.js";
+import { TOKEN_TYPES, verifyTypedToken } from "../utils/jwt.js";
+import { users } from "../models/schema.js";
 import { db } from "../config/db.js";
 import { eq } from "drizzle-orm";
 import { getHighestRole } from "../utils/roles.js";
+import { authService } from "../services/authService.js";
 
+const unauthorized = (res, message, code) =>
+  res.status(401).json({ status: "error", message, ...(code && { code }) });
+
+/**
+ * Authenticates the request from (in order) a Bearer token, the accessToken
+ * cookie, or the express-session. Every path is tied to a server-side session
+ * (`sid`) that logout, logout-all, password changes and deactivation revoke.
+ */
 export const authMiddleware = async (req, res, next) => {
   try {
-    let accessToken = null;
-    let refreshToken = null;
-
-    // 1. Check Bearer token in Authorization header
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      accessToken = authHeader.split(" ")[1];
+    const accessToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : req.cookies?.accessToken;
+
+    let userId;
+    let sessionId;
+
+    if (accessToken) {
+      let decoded;
+      try {
+        decoded = verifyTypedToken(TOKEN_TYPES.ACCESS, accessToken);
+      } catch (error) {
+        // 401 + code lets the client refresh; the session itself is kept.
+        return error.code === "TOKEN_EXPIRED"
+          ? unauthorized(res, "Access token expired", "TOKEN_EXPIRED")
+          : unauthorized(res, "Invalid token", "INVALID_TOKEN");
+      }
+      userId = decoded.id;
+      sessionId = decoded.sid;
+    } else if (req.session?.user?.id) {
+      userId = req.session.user.id;
+      sessionId = req.session.user.sid;
+    } else {
+      return unauthorized(res, "No authentication found", "NO_AUTH");
     }
 
-    // 2. If no Bearer token, check cookies
-    if (!accessToken) {
-      accessToken = req.cookies.accessToken;
-      refreshToken = req.cookies.refreshToken;
+    if (!(await authService.isSessionActive(sessionId))) {
+      return unauthorized(res, "Session has ended. Please log in again.", "SESSION_REVOKED");
     }
 
-    // 3. If no tokens found, check session
-    if (!accessToken && !req.session.user) {
-      return res.status(401).json({
-        status: "error",
-        message: "No authentication found",
-      });
-    }
-
-    try {
-      // If we have a session but no token, use session data
-      if (!accessToken && req.session.user) {
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, req.session.user.id),
-          with: {
-            roles: true,
-          },
-        });
-
-        if (!user) {
-          // Clear invalid session
-          req.session.destroy();
-          return res.status(401).json({
-            status: "error",
-            message: "User not found",
-          });
-        }
-
-        // Update session with fresh data
-        req.session.user = {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
-        req.session.touch(); // Extend session lifetime
-
-        req.user = {
-          ...user,
-          role: getHighestRole(user.roles),
-        };
-        return next();
-      }
-
-      // Verify access token
-      const decoded = verifyToken(accessToken, ENV.JWT.SECRET);
-
-      // Get user from database
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, decoded.id),
-        with: {
-          roles: true,
-        },
-      });
-
-      if (!user) {
-        // Clear invalid session
-        req.session.destroy();
-        return res.status(401).json({
-          status: "error",
-          message: "User not found",
-        });
-      }
-
-      // Set user data in request
-      req.user = {
-        ...user,
-        role: getHighestRole(user.roles),
-      };
-
-      // Update session if using cookies
-      if (refreshToken) {
-        req.session.user = {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
-        req.session.touch(); // Extend session lifetime
-        await new Promise((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-      }
-
-      next();
-    } catch (error) {
-      console.error("Token verification error:", error);
-
-      if (error.name === "TokenExpiredError") {
-        // Clear expired session
-        req.session.destroy();
-        return res.status(401).json({
-          status: "error",
-          message: "Access token expired",
-        });
-      }
-
-      // Clear invalid session
-      req.session.destroy();
-      return res.status(401).json({
-        status: "error",
-        message: "Invalid token",
-      });
-    }
-  } catch (error) {
-    console.error("Auth middleware error:", error);
-    return res.status(500).json({
-      status: "error",
-      message: "Internal server error",
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      with: { roles: true },
     });
+    if (!user) {
+      return unauthorized(res, "User not found", "USER_NOT_FOUND");
+    }
+    if (!user.isActive) {
+      return unauthorized(res, "Account is deactivated", "ACCOUNT_DEACTIVATED");
+    }
+
+    const { password: _password, ...safeUser } = user;
+    req.user = { ...safeUser, role: getHighestRole(user.roles) };
+    req.sessionId = sessionId;
+    return next();
+  } catch (error) {
+    return next(error);
   }
 };
 

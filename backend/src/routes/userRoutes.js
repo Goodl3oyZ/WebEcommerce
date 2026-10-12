@@ -5,22 +5,21 @@ import { requireRole, ROLES } from "../middlewares/authorizationMiddleware.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { userDto } from "../dtos/user.dto.js";
 import multer from "multer";
-import { catchAsync } from "../utils/catchAsync.js";
+import { ApiError } from "../utils/ApiError.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("userId", uuidParam("ไม่พบผู้ใช้"));
 
-// Configure multer for memory storage
+// Avatars: raster images only. SVG is excluded because uploads are served from
+// the site's own origin (/media), where an SVG could run script.
+const AVATAR_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files are allowed!"), false);
-    }
+    if (AVATAR_TYPES.includes(file.mimetype)) return cb(null, true);
+    cb(new ApiError(400, "Avatar must be a JPEG, PNG, GIF or WebP image"));
   },
 });
 
@@ -30,13 +29,13 @@ router.use(authMiddleware);
 // User profile routes
 router
   .route("/profile")
-  .get(catchAsync(userController.getProfile))
+  .get(userController.getProfile)
   .put(
     upload.single("avatar"),
     validationMiddleware(userDto.updateProfile),
-    catchAsync(userController.updateProfile)
+    userController.updateProfile
   );
-router.delete("/profile/image", catchAsync(userController.deleteProfileImage));
+router.delete("/profile/image", userController.deleteProfileImage);
 
 // User preferences routes
 router.get("/preferences", userController.getPreferences);

@@ -1,394 +1,180 @@
 import { authService } from "../services/authService.js";
-import { generateToken } from "../utils/jwt.js";
 import { sendEmail } from "../utils/email.js";
+import { ENV } from "../config/loadENV.js";
+import {
+  setAuthCookies,
+  clearAuthCookies,
+  destroySession,
+  saveSession,
+} from "../utils/authCookies.js";
 
+const clientInfo = (req) => ({
+  ipAddress: req.ip,
+  userAgent: req.headers["user-agent"],
+});
+
+// Errors are ApiErrors thrown by authService; Express 5 forwards rejected
+// promises to errorHandler, which formats them.
 const authController = {
-  testAuth(req, res) {
-    res.status(200).json({ message: "Auth API is working" });
-  },
-  // done
   async register(req, res) {
+    const { email, password, name } = req.body;
+    const user = await authService.register({ email, password, name });
+
+    const token = authService.createEmailVerificationToken(user);
+    const link = `${ENV.SERVER.API_URL}/auth/verify-email?token=${encodeURIComponent(token)}`;
     try {
-      const { email, password, name } = req.body;
-      const deviceInfo = {
-        ipAddress: req.ip,
-        userAgent: req.headers["user-agent"],
-        deviceId: req.headers["x-device-id"] || null, // สมมุติส่งมาจาก client
-      };
-      const user = await authService.register({
-        email,
-        password,
-        name,
-        deviceInfo,
-      });
-      // Generate verification token
-      const verificationToken = generateToken(
-        {
-          id: user.id,
-          email: user.email,
-        },
-        "1h"
-      );
-      // Send verification email
       await sendEmail({
-        to: email,
+        to: user.email,
         subject: "Verify your email",
         html: `
-          <h1>Welcome to Our App!</h1>
+          <h1>Welcome!</h1>
           <p>Please verify your email by clicking the link below:</p>
-          <a href="${process.env.API_URL}/verify-email?token=${verificationToken}">
-            Verify Email
-          </a>
+          <a href="${link}">Verify Email</a>
           <p>This link will expire in 24 hours.</p>
         `,
       });
-
-      res.status(201).json({
-        status: "success",
-        message:
-          "Registration successful. Please check your email to verify your account.",
-        data: {
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-          },
-        },
-      });
     } catch (error) {
-      if (error.message === "Email already exists") {
-        return res.status(409).json({
-          status: "error",
-          message: error.message,
-        });
-      }
-      res.status(500).json({
-        status: "error",
-        message: "Error registering user",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
+      // The account exists either way; failing here would make a retry hit 409.
+      console.error("Verification email could not be sent:", error.message);
     }
+
+    res.status(201).json({
+      status: "success",
+      message: "Registration successful. Please check your email to verify your account.",
+      data: { user: { id: user.id, email: user.email, name: user.name } },
+    });
   },
-  // done
+
   async login(req, res) {
-    try {
-      const { email, password } = req.body;
+    const { email, password } = req.body;
+    const { user, accessToken, refreshToken, sessionId, role } = await authService.login(
+      email,
+      password,
+      clientInfo(req)
+    );
 
-      if (!email || !password) {
-        return res.status(400).json({
-          status: "error",
-          message: "Email and password are required",
-        });
-      }
+    await saveSession(req, user, sessionId);
+    setAuthCookies(res, { accessToken, refreshToken });
 
-      const { user, accessToken, refreshToken, role } = await authService.login(
-        email,
-        password,
-        {
-          ipAddress: req.ip,
-          userAgent: req.headers["user-agent"],
-        }
-      );
-
-      // เก็บ user ลง session
-      req.session.user = {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      };
-
-      await new Promise((resolve, reject) => {
-        req.session.save((err) => (err ? reject(err) : resolve()));
-      });
-
-      // ตั้ง cookie
-      res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 15 * 60 * 60 * 1000, // 15 นาที
-        path: "/",
-      });
-
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 วัน
-        path: "/",
-      });
-
-      // ส่ง response สำเร็จ
-      console.log("Login successful for user:", user.id);
-
-      return res.status(200).json({
-        status: "success",
-        message: "Login successful",
-        data: {
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: role || user.role,
-          },
+    res.status(200).json({
+      status: "success",
+      message: "Login successful",
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role,
+          isVerified: user.isVerified,
         },
-        tokens: {
-          accessToken,
-          refreshToken,
-        },
-      });
-    } catch (error) {
-      console.error("Login controller error:", error);
-
-      if (
-        error.code === "USER_NOT_FOUND" ||
-        error.code === "INVALID_CREDENTIALS"
-      ) {
-        return res.status(401).json({
-          status: "error",
-          message: "Invalid email or password",
-        });
-      }
-
-      if (error.code === "ACCOUNT_DEACTIVATED") {
-        return res.status(403).json({
-          status: "error",
-          message: "Account is deactivated",
-        });
-      }
-
-      if (error.code === "ACCOUNT_LOCKED") {
-        return res.status(403).json({
-          status: "error",
-          message: error.message,
-        });
-      }
-
-      return res.status(500).json({
-        status: "error",
-        message: "Error logging in",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
-    }
+      },
+      // For non-browser clients that use Bearer tokens.
+      tokens: { accessToken, refreshToken },
+    });
   },
 
-  // done
+  /** Accepts the refresh token from the body (API clients) or the cookie (browser). */
   async refreshToken(req, res) {
+    const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
+    if (!refreshToken) {
+      return res
+        .status(401)
+        .json({ status: "error", message: "Refresh token is required", code: "NO_REFRESH_TOKEN" });
+    }
     try {
-      const { refreshToken } = req.body;
-
-      if (!refreshToken) {
-        return res.status(400).json({
-          status: "error",
-          message: "Refresh token is required",
-        });
-      }
-
-      const { accessToken, newRefreshToken } = await authService.refreshToken(
-        refreshToken,
-        {
-          ipAddress: req.ip,
-          userAgent: req.headers["user-agent"],
-        }
-      );
-
+      const tokens = await authService.refreshToken(refreshToken, clientInfo(req));
+      setAuthCookies(res, tokens);
       res.json({
         status: "success",
         message: "Tokens refreshed successfully",
-        data: {
-          accessToken,
-          refreshToken: newRefreshToken,
-        },
+        data: tokens,
       });
     } catch (error) {
-      console.error("Refresh token error:", error);
-
-      if (error.code === "TOKEN_REVOKED") {
-        return res.status(401).json({
-          status: "error",
-          message: "Token has been revoked",
-        });
-      }
-
-      if (error.code === "NO_ACTIVE_SESSION") {
-        return res.status(401).json({
-          status: "error",
-          message: "No active session found",
-        });
-      }
-
-      res.status(401).json({
-        status: "error",
-        message: "Invalid refresh token",
-      });
+      clearAuthCookies(res);
+      throw error;
     }
   },
-  // done
+
+  /** Always succeeds: ends whatever session the request identifies and clears cookies. */
   async logout(req, res) {
-    try {
-      const refreshToken = req.cookies.refreshToken;
-      const accessToken = req.cookies.accessToken;
-
-      if (!refreshToken) {
-        return res.status(400).json({
-          status: "error",
-          message: "No refresh token found in cookies",
-        });
-      }
-
-      await authService.logout(refreshToken, accessToken);
-
-      // Clear cookies
-      res.clearCookie("accessToken");
-      res.clearCookie("refreshToken");
-
-      res.json({
-        status: "success",
-        message: "Logout successful",
-      });
-    } catch (error) {
-      console.error("Logout controller error:", error);
-      res.status(500).json({
-        status: "error",
-        message: "Error during logout",
-      });
-    }
+    const authHeader = req.headers.authorization;
+    await authService.logout({
+      refreshToken: req.body?.refreshToken || req.cookies?.refreshToken,
+      accessToken: authHeader?.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : req.cookies?.accessToken,
+      sessionId: req.session?.user?.sid,
+    });
+    await destroySession(req);
+    clearAuthCookies(res);
+    res.json({ status: "success", message: "Logout successful" });
   },
-  // done
-  async forgotPassword(req, res) {
-    try {
-      const { email } = req.body;
-      const resetToken = await authService.forgotPassword(email);
 
-      // Send reset password email
-      await sendEmail({
-        to: email,
-        subject: "Reset your password",
-        text: `Please reset your password by clicking this link: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`,
-      });
-
-      res.json({ message: "Password reset instructions sent to your email" });
-    } catch (error) {
-      if (error.message === "User not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error processing request", error: error.message });
-    }
-  },
-  // done
-  async resetPassword(req, res) {
-    try {
-      const { token, newPassword } = req.body;
-      await authService.resetPassword(token, newPassword);
-      res.json({ message: "Password reset successful" });
-    } catch (error) {
-      if (error.message === "Invalid or expired token") {
-        return res.status(400).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error resetting password", error: error.message });
-    }
-  },
-  // done
-  async verifyEmail(req, res) {
-    try {
-      const { token } = req.query;
-
-      if (!token) {
-        return res.status(400).json({
-          status: "error",
-          message: "Verification token is required",
-        });
-      }
-
-      await authService.verifyEmail(token);
-
-      res.status(200).json({
-        status: "success",
-        message: "Email verified successfully",
-      });
-    } catch (error) {
-      console.error("Email verification error:", error);
-
-      if (error.code === "TOKEN_EXPIRED") {
-        return res.status(401).json({
-          status: "error",
-          message: "Verification token has expired",
-        });
-      }
-
-      if (error.code === "INVALID_TOKEN") {
-        return res.status(401).json({
-          status: "error",
-          message: "Invalid verification token",
-        });
-      }
-
-      if (error.code === "USER_NOT_FOUND") {
-        return res.status(404).json({
-          status: "error",
-          message: "User not found",
-        });
-      }
-
-      res.status(500).json({
-        status: "error",
-        message: "Error verifying email",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
-    }
-  },
-  // Admin only routes
   async logoutAllSessions(req, res) {
-    try {
-      const userId = req.user.id;
-      await authService.logoutAllSessions(userId);
+    await authService.logoutAllSessions(req.user.id);
+    await destroySession(req);
+    clearAuthCookies(res);
+    res.json({
+      status: "success",
+      message: "All sessions have been logged out successfully",
+    });
+  },
 
-      res.json({
-        status: "success",
-        message: "All sessions have been logged out successfully",
-      });
+  /** Same response whether or not the email has an account. */
+  async forgotPassword(req, res) {
+    const { email } = req.body;
+    const resetToken = await authService.forgotPassword(email);
+    if (resetToken) {
+      const link = `${ENV.SERVER.FRONTEND_URL}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
+      try {
+        await sendEmail({
+          to: email,
+          subject: "Reset your password",
+          text: `Reset your password using this link (valid for 30 minutes): ${link}`,
+        });
+      } catch (error) {
+        console.error("Password reset email could not be sent:", error.message);
+      }
+    }
+    res.json({
+      status: "success",
+      message: "If an account exists for this email, password reset instructions have been sent.",
+    });
+  },
+
+  async resetPassword(req, res) {
+    const { token, newPassword } = req.body;
+    await authService.resetPassword(token, newPassword);
+    res.json({ status: "success", message: "Password reset successful. Please log in." });
+  },
+
+  /** JSON for API clients; browsers following the email link are redirected to the app. */
+  async verifyEmail(req, res) {
+    const { token } = req.query;
+    const wantsHtml = req.accepts(["json", "html"]) === "html";
+    try {
+      if (!token) {
+        return res
+          .status(400)
+          .json({ status: "error", message: "Verification token is required" });
+      }
+      await authService.verifyEmail(String(token));
+      if (wantsHtml) return res.redirect(`${ENV.SERVER.FRONTEND_URL}/auth/login?verified=1`);
+      res.json({ status: "success", message: "Email verified successfully" });
     } catch (error) {
-      console.error("Logout all sessions error:", error);
-      res.status(500).json({
-        status: "error",
-        message: "Error logging out all sessions",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
+      if (wantsHtml && error.statusCode === 400) {
+        return res.redirect(
+          `${ENV.SERVER.FRONTEND_URL}/auth/login?verifyError=${encodeURIComponent(error.code || "INVALID_TOKEN")}`
+        );
+      }
+      throw error;
     }
   },
+
   async changePassword(req, res) {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      const userId = req.user.id;
-
-      await authService.changePassword(userId, currentPassword, newPassword);
-
-      res.json({
-        status: "success",
-        message: "Password changed successfully",
-      });
-    } catch (error) {
-      if (error.message === "Current password is incorrect") {
-        return res.status(401).json({
-          status: "error",
-          message: error.message,
-        });
-      }
-      res.status(500).json({
-        status: "error",
-        message: "Error changing password",
-        error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
-      });
-    }
+    const { currentPassword, newPassword } = req.body;
+    await authService.changePassword(req.user.id, currentPassword, newPassword, req.sessionId);
+    res.json({ status: "success", message: "Password changed successfully" });
   },
 };
 
