@@ -1,10 +1,10 @@
 # Production image for the API server
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-FROM node:20-alpine
+FROM node:24-alpine
 ENV NODE_ENV=production
 # tini forwards SIGTERM to node so graceful shutdown works
 RUN apk add --no-cache tini \

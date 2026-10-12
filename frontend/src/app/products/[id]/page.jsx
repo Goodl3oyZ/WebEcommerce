@@ -166,6 +166,27 @@ export default function ProductDetailPage() {
     toast.success("Added to cart!");
   };
 
+  // Nothing below can render until the product has loaded (all hooks are above).
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 to-white">
+        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (error || !product) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <h2 className="text-2xl font-bold text-red-600 mb-4">
+          {error || "Product not found"}
+        </h2>
+        <Button onClick={() => router.push("/products")}>
+          Back to Products
+        </Button>
+      </div>
+    );
+  }
+
   // Button states
   const isOutOfStock = selectedVariant
     ? selectedVariant.stock <= 0
