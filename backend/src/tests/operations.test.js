@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { newAgent } from "./helpers/app.js";
 import { createUser, loginAs } from "./helpers/factories.js";
-import { checkoutSetup, createProduct } from "./helpers/fixtures.js";
+import { checkoutSetup, createOrder, createProduct } from "./helpers/fixtures.js";
 
 const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
 const { ENV } = await import("../config/loadENV.js");
+const { and, gte, ne, sql } = await import("drizzle-orm");
 
 const newStore = async (name = `Branch ${randomUUID().slice(0, 6)}`) =>
   (await db.insert(schema.stores).values({ name }).returning())[0];
@@ -178,6 +179,27 @@ describe("admin dashboard and seeding", () => {
     expect(res.body.inventory.lowStock.every((v) => v.stock > 0 && v.stock <= 5)).toBe(true);
     expect(res.body.notifications.map((n) => n.type)).toEqual(expect.arrayContaining(["low_stock", "new_order"]));
     expect((await agent.get("/api/admin/dashboard")).status).toBe(403);
+  });
+
+  test("dashboard order counts leave out cancelled orders", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const { user } = await loginAs("user");
+    await createOrder(user.id, { status: "cancelled", paymentStatus: "failed" });
+    const today = new Date().toISOString().slice(0, 10);
+    // Other test files create orders concurrently: compare with counts taken before and after.
+    const liveToday = async () => {
+      const [row] = await db
+        .select({ n: sql`count(*)::int` })
+        .from(schema.orders)
+        .where(and(gte(schema.orders.createdAt, new Date(`${today}T00:00:00Z`)), ne(schema.orders.status, "cancelled")));
+      return row.n;
+    };
+    const before = await liveToday();
+    const res = await admin.get("/api/admin/dashboard");
+    const after = await liveToday();
+    const chartToday = res.body.analytics.ordersChart.find((d) => d.date === today)?.count ?? 0;
+    expect(chartToday).toBeGreaterThanOrEqual(before);
+    expect(chartToday).toBeLessThanOrEqual(after);
   });
 
   test("seeding is super-admin only, needs confirmation and is off in production", async () => {

@@ -13,7 +13,8 @@ const input =
   "mt-1.5 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle focus:border-fg focus:ring-fg";
 
 export function SettingsPanel() {
-  const [settings, setSettings] = useState(null);
+  const [saved, setSaved] = useState(null); // last values stored on the server
+  const [siteName, setSiteName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -28,7 +29,10 @@ export function SettingsPanel() {
     setError(null);
     adminAPI
       .getSettings()
-      .then((data) => setSettings(data))
+      .then((data) => {
+        setSaved(data);
+        setSiteName(data.siteName ?? "");
+      })
       .catch((err) => setError(err.message || "โหลดการตั้งค่าไม่สำเร็จ"))
       .finally(() => setLoading(false));
   };
@@ -37,24 +41,34 @@ export function SettingsPanel() {
     load();
   }, []);
 
-  const save = async (e) => {
-    e.preventDefault();
-    const siteName = settings.siteName.trim();
-    if (!siteName) {
-      toast.error("กรุณากรอกชื่อร้าน");
-      return;
-    }
+  const persist = async (changes, done) => {
     setSaving(true);
     try {
-      const saved = await adminAPI.updateSettings({ siteName, maintenance: Boolean(settings.maintenance) });
-      setSettings(saved);
+      const next = await adminAPI.updateSettings(changes);
+      setSaved(next);
+      setSiteName(next.siteName ?? "");
       await site.reload();
-      toast.success("บันทึกการตั้งค่าแล้ว");
+      toast.success(done);
     } catch (err) {
-      toast.error(err.message || "บันทึกไม่สำเร็จ");
+      toast.error(err?.response?.data?.message || err.message || "บันทึกไม่สำเร็จ");
     } finally {
       setSaving(false);
     }
+  };
+
+  const dirty = saved && siteName.trim() !== (saved.siteName ?? "");
+
+  const save = (e) => {
+    e.preventDefault();
+    const name = siteName.trim();
+    if (!name) return toast.error("กรุณากรอกชื่อร้าน");
+    persist({ siteName: name }, `เปลี่ยนชื่อร้านเป็น “${name}” แล้ว`);
+  };
+
+  const toggleMaintenance = () => {
+    const on = !saved.maintenance;
+    if (on && !window.confirm("ปิดปรับปรุงร้าน? ลูกค้าจะเข้าชมและสั่งซื้อไม่ได้จนกว่าจะเปิดอีกครั้ง")) return;
+    persist({ maintenance: on }, on ? "ปิดปรับปรุงร้านแล้ว" : "เปิดร้านตามปกติแล้ว");
   };
 
   return (
@@ -95,62 +109,91 @@ export function SettingsPanel() {
       ) : error ? (
         <ErrorState message={error} onRetry={load} />
       ) : (
-        <form className={`${card} space-y-6`} onSubmit={save} aria-labelledby="store-title">
-          <div>
-            <h3 id="store-title" className="font-semibold text-fg">
-              ข้อมูลร้าน
-            </h3>
-            <p className="mt-1 text-sm text-fg-muted">มีผลกับทุกหน้าของร้าน</p>
-          </div>
-
-          <div>
-            <label htmlFor="site-name" className="block text-sm font-medium text-fg">
-              ชื่อร้าน
-            </label>
-            <input
-              id="site-name"
-              className={input}
-              maxLength={60}
-              value={settings?.siteName || ""}
-              onChange={(e) => setSettings((s) => ({ ...s, siteName: e.target.value }))}
-            />
-            <p className="mt-2 text-xs text-fg-subtle">
-              แสดงที่โลโก้ด้านบน ท้ายเว็บ และชื่อแท็บเบราว์เซอร์ ตัวอย่าง:{" "}
-              <span className="font-display font-bold italic uppercase text-fg">{settings?.siteName || "—"}</span>
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm font-medium text-fg">สกุลเงิน</p>
-            <p className="mt-1.5 inline-flex rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm font-semibold text-fg">
-              THB (บาท)
-            </p>
-            <p className="mt-2 text-xs text-fg-subtle">ระบบชำระเงิน Omise รับเฉพาะเงินบาท จึงเปลี่ยนสกุลเงินไม่ได้</p>
-          </div>
-
-          <label className="flex items-start gap-3 rounded-xl border border-border p-4">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-border text-fg focus:ring-fg"
-              checked={Boolean(settings?.maintenance)}
-              onChange={(e) => setSettings((s) => ({ ...s, maintenance: e.target.checked }))}
-            />
-            <span className="text-sm">
-              <span className="font-medium text-fg">โหมดปิดปรับปรุง</span>
-              <span className="mt-0.5 block text-fg-muted">
-                ลูกค้าจะเห็นหน้า &quot;ปิดปรับปรุงชั่วคราว&quot; และสั่งซื้อไม่ได้ ทีมงานยังเข้าหลังบ้านได้ตามปกติ
-              </span>
-            </span>
-          </label>
-
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-xl bg-fg px-5 py-2.5 text-sm font-semibold text-canvas transition-colors hover:bg-fg/85 disabled:opacity-50"
+        <>
+          <section
+            className={`${card} flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${
+              saved.maintenance ? "border-warning bg-warning-soft" : ""
+            }`}
+            aria-labelledby="status-title"
           >
-            {saving ? "กำลังบันทึก…" : "บันทึกการตั้งค่า"}
-          </button>
-        </form>
+            <div className="flex items-start gap-3">
+              <span
+                className={`mt-1 h-3 w-3 shrink-0 rounded-full ${saved.maintenance ? "bg-warning" : "bg-success"}`}
+                aria-hidden
+              />
+              <div>
+                <h3 id="status-title" className="font-semibold text-fg">
+                  สถานะร้าน: {saved.maintenance ? "ปิดปรับปรุงอยู่" : "เปิดให้บริการ"}
+                </h3>
+                <p className="mt-1 text-sm text-fg-muted">
+                  {saved.maintenance
+                    ? "ลูกค้าเห็นหน้า “ปิดปรับปรุงชั่วคราว” และสั่งซื้อไม่ได้ ทีมงานยังใช้งานได้ตามปกติ"
+                    : "ลูกค้าเข้าชมและสั่งซื้อได้ตามปกติ"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={toggleMaintenance}
+              className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-50 ${
+                saved.maintenance ? "bg-fg text-canvas hover:bg-fg/85" : "border border-border text-fg hover:bg-surface-muted"
+              }`}
+            >
+              {saved.maintenance ? "เปิดร้านตามปกติ" : "ปิดปรับปรุงร้าน"}
+            </button>
+          </section>
+
+          <form className={`${card} space-y-6`} onSubmit={save} aria-labelledby="store-title">
+            <div>
+              <h3 id="store-title" className="font-semibold text-fg">
+                ข้อมูลร้าน
+              </h3>
+              <p className="mt-1 text-sm text-fg-muted">มีผลกับทุกหน้าของร้านทันทีหลังบันทึก</p>
+            </div>
+
+            <div>
+              <label htmlFor="site-name" className="block text-sm font-medium text-fg">
+                ชื่อร้าน
+              </label>
+              <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="site-name"
+                  className={`${input} mt-0`}
+                  maxLength={60}
+                  value={siteName}
+                  onChange={(e) => setSiteName(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  disabled={saving || !dirty}
+                  className="shrink-0 rounded-xl bg-fg px-5 py-2 text-sm font-semibold text-canvas transition-colors hover:bg-fg/85 disabled:opacity-40"
+                >
+                  {saving ? "กำลังบันทึก…" : "บันทึกชื่อร้าน"}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-fg-subtle">
+                {dirty ? (
+                  <span className="font-medium text-warning">ยังไม่ได้บันทึก — ตอนนี้ร้านยังใช้ชื่อ “{saved.siteName}”</span>
+                ) : (
+                  <>ชื่อที่ใช้อยู่ตอนนี้ แสดงที่โลโก้ด้านบน ท้ายเว็บ และชื่อแท็บเบราว์เซอร์</>
+                )}
+              </p>
+              <p className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border bg-canvas px-3 py-2">
+                <span className="text-xs text-fg-subtle">ตัวอย่างโลโก้:</span>
+                <span className="font-display text-lg font-bold italic uppercase tracking-tight text-fg">{siteName || "—"}</span>
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-fg">สกุลเงิน</p>
+              <p className="mt-1.5 inline-flex rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm font-semibold text-fg">
+                THB (บาท)
+              </p>
+              <p className="mt-2 text-xs text-fg-subtle">ระบบชำระเงิน Omise รับเฉพาะเงินบาท จึงเปลี่ยนสกุลเงินไม่ได้</p>
+            </div>
+          </form>
+        </>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { db } from "../config/db.js";
 import { orders, users, products, productVariants, orderItems, coupons } from "../models/schema.js";
-import { and, eq, gte, lte, desc, sql, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, ne, gte, lte, desc, sql, inArray, isNotNull } from "drizzle-orm";
 
 const PAID = ["completed", "partially_refunded", "refunded"];
 const LOW_STOCK = 5;
@@ -98,7 +98,8 @@ export const adminService = {
       db
         .select({ date: sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`, count: sql`count(*)::int` })
         .from(orders)
-        .where(gte(orders.createdAt, thirtyDaysAgo))
+        // Cancelled orders are not real orders (e.g. abandoned PromptPay QR).
+        .where(and(gte(orders.createdAt, thirtyDaysAgo), ne(orders.status, "cancelled")))
         .groupBy(sql`1`)
         .orderBy(sql`1`),
       db
@@ -121,7 +122,10 @@ export const adminService = {
         orderBy: [coupons.endDate],
         limit: 5,
       }),
-      db.select({ count: sql`count(*)::int` }).from(orders).where(gte(orders.createdAt, startOfDay)),
+      db
+        .select({ count: sql`count(*)::int` })
+        .from(orders)
+        .where(and(gte(orders.createdAt, startOfDay), ne(orders.status, "cancelled"))),
     ]);
 
     // Real alerts (these used to be hard-coded messages).

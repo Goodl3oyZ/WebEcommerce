@@ -124,9 +124,10 @@ export const adminAPI = {
     axiosInstance.delete(`/notifications/admin/${id}`).then((r) => r.data),
 
   // --- Settings (admin only) ---
-  getSettings: async () => axiosInstance.get("/settings").then((r) => r.data),
+  // The API wraps settings as { success, data }.
+  getSettings: async () => axiosInstance.get("/settings").then((r) => r.data?.data ?? r.data),
   updateSettings: async (data) =>
-    axiosInstance.put("/settings", data).then((r) => r.data),
+    axiosInstance.put("/settings", data).then((r) => r.data?.data ?? r.data),
   getDashboard: async () =>
     axiosInstance.get("/admin/dashboard").then((r) => r.data),
   runSeed: async (seedType, confirm) =>
