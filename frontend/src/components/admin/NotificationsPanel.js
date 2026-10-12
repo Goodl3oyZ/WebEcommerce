@@ -99,6 +99,8 @@ export function NotificationsPanel() {
         title: form.title.trim(),
         message: form.message.trim(),
         priority: form.priority,
+        // Sent to every active user (previously it only reached the admin).
+        broadcast: true,
       });
       toast.success("ส่งการแจ้งเตือนสำเร็จ");
       setShowForm(false);

@@ -105,15 +105,15 @@ export const adminAPI = {
 
   // --- Reports (admin only) ---
   getOrderReport: async (params = {}) =>
-    axiosInstance.get("/report/orders", { params }).then((r) => r.data),
+    axiosInstance.get("/reports/orders", { params }).then((r) => r.data),
   getSalesReport: async (params = {}) =>
-    axiosInstance.get("/report/sales", { params }).then((r) => r.data),
+    axiosInstance.get("/reports/sales", { params }).then((r) => r.data),
   getProductReport: async (params = {}) =>
-    axiosInstance.get("/report/inventory", { params }).then((r) => r.data),
+    axiosInstance.get("/reports/inventory", { params }).then((r) => r.data),
   getCustomerReport: async (params = {}) =>
-    axiosInstance.get("/report/customer", { params }).then((r) => r.data),
+    axiosInstance.get("/reports/customer", { params }).then((r) => r.data),
   getSupplierReport: async (params = {}) =>
-    axiosInstance.get("/report/supplier", { params }).then((r) => r.data),
+    axiosInstance.get("/reports/supplier", { params }).then((r) => r.data),
 
   // --- Notifications (admin only) ---
   getNotifications: async (params = {}) =>
@@ -129,6 +129,6 @@ export const adminAPI = {
     axiosInstance.put("/settings", data).then((r) => r.data),
   getDashboard: async () =>
     axiosInstance.get("/admin/dashboard").then((r) => r.data),
-  runSeed: async (seedType) =>
-    axiosInstance.post("/admin/seed", { seedType }).then((r) => r.data),
+  runSeed: async (seedType, confirm) =>
+    axiosInstance.post("/admin/seed", { seedType, confirm }).then((r) => r.data),
 };

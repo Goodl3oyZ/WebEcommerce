@@ -1,31 +1,19 @@
-let appSettings = {
-  siteName: "My Shop",
-  maintenance: false,
-  theme: "light",
-  currency: "THB",
-};
+import { settingsService } from "../services/settingsService.js";
 
 export const settingsController = {
-  getSettings: (req, res) => {
-    res.json({
-      success: true,
-      data: appSettings,
-    });
+  async getSettings(req, res) {
+    res.json({ success: true, data: await settingsService.getSettings() });
   },
 
-  getPublicSettings: (req, res) => {
-    const { siteName, maintenance, theme, currency } = appSettings;
-    res.json({
-      success: true,
-      data: { siteName, maintenance, theme, currency },
-    });
+  async getPublicSettings(req, res) {
+    res.set("Cache-Control", "public, max-age=60");
+    res.json({ success: true, data: await settingsService.getPublicSettings() });
   },
 
-  updateSettings: (req, res) => {
-    appSettings = { ...appSettings, ...req.body };
+  async updateSettings(req, res) {
     res.json({
       success: true,
-      data: appSettings,
+      data: await settingsService.updateSettings(req.body),
       message: "การตั้งค่าถูกบันทึกเรียบร้อยแล้ว",
     });
   },

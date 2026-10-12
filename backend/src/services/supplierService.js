@@ -1,13 +1,27 @@
 import { db } from "../config/db.js";
-import { suppliers, supplierProducts } from "../models/schema.js";
-import { eq, and, desc } from "drizzle-orm";
+import { suppliers, supplierProducts, products } from "../models/schema.js";
+import { eq, and, desc, or, ilike, sql } from "drizzle-orm";
+import { paginationMeta } from "../utils/pagination.js";
 import { ApiError } from "../utils/ApiError.js";
 
 export const supplierService = {
-  async getAllSuppliers() {
-    return db.query.suppliers.findMany({
-      orderBy: [desc(suppliers.createdAt)],
-    });
+  async getAllSuppliers({ search, status }, pagination) {
+    const where = and(
+      status ? eq(suppliers.status, status) : undefined,
+      search
+        ? or(ilike(suppliers.name, `%${search}%`), ilike(suppliers.contactPerson, `%${search}%`), ilike(suppliers.email, `%${search}%`))
+        : undefined
+    );
+    const [items, total] = await Promise.all([
+      db.query.suppliers.findMany({
+        where,
+        orderBy: [desc(suppliers.createdAt)],
+        limit: pagination.limit,
+        offset: pagination.offset,
+      }),
+      db.select({ count: sql`count(*)::int` }).from(suppliers).where(where),
+    ]);
+    return { suppliers: items, pagination: paginationMeta(total[0].count, pagination) };
   },
 
   async getSupplierById(id) {
@@ -69,6 +83,7 @@ export const supplierService = {
 
     return db.query.supplierProducts.findMany({
       where: eq(supplierProducts.supplierId, supplierId),
+      with: { product: { columns: { id: true, name: true, price: true, isActive: true } } },
     });
   },
 
@@ -83,8 +98,10 @@ export const supplierService = {
     });
 
     if (existing) {
-      throw ApiError.badRequest("Product already linked to supplier");
+      throw ApiError.conflict("Product already linked to supplier");
     }
+    const product = await db.query.products.findFirst({ where: eq(products.id, data.productId) });
+    if (!product) throw ApiError.notFound("Product not found");
 
     const [link] = await db
       .insert(supplierProducts)

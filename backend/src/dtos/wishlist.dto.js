@@ -1,73 +1,20 @@
 import { z } from "zod";
 
-// Wishlist DTOs
 export const wishlistDto = {
-  // Add to wishlist
   addToWishlist: z.object({
     productId: z.string().uuid(),
-    variantId: z.string().uuid().optional(),
+    variantId: z.string().uuid().nullable().optional(),
   }),
 
-  // Remove from wishlist
-  removeFromWishlist: z.object({
-    productId: z.string().uuid(),
-  }),
+  // Change or clear (null) the chosen variant.
+  updateWishlistItem: z.object({ variantId: z.string().uuid().nullable() }),
 
-  // Update wishlist item
-  updateWishlistItem: z
-    .object({
-      productId: z.string().uuid(),
-      variantId: z.string().uuid().optional(),
-    })
-    .refine((data) => Object.keys(data).length > 0, {
-      message: "At least one field must be provided for update",
-    }),
-
-  // Move to cart
   moveToCart: z.object({
-    productId: z.string().uuid(),
-    quantity: z.number().min(1),
-  }),
-};
-
-// Response DTOs
-export const wishlistResponseDto = {
-  // Basic wishlist item info
-  basic: z.object({
-    id: z.string().uuid(),
-    productId: z.string().uuid(),
-    productName: z.string(),
-    productPrice: z.number(),
-    productImage: z.string().url(),
-    addedAt: z.string().datetime(),
+    quantity: z.number().int().min(1).max(99).default(1),
   }),
 
-  // Detailed wishlist item info
-  detailed: z.object({
-    id: z.string().uuid(),
-    productId: z.string().uuid(),
-    productName: z.string(),
-    productPrice: z.number(),
-    productImage: z.string().url(),
-    notes: z.string().optional(),
-    priority: z.string().optional(),
-    addedAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  }),
-
-  // Admin view of wishlist
-  admin: z.object({
-    id: z.string().uuid(),
-    userId: z.string().uuid(),
-    productId: z.string().uuid(),
-    productName: z.string(),
-    productPrice: z.number(),
-    productImage: z.string().url(),
-    notes: z.string().optional(),
-    priority: z.string().optional(),
-    addedAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-    lastViewedAt: z.string().datetime().optional(),
-    viewCount: z.number(),
+  adminListQuery: z.object({
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
   }),
 };

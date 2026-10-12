@@ -13,6 +13,7 @@ import { omiseService } from "./omiseService.js";
 import { toSatang, fromSatang } from "../utils/money.js";
 import { paginationMeta } from "../utils/pagination.js";
 import { setOrderStatus, cancelOrder } from "./orderLifecycle.js";
+import { loyaltyService } from "./loyaltyService.js";
 
 /** Omise charge status -> our payment status. */
 export function mapChargeStatus(omiseStatus) {
@@ -144,6 +145,7 @@ export const paymentService = {
       if (order.status === "pending") {
         await setOrderStatus(txOrDb, order, "paid", { comment: `Payment ${charge.id} received` });
       }
+      await loyaltyService.creditForOrder(txOrDb, order);
     } else if (status === "failed" && order.paymentStatus === "pending") {
       // Card declined: the order stays open so the customer can try again.
       await txOrDb
@@ -257,6 +259,7 @@ export const paymentService = {
           if (order.status === "pending") {
             await setOrderStatus(tx, order, "paid", { comment: "Payment confirmed by admin", actorId });
           }
+          await loyaltyService.creditForOrder(tx, order);
         }
       } else if (status === "failed" && payment.orderId) {
         await tx
@@ -329,6 +332,7 @@ export const paymentService = {
         if (fullyRefunded && order && order.status !== "refunded") {
           await setOrderStatus(tx, order, "refunded", { comment: reason, actorId });
         }
+        if (fullyRefunded && order) await loyaltyService.reverseForOrder(tx, order);
         [refundRecord] = await tx
           .insert(refunds)
           .values({

@@ -69,6 +69,10 @@ case, review the change and apply it by hand
   (503 if any is down).
 - **Logs:** `docker compose -f docker-compose.prod.yml logs -f backend`
   (json-file driver, rotated at 5 × 10 MB per container).
+- **Admin seeding:** `POST /api/admin/seed` (the "Seed" admin tab) can delete every
+  user and product. It is disabled in production unless `ALLOW_ADMIN_SEED=true`, is
+  restricted to super admins, and needs a typed confirmation. Seed a fresh database
+  from the command line instead (see First deploy).
 - **API docs:** these are disabled in production. To enable them, set
   `SWAGGER_ENABLED=true` with `SWAGGER_USER` / `SWAGGER_PASS` (basic auth).
 - **Storage capacity:** SeaweedFS holds up to `SEAWEEDFS_VOLUME_MAX` (default 100)

@@ -1,231 +1,110 @@
 import { db } from "../config/db.js";
-import {
-  wishlistItems,
-  products,
-  productVariants,
-} from "../models/schema.js";
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { wishlistItems, products, productVariants } from "../models/schema.js";
+import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { cartService } from "./cartService.js";
+import { presentProduct } from "./productService.js";
+import { paginationMeta } from "../utils/pagination.js";
 
-const wishlistWith = {
-  product: {
-    with: {
-      category: true,
-      brand: true,
-    },
-  },
+const itemWith = {
+  product: { with: { category: true, brand: true, variants: true } },
   variant: true,
 };
+const userColumns = { columns: { id: true, name: true, email: true } };
 
-const getUserWishlist = async (userId) => {
-  return db.query.wishlistItems.findMany({
-    where: eq(wishlistItems.userId, userId),
-    with: wishlistWith,
-    orderBy: [desc(wishlistItems.createdAt)],
+const present = (item) => item && { ...item, product: presentProduct(item.product) };
+
+async function findOwn(userId, itemId) {
+  const item = await db.query.wishlistItems.findFirst({
+    where: and(eq(wishlistItems.id, itemId), eq(wishlistItems.userId, userId)),
+    with: itemWith,
   });
-};
+  if (!item) throw ApiError.notFound("Wishlist item not found");
+  return item;
+}
 
-const addToWishlist = async (userId, productId, variantId = null) => {
-  const product = await db.query.products.findFirst({
-    where: eq(products.id, productId),
+async function assertVariantOf(productId, variantId) {
+  const variant = await db.query.productVariants.findFirst({
+    where: and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)),
   });
-
-  if (!product) {
-    throw ApiError.notFound("Product not found");
-  }
-
-  if (variantId) {
-    const variant = await db.query.productVariants.findFirst({
-      where: and(
-        eq(productVariants.id, variantId),
-        eq(productVariants.productId, productId)
-      ),
-    });
-
-    if (!variant) {
-      throw ApiError.notFound("Product variant not found");
-    }
-  }
-
-  const variantCondition = variantId
-    ? eq(wishlistItems.variantId, variantId)
-    : isNull(wishlistItems.variantId);
-
-  const existingItem = await db.query.wishlistItems.findFirst({
-    where: and(
-      eq(wishlistItems.userId, userId),
-      eq(wishlistItems.productId, productId),
-      variantCondition
-    ),
-  });
-
-  if (existingItem) {
-    return existingItem;
-  }
-
-  const [created] = await db
-    .insert(wishlistItems)
-    .values({
-      userId,
-      productId,
-      variantId: variantId ?? null,
-    })
-    .returning();
-
-  return created;
-};
-
-const removeFromWishlist = async (userId, wishlistItemId) => {
-  const wishlistItem = await db.query.wishlistItems.findFirst({
-    where: and(
-      eq(wishlistItems.id, wishlistItemId),
-      eq(wishlistItems.userId, userId)
-    ),
-  });
-
-  if (!wishlistItem) {
-    throw ApiError.notFound("Wishlist item not found");
-  }
-
-  await db
-    .delete(wishlistItems)
-    .where(eq(wishlistItems.id, wishlistItemId));
-};
-
-const moveToCart = async (userId, wishlistItemId, quantity = 1) => {
-  const wishlistItem = await db.query.wishlistItems.findFirst({
-    where: and(
-      eq(wishlistItems.id, wishlistItemId),
-      eq(wishlistItems.userId, userId)
-    ),
-  });
-
-  if (!wishlistItem) {
-    throw ApiError.notFound("Wishlist item not found");
-  }
-
-  const cart = await cartService.addItem(userId, {
-    productId: wishlistItem.productId,
-    variantId: wishlistItem.variantId,
-    quantity,
-  });
-
-  await db
-    .delete(wishlistItems)
-    .where(eq(wishlistItems.id, wishlistItemId));
-
-  return cart;
-};
-
-const clearWishlist = async (userId) => {
-  await db
-    .delete(wishlistItems)
-    .where(eq(wishlistItems.userId, userId));
-};
-
-const getWishlistItemById = async (userId, wishlistItemId) => {
-  const wishlistItem = await db.query.wishlistItems.findFirst({
-    where: and(
-      eq(wishlistItems.id, wishlistItemId),
-      eq(wishlistItems.userId, userId)
-    ),
-    with: wishlistWith,
-  });
-
-  if (!wishlistItem) {
-    throw ApiError.notFound("Wishlist item not found");
-  }
-
-  return wishlistItem;
-};
-
-const getWishlistItemsByProduct = async (userId, productId) => {
-  return db.query.wishlistItems.findMany({
-    where: and(
-      eq(wishlistItems.userId, userId),
-      eq(wishlistItems.productId, productId)
-    ),
-    with: wishlistWith,
-  });
-};
-
-const updateWishlistItem = async (wishlistItemId, userId, updateData = {}) => {
-  const item = await getWishlistItemById(userId, wishlistItemId);
-
-  if (updateData.variantId === undefined) {
-    return item;
-  }
-
-  if (updateData.variantId) {
-    const variant = await db.query.productVariants.findFirst({
-      where: and(
-        eq(productVariants.id, updateData.variantId),
-        eq(productVariants.productId, item.productId)
-      ),
-    });
-
-    if (!variant) {
-      throw ApiError.notFound("Product variant not found");
-    }
-  }
-
-  const [updated] = await db
-    .update(wishlistItems)
-    .set({ variantId: updateData.variantId ?? null })
-    .where(eq(wishlistItems.id, wishlistItemId))
-    .returning();
-
-  return db.query.wishlistItems.findFirst({
-    where: eq(wishlistItems.id, updated.id),
-    with: wishlistWith,
-  });
-};
-
-const getAllWishlists = async () => {
-  return db.query.wishlistItems.findMany({
-    with: {
-      user: {
-        columns: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      product: wishlistWith.product,
-      variant: true,
-    },
-    orderBy: [desc(wishlistItems.createdAt)],
-  });
-};
-
-const getProductWishlists = async (productId) => {
-  return db.query.wishlistItems.findMany({
-    where: eq(wishlistItems.productId, productId),
-    with: {
-      user: {
-        columns: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      product: wishlistWith.product,
-      variant: true,
-    },
-    orderBy: [desc(wishlistItems.createdAt)],
-  });
-};
+  if (!variant) throw ApiError.notFound("Product variant not found");
+}
 
 export const wishlistService = {
-  getUserWishlist,
-  addToWishlist,
-  removeFromWishlist,
-  moveToCart,
-  clearWishlist,
-  getWishlistItemById,
-  getWishlistItemsByProduct,
-  updateWishlistItem,
-  getAllWishlists,
-  getProductWishlists,
+  async getUserWishlist(userId) {
+    const items = await db.query.wishlistItems.findMany({
+      where: eq(wishlistItems.userId, userId),
+      with: itemWith,
+      orderBy: [desc(wishlistItems.createdAt)],
+    });
+    return items.map(present);
+  },
+
+  /** Idempotent: adding the same product/variant twice returns the existing item. */
+  async addToWishlist(userId, productId, variantId = null) {
+    const product = await db.query.products.findFirst({ where: eq(products.id, productId) });
+    if (!product || !product.isActive) throw ApiError.notFound("Product not found");
+    if (variantId) await assertVariantOf(productId, variantId);
+
+    const existing = await db.query.wishlistItems.findFirst({
+      where: and(
+        eq(wishlistItems.userId, userId),
+        eq(wishlistItems.productId, productId),
+        variantId ? eq(wishlistItems.variantId, variantId) : isNull(wishlistItems.variantId)
+      ),
+    });
+    const id =
+      existing?.id ??
+      (await db.insert(wishlistItems).values({ userId, productId, variantId }).returning())[0].id;
+    return { created: !existing, item: present(await findOwn(userId, id)) };
+  },
+
+  /** Change (or clear) the chosen variant. */
+  async updateWishlistItem(userId, itemId, { variantId }) {
+    const item = await findOwn(userId, itemId);
+    if (variantId) await assertVariantOf(item.productId, variantId);
+    await db.update(wishlistItems).set({ variantId: variantId ?? null }).where(eq(wishlistItems.id, itemId));
+    return present(await findOwn(userId, itemId));
+  },
+
+  async removeFromWishlist(userId, itemId) {
+    await findOwn(userId, itemId);
+    await db.delete(wishlistItems).where(eq(wishlistItems.id, itemId));
+  },
+
+  /** Adds to the cart (stock is checked there) and removes it from the wishlist. */
+  async moveToCart(userId, itemId, quantity = 1) {
+    const item = await findOwn(userId, itemId);
+    const cart = await cartService.addItem(userId, {
+      productId: item.productId,
+      variantId: item.variantId,
+      quantity,
+    });
+    await db.delete(wishlistItems).where(eq(wishlistItems.id, itemId));
+    return cart;
+  },
+
+  // --- Admin ---------------------------------------------------------------
+  async getAllWishlists(pagination) {
+    const [items, total] = await Promise.all([
+      db.query.wishlistItems.findMany({
+        with: { ...itemWith, user: userColumns },
+        orderBy: [desc(wishlistItems.createdAt)],
+        limit: pagination.limit,
+        offset: pagination.offset,
+      }),
+      db.select({ count: sql`count(*)::int` }).from(wishlistItems),
+    ]);
+    return { items: items.map(present), pagination: paginationMeta(total[0].count, pagination) };
+  },
+
+  /** Who wants this product (demand signal for restocking). */
+  async getProductWishlists(productId) {
+    const items = await db.query.wishlistItems.findMany({
+      where: eq(wishlistItems.productId, productId),
+      with: { variant: true, user: userColumns },
+      orderBy: [desc(wishlistItems.createdAt)],
+    });
+    return { productId, count: items.length, items };
+  },
 };

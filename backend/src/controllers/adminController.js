@@ -1,234 +1,61 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { adminService } from "../services/adminService.js";
+import { ENV } from "../config/loadENV.js";
+import { ApiError } from "../utils/ApiError.js";
+
+const run = promisify(execFile);
+
+/** Seed scripts, in order. "main" and "shipping" DELETE existing data first. */
+const SEEDS = {
+  address: { scripts: ["src/seed/seed-address-thai.js"], destructive: false },
+  shipping: { scripts: ["src/seed/seed-shipping-payment.js"], destructive: true },
+  main: { scripts: ["src/seed/seed.js"], destructive: true },
+  all: {
+    scripts: ["src/seed/seed.js", "src/seed/seed-shipping-payment.js", "src/seed/seed-address-thai.js"],
+    destructive: true,
+  },
+};
+export const SEED_CONFIRMATION = "DELETE EXISTING DATA";
 
 export const adminController = {
-  // User Management
-  async getAllUsers(req, res) {
-    try {
-      const { page = 1, limit = 10, search } = req.query;
-      const users = await adminService.getAllUsers({ page, limit, search });
-      res.json(users);
-    } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error fetching users", error: error.message });
-    }
-  },
-
-  async getUserById(req, res) {
-    try {
-      const { id } = req.params;
-      const user = await adminService.getUserById(id);
-      res.json(user);
-    } catch (error) {
-      if (error.message === "User not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error fetching user", error: error.message });
-    }
-  },
-
-  async updateUser(req, res) {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      const user = await adminService.updateUser(id, updates);
-      res.json(user);
-    } catch (error) {
-      if (error.message === "User not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error updating user", error: error.message });
-    }
-  },
-
-  async deleteUser(req, res) {
-    try {
-      const { id } = req.params;
-      await adminService.deleteUser(id);
-      res.json({ message: "User deleted successfully" });
-    } catch (error) {
-      if (error.message === "User not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error deleting user", error: error.message });
-    }
-  },
-
-  async updateUserRole(req, res) {
-    try {
-      const { id } = req.params;
-      const { role } = req.body;
-      const user = await adminService.updateUserRole(id, role);
-      res.json(user);
-    } catch (error) {
-      if (error.message === "User not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Invalid role") {
-        return res.status(400).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error updating user role", error: error.message });
-    }
-  },
-
-  // Product Management
-  async createProduct(req, res) {
-    try {
-      const productData = req.body;
-      const product = await adminService.createProduct(productData);
-      res.status(201).json(product);
-    } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error creating product", error: error.message });
-    }
-  },
-
-  async updateProduct(req, res) {
-    try {
-      const { id } = req.params;
-      const updates = req.body;
-      const product = await adminService.updateProduct(id, updates);
-      res.json(product);
-    } catch (error) {
-      if (error.message === "Product not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error updating product", error: error.message });
-    }
-  },
-
-  async deleteProduct(req, res) {
-    try {
-      const { id } = req.params;
-      await adminService.deleteProduct(id);
-      res.json({ message: "Product deleted successfully" });
-    } catch (error) {
-      if (error.message === "Product not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error deleting product", error: error.message });
-    }
-  },
-
-  // Order Management
-  async getAllOrders(req, res) {
-    try {
-      const { page = 1, limit = 10, status } = req.query;
-      const orders = await adminService.getAllOrders({ page, limit, status });
-      res.json(orders);
-    } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error fetching orders", error: error.message });
-    }
-  },
-
-  async updateOrderStatus(req, res) {
-    try {
-      const { id } = req.params;
-      const { status, comment } = req.body;
-      const order = await adminService.updateOrderStatus(id, status, comment);
-      res.json(order);
-    } catch (error) {
-      if (error.message === "Order not found") {
-        return res.status(404).json({ message: error.message });
-      }
-      if (error.message === "Invalid status") {
-        return res.status(400).json({ message: error.message });
-      }
-      res
-        .status(500)
-        .json({ message: "Error updating order status", error: error.message });
-    }
-  },
-
-  // Analytics
-  async getOrderStatistics(req, res) {
-    try {
-      const { startDate, endDate } = req.query;
-      const statistics = await adminService.getOrderStatistics(
-        startDate,
-        endDate
-      );
-      res.json(statistics);
-    } catch (error) {
-      res.status(500).json({
-        message: "Error fetching order statistics",
-        error: error.message,
-      });
-    }
-  },
-
-  // Dashboard
   async getDashboard(req, res) {
-    try {
-      const data = await adminService.getDashboardData();
-      res.json(data);
-    } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error fetching dashboard", error: error.message });
-    }
+    res.json(await adminService.getDashboardData());
   },
 
-  // Run Seed Scripts
+  /**
+   * Re-seed reference/demo data. The "main" seed deletes every user, product,
+   * coupon and store, so: disabled in production unless ALLOW_ADMIN_SEED=true,
+   * super_admin only (route), and destructive seeds need an explicit phrase.
+   */
   async runSeed(req, res) {
-    const { exec } = await import("child_process");
-    try {
-      const { seedType } = req.body || {};
-      let script = "";
-
-      switch (seedType) {
-        case "address":
-          script = "node src/seed/seed-address-thai.js";
-          break;
-        case "shipping":
-          script = "node src/seed/seed-shipping-payment.js";
-          break;
-        case "main":
-          script = "node src/seed/seed.js";
-          break;
-        case "all":
-          script =
-            "node src/seed/seed.js && node src/seed/seed-shipping-payment.js && node src/seed/seed-address-thai.js";
-          break;
-        default:
-          return res.status(400).json({ message: "Invalid seedType provided" });
-      }
-
-      const cwd = process.cwd();
-      exec(script, { cwd, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Seed execution error (${seedType}):`, error);
-          return res.status(500).json({
-            success: false,
-            message: `Seed failed: ${error.message}`,
-            output: (stdout || "") + "\n" + (stderr || ""),
-          });
-        }
-        res.json({
-          success: true,
-          message: `Seed '${seedType}' completed successfully!`,
-          output: stdout || stderr || "Seed completed",
-        });
-      });
-    } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Error running seed script", error: error.message });
+    if (ENV.SERVER.NODE_ENV === "production" && process.env.ALLOW_ADMIN_SEED !== "true") {
+      throw new ApiError(403, "Seeding is disabled in production", null, "SEED_DISABLED");
     }
+    const { seedType, confirm } = req.body;
+    const seed = SEEDS[seedType];
+    if (seed.destructive && confirm !== SEED_CONFIRMATION) {
+      throw new ApiError(
+        400,
+        `The "${seedType}" seed deletes existing data. Send confirm: "${SEED_CONFIRMATION}" to proceed.`,
+        null,
+        "CONFIRMATION_REQUIRED"
+      );
+    }
+
+    let output = "";
+    try {
+      for (const script of seed.scripts) {
+        const { stdout, stderr } = await run(process.execPath, [script], {
+          cwd: process.cwd(),
+          maxBuffer: 10 * 1024 * 1024,
+        });
+        output += stdout + stderr;
+      }
+    } catch (error) {
+      console.error(`Seed "${seedType}" failed:`, error);
+      throw new ApiError(500, `Seed failed: ${error.message}`, null, "SEED_FAILED");
+    }
+    res.json({ success: true, message: `Seed '${seedType}' completed successfully!`, output: output.slice(-5000) });
   },
 };

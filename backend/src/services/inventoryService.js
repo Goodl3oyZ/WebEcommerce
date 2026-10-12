@@ -1,203 +1,143 @@
+/**
+ * Per-branch stock (store_inventory). Online stock lives on product_variants;
+ * this tracks what each physical store holds.
+ */
 import { db } from "../config/db.js";
-import { storeInventory, products, productVariants } from "../models/schema.js";
-import { eq, and, lte, desc, asc } from "drizzle-orm";
-import { AppError } from "../utils/appError.js";
+import { storeInventory, products, productVariants, stores } from "../models/schema.js";
+import { eq, and, lte, desc, asc, sql, gte } from "drizzle-orm";
+import { ApiError } from "../utils/ApiError.js";
+import { paginationMeta } from "../utils/pagination.js";
 
-const LOW_STOCK_THRESHOLD = 5;
+export const LOW_STOCK_THRESHOLD = 5;
 
 const itemRelations = {
-  store: true,
-  product: { with: { category: true } },
-  variant: true,
+  store: { columns: { id: true, name: true, city: true, isActive: true } },
+  product: { columns: { id: true, name: true, isActive: true } },
+  variant: { columns: { id: true, sku: true, color: true, size: true } },
 };
 
-const getAllInventoryItems = async () => {
-  return db.query.storeInventory.findMany({
-    with: itemRelations,
-    orderBy: [desc(storeInventory.updatedAt)],
-  });
-};
-
-const getInventoryItemById = async (itemId) => {
-  const item = await db.query.storeInventory.findFirst({
+async function getItem(itemId, txOrDb = db) {
+  const item = await txOrDb.query.storeInventory.findFirst({
     where: eq(storeInventory.id, itemId),
     with: itemRelations,
   });
-
-  if (!item) {
-    throw new AppError("Inventory item not found", 404);
-  }
-
+  if (!item) throw ApiError.notFound("Inventory item not found");
   return item;
-};
+}
 
-const createInventoryItem = async (itemData) => {
-  const storeId = itemData.storeId || itemData.location;
-  const productId = String(itemData.productId);
+async function assertStore(storeId, txOrDb = db) {
+  const store = await txOrDb.query.stores.findFirst({ where: eq(stores.id, storeId) });
+  if (!store) throw ApiError.badRequest("Store not found");
+}
 
-  const product = await db.query.products.findFirst({
-    where: eq(products.id, productId),
-  });
-  if (!product) {
-    throw new AppError("Product not found", 404);
-  }
-
-  let variantId = itemData.variantId;
-  if (variantId) {
-    const variant = await db.query.productVariants.findFirst({
-      where: and(
-        eq(productVariants.id, variantId),
-        eq(productVariants.productId, productId)
-      ),
-    });
-    if (!variant) {
-      throw new AppError("Product variant not found", 404);
-    }
-  } else {
-    const firstVariant = await db.query.productVariants.findFirst({
-      where: eq(productVariants.productId, productId),
-    });
-    if (!firstVariant) {
-      throw new AppError("Product has no variants; variantId is required", 400);
-    }
-    variantId = firstVariant.id;
-  }
-
-  const existingItem = await db.query.storeInventory.findFirst({
-    where: and(
-      eq(storeInventory.productId, productId),
-      eq(storeInventory.variantId, variantId),
-      eq(storeInventory.storeId, storeId)
-    ),
-  });
-
-  if (existingItem) {
-    throw new AppError("Inventory item already exists for this store", 400);
-  }
-
-  const [created] = await db
-    .insert(storeInventory)
-    .values({
-      storeId,
-      productId,
-      variantId,
-      quantity: itemData.quantity ?? 0,
-    })
-    .returning();
-
-  return getInventoryItemById(created.id);
-};
-
-const updateInventoryItem = async (itemId, updateData) => {
-  await getInventoryItemById(itemId);
-
-  const patch = {};
-  if (updateData.quantity !== undefined) patch.quantity = updateData.quantity;
-  if (updateData.storeId || updateData.location) {
-    patch.storeId = updateData.storeId || updateData.location;
-  }
-
-  await db
-    .update(storeInventory)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(eq(storeInventory.id, itemId));
-
-  return getInventoryItemById(itemId);
-};
-
-const adjustInventory = async (itemId, adjustmentData) => {
-  const item = await getInventoryItemById(itemId);
-  const delta = Number(adjustmentData.quantity ?? 0);
-  const nextQty = Math.max(0, item.quantity + delta);
-
-  await db
-    .update(storeInventory)
-    .set({ quantity: nextQty, updatedAt: new Date() })
-    .where(eq(storeInventory.id, itemId));
-
-  return getInventoryItemById(itemId);
-};
-
-const transferInventory = async (sourceId, destinationStoreId, quantity) => {
-  const sourceItem = await getInventoryItemById(sourceId);
-  const qty = Number(quantity);
-
-  if (sourceItem.quantity < qty) {
-    throw new AppError("Insufficient inventory quantity", 400);
-  }
-
-  let destinationItem = await db.query.storeInventory.findFirst({
-    where: and(
-      eq(storeInventory.productId, sourceItem.productId),
-      eq(storeInventory.variantId, sourceItem.variantId),
-      eq(storeInventory.storeId, destinationStoreId)
-    ),
-  });
-
-  if (!destinationItem) {
-    const [created] = await db
-      .insert(storeInventory)
-      .values({
-        storeId: destinationStoreId,
-        productId: sourceItem.productId,
-        variantId: sourceItem.variantId,
-        quantity: 0,
-      })
-      .returning();
-    destinationItem = created;
-  }
-
-  await db
-    .update(storeInventory)
-    .set({
-      quantity: sourceItem.quantity - qty,
-      updatedAt: new Date(),
-    })
-    .where(eq(storeInventory.id, sourceId));
-
-  await db
-    .update(storeInventory)
-    .set({
-      quantity: destinationItem.quantity + qty,
-      updatedAt: new Date(),
-    })
-    .where(eq(storeInventory.id, destinationItem.id));
-
-  return getInventoryItemById(destinationItem.id);
-};
-
-const getInventoryByLocation = async (storeId) => {
-  return db.query.storeInventory.findMany({
-    where: eq(storeInventory.storeId, storeId),
-    with: itemRelations,
-    orderBy: [desc(storeInventory.updatedAt)],
-  });
-};
-
-const getInventoryByProduct = async (productId) => {
-  return db.query.storeInventory.findMany({
-    where: eq(storeInventory.productId, productId),
-    with: itemRelations,
-    orderBy: [desc(storeInventory.updatedAt)],
-  });
-};
-
-const getLowStockItems = async (threshold = LOW_STOCK_THRESHOLD) => {
-  return db.query.storeInventory.findMany({
-    where: lte(storeInventory.quantity, threshold),
-    with: itemRelations,
-    orderBy: [asc(storeInventory.quantity)],
-  });
-};
+const list = (where, pagination, orderBy = [desc(storeInventory.updatedAt)]) =>
+  Promise.all([
+    db.query.storeInventory.findMany({
+      where,
+      with: itemRelations,
+      orderBy,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    }),
+    db.select({ count: sql`count(*)::int` }).from(storeInventory).where(where),
+  ]).then(([items, total]) => ({ items, pagination: paginationMeta(total[0].count, pagination) }));
 
 export const inventoryService = {
-  getAllInventoryItems,
-  getInventoryItemById,
-  createInventoryItem,
-  updateInventoryItem,
-  adjustInventory,
-  transferInventory,
-  getInventoryByLocation,
-  getInventoryByProduct,
-  getLowStockItems,
+  getAllInventoryItems(pagination) {
+    return list(undefined, pagination);
+  },
+
+  getInventoryItemById(itemId) {
+    return getItem(itemId);
+  },
+
+  async getInventoryByLocation(storeId, pagination) {
+    await assertStore(storeId);
+    return list(eq(storeInventory.storeId, storeId), pagination);
+  },
+
+  async getInventoryByProduct(productId, pagination) {
+    const product = await db.query.products.findFirst({ where: eq(products.id, productId) });
+    if (!product) throw ApiError.notFound("Product not found");
+    return list(eq(storeInventory.productId, productId), pagination);
+  },
+
+  getLowStockItems(threshold, pagination) {
+    return list(lte(storeInventory.quantity, threshold), pagination, [asc(storeInventory.quantity)]);
+  },
+
+  /** One row per store + variant. */
+  async createInventoryItem({ storeId, productId, variantId, quantity = 0 }) {
+    await assertStore(storeId);
+    const variant = await db.query.productVariants.findFirst({
+      where: and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)),
+    });
+    if (!variant) throw ApiError.notFound("Product variant not found");
+    const existing = await db.query.storeInventory.findFirst({
+      where: and(eq(storeInventory.storeId, storeId), eq(storeInventory.variantId, variantId)),
+    });
+    if (existing) {
+      throw new ApiError("This store already tracks this variant; adjust it instead", 409, null, "INVENTORY_EXISTS");
+    }
+    const [created] = await db
+      .insert(storeInventory)
+      .values({ storeId, productId, variantId, quantity })
+      .returning();
+    return getItem(created.id);
+  },
+
+  /** Set the counted quantity (e.g. after a stock take). */
+  async updateInventoryItem(itemId, { quantity }) {
+    await getItem(itemId);
+    await db
+      .update(storeInventory)
+      .set({ quantity, updatedAt: new Date() })
+      .where(eq(storeInventory.id, itemId));
+    return getItem(itemId);
+  },
+
+  /** Add or remove stock atomically; refuses to go below zero. */
+  async adjustInventory(itemId, { quantity }) {
+    await getItem(itemId);
+    const [updated] = await db
+      .update(storeInventory)
+      .set({ quantity: sql`${storeInventory.quantity} + ${quantity}`, updatedAt: new Date() })
+      .where(and(eq(storeInventory.id, itemId), gte(storeInventory.quantity, -quantity)))
+      .returning();
+    if (!updated) throw ApiError.badRequest("Not enough stock to remove that quantity");
+    return getItem(itemId);
+  },
+
+  /** Move stock between stores in one transaction. */
+  async transferInventory(sourceId, toStoreId, quantity) {
+    return db.transaction(async (tx) => {
+      const source = await getItem(sourceId, tx);
+      if (source.storeId === toStoreId) throw ApiError.badRequest("Source and destination store are the same");
+      await assertStore(toStoreId, tx);
+
+      const [taken] = await tx
+        .update(storeInventory)
+        .set({ quantity: sql`${storeInventory.quantity} - ${quantity}`, updatedAt: new Date() })
+        .where(and(eq(storeInventory.id, sourceId), gte(storeInventory.quantity, quantity)))
+        .returning();
+      if (!taken) throw ApiError.badRequest("Insufficient inventory quantity");
+
+      const destination = await tx.query.storeInventory.findFirst({
+        where: and(eq(storeInventory.storeId, toStoreId), eq(storeInventory.variantId, source.variantId)),
+      });
+      let destinationId = destination?.id;
+      if (destination) {
+        await tx
+          .update(storeInventory)
+          .set({ quantity: sql`${storeInventory.quantity} + ${quantity}`, updatedAt: new Date() })
+          .where(eq(storeInventory.id, destination.id));
+      } else {
+        [{ id: destinationId }] = await tx
+          .insert(storeInventory)
+          .values({ storeId: toStoreId, productId: source.productId, variantId: source.variantId, quantity })
+          .returning({ id: storeInventory.id });
+      }
+      return { source: await getItem(sourceId, tx), destination: await getItem(destinationId, tx) };
+    });
+  },
 };

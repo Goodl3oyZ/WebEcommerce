@@ -26,7 +26,20 @@ export function SeedDataPanel() {
     setOutput(`[RUNNING] Executing seed: ${label}...\n`);
 
     try {
-      const res = await adminAPI.runSeed(seedType);
+      // "address" only adds data; every other seed DELETES existing data
+      // (including all users), so the API requires a typed confirmation.
+      let confirmPhrase;
+      if (seedType !== "address") {
+        confirmPhrase = window.prompt(
+          `Seed "${label}" จะลบข้อมูลเดิมทั้งหมด (รวมถึงผู้ใช้) พิมพ์ DELETE EXISTING DATA เพื่อยืนยัน`
+        );
+        if (confirmPhrase !== "DELETE EXISTING DATA") {
+          setLoadingType(null);
+          setOutput("[CANCELLED] Seed was not confirmed.\n");
+          return;
+        }
+      }
+      const res = await adminAPI.runSeed(seedType, confirmPhrase);
       if (res.success) {
         toast.success(`Seed ${label} สำเร็จ!`);
         setStatus({

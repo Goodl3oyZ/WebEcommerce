@@ -2,6 +2,12 @@ import { z } from "zod";
 
 // Supplier DTOs
 export const supplierDto = {
+  listQuery: z.object({
+    search: z.string().trim().max(100).optional().describe("Name, contact person or email"),
+    status: z.enum(["active", "inactive", "pending"]).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
+  }),
   // Create supplier
   createSupplier: z.object({
     name: z.string().min(1),
@@ -51,8 +57,8 @@ export const supplierDto = {
     productId: z.string().uuid(),
     sku: z.string().min(1),
     cost: z.number().min(0),
-    leadTime: z.number().min(0),
-    minimumOrder: z.number().min(1),
+    leadTime: z.number().int().min(0).describe("Days"),
+    minimumOrder: z.number().int().min(1),
     notes: z.string().optional(),
   }),
 

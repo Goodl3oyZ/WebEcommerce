@@ -1,104 +1,38 @@
 import { z } from "zod";
 
-// Inventory DTOs
-export const inventoryDto = {
-  // Create inventory item
-  createInventoryItem: z.object({
-    productId: z.string().uuid(),
-    sku: z.string().min(1),
-    quantity: z.number().min(0),
-    location: z.string().min(1),
-    reorderPoint: z.number().min(0),
-    reorderQuantity: z.number().min(1),
-    cost: z.number().min(0),
-    notes: z.string().optional(),
-  }),
-
-  // Update inventory item
-  updateInventoryItem: z
-    .object({
-      sku: z.string().min(1).optional(),
-      quantity: z.number().min(0).optional(),
-      location: z.string().min(1).optional(),
-      reorderPoint: z.number().min(0).optional(),
-      reorderQuantity: z.number().min(1).optional(),
-      cost: z.number().min(0).optional(),
-      notes: z.string().optional(),
-    })
-    .refine((data) => Object.keys(data).length > 0, {
-      message: "At least one field must be provided for update",
-    }),
-
-  // Adjust inventory
-  adjustInventory: z.object({
-    productId: z.string().uuid(),
-    quantity: z.number(),
-    reason: z.string().min(1),
-    notes: z.string().optional(),
-  }),
-
-  // Transfer inventory
-  transferInventory: z.object({
-    productId: z.string().uuid(),
-    fromLocation: z.string().min(1),
-    toLocation: z.string().min(1),
-    quantity: z.number().min(1),
-    reason: z.string().min(1),
-    notes: z.string().optional(),
-  }),
+const page = {
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
 };
 
-// Response DTOs
-export const inventoryResponseDto = {
-  // Basic inventory info
-  basic: z.object({
-    id: z.string().uuid(),
-    productId: z.string().uuid(),
-    sku: z.string(),
-    quantity: z.number(),
-    location: z.string(),
+export const inventoryDto = {
+  createInventoryItem: z
+    .object({
+      storeId: z.string().uuid(),
+      productId: z.string().uuid(),
+      variantId: z.string().uuid(),
+      quantity: z.number().int().min(0).default(0),
+    })
+    .strict(),
+  updateInventoryItem: z
+    .object({ quantity: z.number().int().min(0).describe("The counted quantity") })
+    .strict(),
+  adjustInventory: z.object({
+    quantity: z
+      .number()
+      .int()
+      .refine((n) => n !== 0, "quantity must not be 0")
+      .describe("Positive to add, negative to remove"),
+    reason: z.string().trim().min(1).max(500),
   }),
-
-  // Detailed inventory info
-  detailed: z.object({
-    id: z.string().uuid(),
-    productId: z.string().uuid(),
-    sku: z.string(),
-    quantity: z.number(),
-    location: z.string(),
-    reorderPoint: z.number(),
-    reorderQuantity: z.number(),
-    cost: z.number(),
-    notes: z.string().optional(),
-    lastUpdated: z.string().datetime(),
+  transferInventory: z.object({
+    toStoreId: z.string().uuid(),
+    quantity: z.number().int().min(1),
+    reason: z.string().trim().max(500).optional(),
   }),
-
-  // Admin view of inventory
-  admin: z.object({
-    id: z.string().uuid(),
-    productId: z.string().uuid(),
-    sku: z.string(),
-    quantity: z.number(),
-    location: z.string(),
-    reorderPoint: z.number(),
-    reorderQuantity: z.number(),
-    cost: z.number(),
-    notes: z.string().optional(),
-    lastUpdated: z.string().datetime(),
-    history: z.array(
-      z.object({
-        type: z.string(),
-        quantity: z.number(),
-        reason: z.string(),
-        notes: z.string().optional(),
-        timestamp: z.string().datetime(),
-      })
-    ),
-    statistics: z.object({
-      totalReceived: z.number(),
-      totalShipped: z.number(),
-      totalAdjusted: z.number(),
-      averageCost: z.number(),
-    }),
+  listQuery: z.object(page),
+  lowStockQuery: z.object({
+    ...page,
+    threshold: z.coerce.number().int().min(0).optional().describe("Default 5"),
   }),
 };

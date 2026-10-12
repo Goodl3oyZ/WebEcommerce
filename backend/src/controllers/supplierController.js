@@ -1,9 +1,11 @@
 import { supplierService } from "../services/supplierService.js";
+import { parsePagination } from "../utils/pagination.js";
 import { catchAsync } from "../utils/catchAsync.js";
 
 // Get all suppliers
 const getAllSuppliers = catchAsync(async (req, res) => {
-  const suppliers = await supplierService.getAllSuppliers();
+  const { search, status } = req.query;
+  const suppliers = await supplierService.getAllSuppliers({ search, status }, parsePagination(req.query));
   res.json(suppliers);
 });
 

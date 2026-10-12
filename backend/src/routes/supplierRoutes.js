@@ -5,8 +5,11 @@ import { supplierController } from "../controllers/supplierController.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { supplierDto } from "../dtos/supplier.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("id", uuidParam("Supplier not found"));
+router.param("productId", uuidParam("Supplier product not found"));
 
 // Apply rate limiter to all supplier routes
 router.use(apiRateLimiter);
@@ -15,7 +18,12 @@ router.use(apiRateLimiter);
 router.use(authMiddleware);
 
 // Admin routes
-router.get("/", requireRole(ROLES.ADMIN), supplierController.getAllSuppliers);
+router.get(
+  "/",
+  requireRole(ROLES.ADMIN),
+  validationMiddleware(supplierDto.listQuery, "query"),
+  supplierController.getAllSuppliers
+);
 router.post(
   "/",
   requireRole(ROLES.ADMIN),

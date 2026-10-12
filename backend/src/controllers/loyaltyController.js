@@ -1,69 +1,45 @@
 import { loyaltyService } from "../services/loyaltyService.js";
-import { catchAsync } from "../utils/catchAsync.js";
+import { parsePagination } from "../utils/pagination.js";
 
 export const loyaltyController = {
-  getLoyaltyPoints: catchAsync(async (req, res) => {
-    const points = await loyaltyService.getLoyaltyPoints(req.user.id);
-    res.json(points);
-  }),
+  async getLoyaltyPoints(req, res) {
+    res.json(await loyaltyService.getLoyaltyPoints(req.user.id));
+  },
 
-  getPointsHistory: catchAsync(async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
-    const history = await loyaltyService.getPointsHistory(req.user.id, {
-      page,
-      limit,
-    });
-    res.json(history);
-  }),
+  async getPointsHistory(req, res) {
+    res.json(await loyaltyService.getPointsHistory(req.user.id, parsePagination(req.query)));
+  },
 
-  getAvailableRewards: catchAsync(async (req, res) => {
-    const rewards = loyaltyService.getAvailableRewards();
-    res.json(rewards);
-  }),
+  async getAvailableRewards(req, res) {
+    res.json(loyaltyService.getAvailableRewards());
+  },
 
-  redeemReward: catchAsync(async (req, res) => {
-    const result = await loyaltyService.redeemReward(
-      req.user.id,
-      req.params.id
-    );
-    res.json(result);
-  }),
+  async redeemReward(req, res) {
+    res.status(201).json(await loyaltyService.redeemReward(req.user.id, req.params.id));
+  },
 
-  createReward: catchAsync(async (req, res) => {
-    const reward = await loyaltyService.createReward(req.body);
-    res.status(201).json(reward);
-  }),
+  // --- Admin ---------------------------------------------------------------
+  async getLoyaltyStatistics(req, res) {
+    res.json(await loyaltyService.getLoyaltyStatistics(req.query));
+  },
 
-  updateReward: catchAsync(async (req, res) => {
-    const reward = await loyaltyService.updateReward(req.params.id, req.body);
-    res.json(reward);
-  }),
+  async getLoyaltyTiers(req, res) {
+    res.json(loyaltyService.getLoyaltyTiers());
+  },
 
-  deleteReward: catchAsync(async (req, res) => {
-    await loyaltyService.deleteReward(req.params.id);
-    res.status(204).send();
-  }),
-
-  getLoyaltyTiers: catchAsync(async (req, res) => {
-    const tiers = loyaltyService.getLoyaltyTiers();
-    res.json(tiers);
-  }),
-
-  createLoyaltyTier: catchAsync(async (req, res) => {
-    const tier = await loyaltyService.createLoyaltyTier(req.body);
-    res.status(201).json(tier);
-  }),
-
-  updateLoyaltyTier: catchAsync(async (req, res) => {
-    const tier = await loyaltyService.updateLoyaltyTier(
-      req.params.id,
-      req.body
-    );
-    res.json(tier);
-  }),
-
-  getLoyaltyStatistics: catchAsync(async (req, res) => {
-    const stats = await loyaltyService.getLoyaltyStatistics(req.query);
-    res.json(stats);
-  }),
+  createLoyaltyTier() {
+    loyaltyService.createLoyaltyTier();
+  },
+  updateLoyaltyTier() {
+    loyaltyService.updateLoyaltyTier();
+  },
+  createReward() {
+    loyaltyService.createReward();
+  },
+  updateReward() {
+    loyaltyService.updateReward();
+  },
+  deleteReward() {
+    loyaltyService.deleteReward();
+  },
 };

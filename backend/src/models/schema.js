@@ -889,6 +889,8 @@ export const pointsHistory = pgTable("points_history", {
   points: integer("points").notNull(),
   type: varchar("type", { length: 50 }).notNull(),
   description: text("description"),
+  // Set for points earned/reversed by an order, so each order credits once.
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1360,6 +1362,13 @@ export const categoryDiscountsRelations = relations(
 );
 
 // Notifications
+// Site-wide settings (key -> JSON value), editable by admins.
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")

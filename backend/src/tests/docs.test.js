@@ -59,9 +59,12 @@ describe("API documentation", () => {
   });
 
   test("documentation has no paths that do not exist", () => {
-    const real = new Set(
-      listRoutes(routeModules).map((r) => `${r.method} ${toOpenApiPath(r.path)}`)
-    );
+    // Routes defined directly on the app rather than in a route module.
+    const appRoutes = ["GET /api/health"];
+    const real = new Set([
+      ...listRoutes(routeModules).map((r) => `${r.method} ${toOpenApiPath(r.path)}`),
+      ...appRoutes,
+    ]);
     const phantom = [];
     for (const [p, ops] of Object.entries(swaggerSpec.paths ?? {})) {
       for (const method of Object.keys(ops)) {

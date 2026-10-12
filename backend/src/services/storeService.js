@@ -171,13 +171,14 @@ export const storeService = {
   /** Paid pickup orders in a date range (default: last 30 days). */
   async getStoreAnalytics(storeId, { startDate, endDate }) {
     await this.getStoreById(storeId, { includeInactive: true });
+    // No upper bound unless asked: the DB clock may be slightly ahead of ours.
     const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate) : new Date();
+    const end = endDate ? new Date(endDate) : null;
     const where = and(
       inArray(orders.id, pickupOrderIds(storeId)),
       inArray(orders.paymentStatus, PAID),
       gte(orders.createdAt, start),
-      lte(orders.createdAt, end)
+      end ? lte(orders.createdAt, end) : undefined
     );
     const [[totals], topProducts] = await Promise.all([
       db
