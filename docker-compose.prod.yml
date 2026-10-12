@@ -1,4 +1,5 @@
-# Production stack. Usage:
+# PRODUCTION stack (the server). Config files it mounts live in production/.
+# Usage:
 #   cp .env.production.example .env.production   # then fill in every value
 #   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 #
@@ -48,7 +49,7 @@ services:
       DOMAIN: ${DOMAIN:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./production/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -140,7 +141,7 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
     volumes:
-      - ./deploy/seaweedfs/start.sh:/scripts/start.sh:ro
+      - ./production/seaweedfs/start.sh:/scripts/start.sh:ro
       - seaweedfs_data:/data
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1"]

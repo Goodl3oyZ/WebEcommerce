@@ -48,7 +48,7 @@ backend/
 ├── index.js                 # App entry
 ├── Dockerfile               # Production image
 ├── Dockerfile.dev           # Dev image (nodemon, no full COPY)
-├── docker-compose.yaml      # Production stack (+ frontend)
+├── docker-compose.dev.yml   # Local development stack (+ frontend)
 ├── docker-compose.dev.yml   # Dev stack with volume mounts
 ├── scripts/init-minio.sh    # One-shot bucket init (minio-init service)
 ├── migrations/              # Drizzle SQL migrations
@@ -76,7 +76,7 @@ Route → Controller → Service → DB (Drizzle) / MinIO / Redis / External API
 
 ## Infrastructure (Docker)
 
-**Compose file:** `backend/docker-compose.yaml`
+**Compose file:** `backend/docker-compose.dev.yml` (production: `docker-compose.prod.yml` at the repo root)
 
 | Service | Container | Purpose |
 |---------|-----------|---------|

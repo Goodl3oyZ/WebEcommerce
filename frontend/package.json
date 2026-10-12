@@ -8,9 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "docker:dev": "docker-compose -f ../backend/docker-compose.yaml up frontend --build",
-    "docker:dev:down": "docker-compose -f ../backend/docker-compose.yaml down",
-    "docker:dev:logs": "docker-compose -f ../backend/docker-compose.yaml logs -f frontend"
+    "docker:dev": "docker-compose -f ../backend/docker-compose.dev.yml up frontend --build",
+    "docker:dev:down": "docker-compose -f ../backend/docker-compose.dev.yml down",
+    "docker:dev:logs": "docker-compose -f ../backend/docker-compose.dev.yml logs -f frontend"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

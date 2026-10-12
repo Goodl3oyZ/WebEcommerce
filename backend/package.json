@@ -24,9 +24,9 @@
     "docs:validate": "node scripts/validate-swagger.js",
     "storage:init": "node scripts/init-buckets.mjs",
     "audit:routes": "node scripts/audit-routes.js",
-    "docker:dev": "docker-compose -f docker-compose.yaml up --build",
-    "docker:dev:down": "docker-compose -f docker-compose.yaml down",
-    "docker:dev:logs": "docker-compose -f docker-compose.yaml logs -f",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up --build",
+    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
+    "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
     "test:infra:down": "docker compose -f docker-compose.test.yml down",
     "test:baseline:prune": "node scripts/prune-route-baseline.js"
   },

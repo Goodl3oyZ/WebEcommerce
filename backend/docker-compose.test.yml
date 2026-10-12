@@ -1,4 +1,4 @@
-# Throwaway services for the integration test suite (npm test starts them).
+# TESTS ONLY: throwaway services for the integration test suite (npm test starts them).
 # Data lives in tmpfs, so every `down` gives a clean slate.
 name: webecommerce-test
 
@@ -38,7 +38,7 @@ services:
     ports:
       - "58333:8333"
     volumes:
-      - ../deploy/seaweedfs/start.sh:/scripts/start.sh:ro
+      - ../production/seaweedfs/start.sh:/scripts/start.sh:ro
     tmpfs:
       - /data
     healthcheck:
