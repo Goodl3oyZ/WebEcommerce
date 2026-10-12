@@ -5,16 +5,28 @@ import { orderController } from "../controllers/orderController.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { orderDto } from "../dtos/order.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("orderId", uuidParam("Order not found"));
 const requireAdmin = requireRole(ROLES.ADMIN);
 
 router.use(apiRateLimiter);
 router.use(authMiddleware);
 
-// Admin routes (static paths before /:orderId)
-router.get("/admin/all", requireAdmin, orderController.getAllOrders);
-router.get("/admin/stats", requireAdmin, orderController.getOrderStats);
+// --- Admin -------------------------------------------------------------------
+router.get(
+  "/admin/all",
+  requireAdmin,
+  validationMiddleware(orderDto.adminListQuery, "query"),
+  orderController.getAllOrders
+);
+router.get(
+  "/admin/stats",
+  requireAdmin,
+  validationMiddleware(orderDto.statsQuery, "query"),
+  orderController.getOrderStats
+);
 router.put(
   "/admin/:orderId/status",
   requireAdmin,
@@ -34,17 +46,9 @@ router.put(
   orderController.updateShippingInfo
 );
 
-// Checkout (canonical order creation)
-router.post(
-  "/checkout",
-  validationMiddleware(orderDto.checkout),
-  orderController.createOrder
-);
-
-// User order collection
-router.get("/", orderController.getOrders);
-
-// Order instance routes
+// --- Customer ----------------------------------------------------------------
+router.post("/checkout", validationMiddleware(orderDto.checkout), orderController.createOrder);
+router.get("/", validationMiddleware(orderDto.listQuery, "query"), orderController.getOrders);
 router.get("/:orderId/status", orderController.getOrderStatus);
 router.get("/:orderId/tracking", orderController.getOrderTracking);
 router.post(
@@ -57,10 +61,11 @@ router.post(
   validationMiddleware(orderDto.refundOrder),
   orderController.refundOrder
 );
+// A customer can only confirm delivery; every other change is admin-only.
 router.patch(
   "/:orderId/status",
-  validationMiddleware(orderDto.updateOrderStatus),
-  orderController.updateOrderStatus
+  validationMiddleware(orderDto.confirmDelivery),
+  orderController.confirmDelivery
 );
 router.get("/:orderId", orderController.getOrder);
 router.delete("/:orderId", (req, res) => {

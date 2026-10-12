@@ -1,746 +1,517 @@
+import { randomBytes } from "node:crypto";
 import { db } from "../config/db.js";
 import {
   orders,
   orderItems,
   orderStatusHistory,
+  orderCoupons,
   products,
   productVariants,
   carts,
   cartItems,
   addresses,
   paymentMethods,
-  coupons,
   shippingMethods,
-  paymentTransactions,
   shipments,
 } from "../models/schema.js";
-import { eq, and, desc, sql, gte, lte, ilike, or } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, ilike, or, inArray } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
-import { assertOrderTransition } from "../utils/orderStatus.js";
+import { ORDER_STATUSES } from "../utils/orderStatus.js";
 import { writeAuditLog } from "./auditService.js";
-import { cartService } from "./cartService.js";
-import { generateOrderNumber } from "../utils/orderUtils.js";
-import { omiseService } from "./omiseService.js";
 import { shippingService } from "./shippingService.js";
 import { paymentService } from "./paymentService.js";
+import { couponService } from "./couponService.js";
+import { setOrderStatus, cancelOrder } from "./orderLifecycle.js";
 import { getFileUrl, BUCKETS } from "../config/minio.js";
+import { toSatang, fromSatang, percentOf } from "../utils/money.js";
+import { paginationMeta } from "../utils/pagination.js";
 
-// Utility: normalize payment code
-function normalizePaymentCode(code) {
-  if (!code) return "";
-  const c = code.toLowerCase();
-  if (["credit", "credit_card", "card"].includes(c)) return "card";
-  if (["promptpay", "prompt_pay"].includes(c)) return "promptpay";
-  if (["omise"].includes(c)) return "omise";
-  return c;
+const VAT_PERCENT = 7;
+const ONLINE_PAYMENT_CODES = { card: "credit_card", credit_card: "credit_card", promptpay: "promptpay" };
+
+/** ORD20261012-7K3M9QX2: date + 8 random base32 chars (collisions are negligible). */
+export function generateOrderNumber(now = new Date()) {
+  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  const random = [...randomBytes(8)].map((b) => alphabet[b % 32]).join("");
+  return `ORD${datePart}-${random}`;
 }
 
-// Utility: generate presigned image URLs for product
-async function withPresignedImageUrl(product) {
-  if (!product || !product.imageUrl) return product;
-  if (Array.isArray(product.imageUrl)) {
-    product.imageUrl = product.imageUrl.map((img) =>
-      img ? getFileUrl(BUCKETS.PRODUCTS, img) : null
-    );
-  } else if (typeof product.imageUrl === "string") {
-    product.imageUrl = getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
+const orderDetails = {
+  items: {
+    with: {
+      product: { with: { brand: true, category: true } },
+      variant: true,
+    },
+  },
+  shippingAddress: true,
+  billingAddress: true,
+  paymentMethod: true,
+};
+
+function withImageUrls(order) {
+  for (const item of order.items ?? []) {
+    const product = item.product;
+    if (!product?.imageUrl) continue;
+    product.imageUrl = Array.isArray(product.imageUrl)
+      ? product.imageUrl.map((img) => (img ? getFileUrl(BUCKETS.PRODUCTS, img) : null))
+      : getFileUrl(BUCKETS.PRODUCTS, product.imageUrl);
   }
-  return product;
+  return order;
+}
+
+/** Combine repeated lines for the same variant so stock is checked once. */
+function mergeItems(items) {
+  const byVariant = new Map();
+  for (const item of items) {
+    if (!item.variantId) {
+      throw ApiError.badRequest("Every item needs a variantId (size/colour) to be purchased");
+    }
+    const existing = byVariant.get(item.variantId);
+    if (existing) existing.quantity += item.quantity;
+    else byVariant.set(item.variantId, { ...item });
+  }
+  return [...byVariant.values()];
 }
 
 export const orderService = {
-  async getOrders(userId, { page, limit, status }, txOrDb = db) {
-    const offset = (page - 1) * limit;
-
-    const whereConditions = [eq(orders.userId, userId)];
-    if (status) {
-      whereConditions.push(eq(orders.status, status));
-    }
-
-    const orderList = await txOrDb.query.orders.findMany({
-      where: and(...whereConditions),
-      with: {
-        items: {
-          with: {
-            product: {
-              with: {
-                brand: true,
-                category: true,
-              },
-            },
-            variant: true,
-          },
-        },
-        shippingAddress: true,
-        billingAddress: true,
-        paymentMethod: true,
-      },
-      limit,
-      offset,
-      orderBy: [desc(orders.createdAt)],
-    });
-
-    // Generate presigned URLs for product images in order items
-    await Promise.all(
-      orderList.map(async (order) => {
-        if (order.items && order.items.length > 0) {
-          await Promise.all(
-            order.items.map(async (item) => {
-              item.product = await withPresignedImageUrl(item.product);
-            })
-          );
-        }
-      })
-    );
-
-    const total = await txOrDb
-      .select({ count: sql`count(*)` })
-      .from(orders)
-      .where(and(...whereConditions));
-
+  async getOrders(userId, { status }, pagination, txOrDb = db) {
+    const where = and(eq(orders.userId, userId), status ? eq(orders.status, status) : undefined);
+    const [orderList, total] = await Promise.all([
+      txOrDb.query.orders.findMany({
+        where,
+        with: orderDetails,
+        limit: pagination.limit,
+        offset: pagination.offset,
+        orderBy: [desc(orders.createdAt)],
+      }),
+      txOrDb.select({ count: sql`count(*)::int` }).from(orders).where(where),
+    ]);
+    const meta = paginationMeta(total[0].count, pagination);
     return {
-      orders: orderList,
-      totalPages: Math.ceil(total[0].count / limit),
-      currentPage: page,
-      totalItems: total[0].count,
+      orders: orderList.map(withImageUrls),
+      totalPages: meta.pages,
+      currentPage: meta.page,
+      totalItems: meta.total,
+      pagination: meta,
     };
   },
 
-  async getOrderById(userId, orderId, txOrDb = db) {
+  /** An order the user owns (admins may read any order). */
+  async getOrderById(userId, orderId, txOrDb = db, { isAdmin = false } = {}) {
     const order = await txOrDb.query.orders.findFirst({
-      where: and(eq(orders.id, orderId), eq(orders.userId, userId)),
-      with: {
-        items: {
-          with: {
-            product: {
-              with: {
-                brand: true,
-                category: true,
-              },
-            },
-            variant: true,
-          },
-        },
-        shippingAddress: true,
-        billingAddress: true,
-        paymentMethod: true,
-      },
+      where: isAdmin ? eq(orders.id, orderId) : and(eq(orders.id, orderId), eq(orders.userId, userId)),
+      with: orderDetails,
+    });
+    if (!order) {
+      throw ApiError.notFound("Order not found");
+    }
+    return withImageUrls(order);
+  },
+
+  /**
+   * Checkout. Prices, shipping, discount, tax and total are all computed here
+   * from the database; anything the client sends for them is ignored.
+   */
+  async createOrder(userId, orderData) {
+    const items = mergeItems(orderData.items ?? []);
+    if (items.length === 0) {
+      throw ApiError.badRequest("Order must contain at least one item");
+    }
+    const shippingAddressId = orderData.shippingAddressId;
+    const billingAddressId = orderData.billingAddressId ?? shippingAddressId;
+
+    const { order, payment, paymentCode } = await db.transaction(async (tx) => {
+      const [shippingAddress, billingAddress] = await Promise.all([
+        tx.query.addresses.findFirst({
+          where: and(eq(addresses.id, shippingAddressId), eq(addresses.userId, userId)),
+        }),
+        tx.query.addresses.findFirst({
+          where: and(eq(addresses.id, billingAddressId), eq(addresses.userId, userId)),
+        }),
+      ]);
+      if (!shippingAddress || !billingAddress) {
+        throw ApiError.badRequest("Invalid shipping or billing address");
+      }
+
+      const shippingMethod = await tx.query.shippingMethods.findFirst({
+        where: eq(shippingMethods.id, orderData.shippingMethodId),
+      });
+      if (!shippingMethod?.isActive) {
+        throw ApiError.badRequest("Invalid shipping method");
+      }
+      const paymentMethod = await tx.query.paymentMethods.findFirst({
+        where: eq(paymentMethods.id, orderData.paymentMethodId),
+      });
+      if (!paymentMethod?.isActive) {
+        throw ApiError.badRequest("Invalid payment method");
+      }
+
+      // Reserve stock atomically: the update only succeeds if enough is left.
+      let subtotal = 0;
+      const lines = [];
+      for (const item of items) {
+        const variant = await tx.query.productVariants.findFirst({
+          where: and(eq(productVariants.id, item.variantId), eq(productVariants.productId, item.productId)),
+          with: { product: true },
+        });
+        if (!variant || variant.product?.isActive === false) {
+          throw ApiError.notFound(`Product variant not found: ${item.variantId}`);
+        }
+        const [reserved] = await tx
+          .update(productVariants)
+          .set({ stock: sql`${productVariants.stock} - ${item.quantity}` })
+          .where(and(eq(productVariants.id, variant.id), gte(productVariants.stock, item.quantity)))
+          .returning({ id: productVariants.id });
+        if (!reserved) {
+          throw new ApiError(
+            `Insufficient stock for ${variant.product.name} (${variant.color} ${variant.size}). Available: ${variant.stock}`,
+            409,
+            null,
+            "INSUFFICIENT_STOCK"
+          );
+        }
+        const price = toSatang(variant.price);
+        subtotal += price * item.quantity;
+        lines.push({ ...item, price, lineTotal: price * item.quantity });
+      }
+
+      const shippingOptions = await shippingService.calculateShippingCost(shippingAddressId, items);
+      const shippingOption = shippingOptions.find((m) => m.methodId === shippingMethod.id);
+      if (!shippingOption) {
+        throw ApiError.badRequest("Shipping method not available for this address");
+      }
+      const shippingCost = toSatang(shippingOption.cost);
+
+      let coupon = null;
+      let discount = 0;
+      if (orderData.couponCode) {
+        ({ coupon, discountSatang: discount } = await couponService.resolve(
+          orderData.couponCode,
+          subtotal,
+          userId,
+          tx
+        ));
+      }
+      const tax = percentOf(subtotal - discount, VAT_PERCENT);
+      const total = subtotal - discount + shippingCost + tax;
+
+      const [order] = await tx
+        .insert(orders)
+        .values({
+          userId,
+          orderNumber: generateOrderNumber(),
+          status: "pending",
+          paymentStatus: "pending",
+          shippingStatus: "pending",
+          subtotal: fromSatang(subtotal),
+          shippingCost: fromSatang(shippingCost),
+          discount: fromSatang(discount),
+          tax: fromSatang(tax),
+          total: fromSatang(total),
+          shippingAddressId,
+          billingAddressId,
+          shippingMethodId: shippingMethod.id,
+          paymentMethodId: paymentMethod.id,
+          notes: orderData.notes ?? null,
+        })
+        .returning();
+
+      await tx.insert(orderItems).values(
+        lines.map((line) => ({
+          orderId: order.id,
+          productId: line.productId,
+          variantId: line.variantId,
+          quantity: line.quantity,
+          price: fromSatang(line.price),
+          subtotal: fromSatang(line.lineTotal),
+        }))
+      );
+      if (coupon) {
+        await tx
+          .insert(orderCoupons)
+          .values({ orderId: order.id, couponId: coupon.id, discountAmount: fromSatang(discount) });
+      }
+      await tx.insert(orderStatusHistory).values({
+        orderId: order.id,
+        status: "pending",
+        comment: "Order created",
+        createdBy: userId,
+      });
+
+      const shipment = await shippingService.createShippingLabel(order.id, shippingMethod.id, tx);
+      await tx
+        .update(orders)
+        .set({ trackingNumber: shipment.trackingNumber, carrier: shippingMethod.name })
+        .where(eq(orders.id, order.id));
+
+      // The purchased variants leave the cart.
+      const cart = await tx.query.carts.findFirst({ where: eq(carts.userId, userId) });
+      if (cart) {
+        await tx.delete(cartItems).where(
+          and(
+            eq(cartItems.cartId, cart.id),
+            inArray(cartItems.variantId, lines.map((l) => l.variantId))
+          )
+        );
+      }
+
+      const paymentCode = ONLINE_PAYMENT_CODES[paymentMethod.code?.toLowerCase()] ?? paymentMethod.code;
+      const payment = await paymentService.createPayment(userId, order.id, paymentCode, null, tx);
+      return { order, payment, paymentCode };
     });
 
-    if (!order) {
-      throw new ApiError("Order not found", 404);
-    }
-
-    // Generate presigned URLs for product images in order items
-    if (order.items && order.items.length > 0) {
-      await Promise.all(
-        order.items.map(async (item) => {
-          item.product = await withPresignedImageUrl(item.product);
-        })
-      );
-    }
-
-    return order;
-  },
-
-  // ตรวจสอบให้แน่ใจว่าได้ import สิ่งเหล่านี้แล้ว
-  // import { db } from './db';
-  // import { addresses, paymentMethods, products, productVariants, orders, orderItems, coupons, shippingMethods, orderStatusHistory } from './schema'; // เพิ่ม shippingMethods, orderStatusHistory
-  // import { eq, and, gte } from 'drizzle-orm';
-  // import { ApiError } from './apiError';
-  // import { generateOrderNumber } from '../utils/orderUtils'; // สมมติว่ามี util นี้
-  // import { shippingService } from '../services/shippingService'; // สมมติว่ามี service นี้
-  // import { paymentService } from '../services/paymentService'; // สมมติว่ามี service นี้
-  // import { omiseService } from '../services/omiseService'; // สมมติว่ามี service นี้
-  // import { normalizePaymentCode } from '../utils/paymentUtils'; // สมมติว่ามี util นี้
-
-  async createOrder(userId, orderData) {
-    const {
-      shippingAddressId,
-      billingAddressId,
-      shippingMethodId,
-      paymentMethodId,
-      notes,
-      items, // orderData.items ควรมี { productId, variantId, quantity }
-    } = orderData;
-
-    // ตรวจสอบว่ามีรายการสินค้าในออร์เดอร์หรือไม่
-    if (!items || items.length === 0) {
-      throw new ApiError("Order must contain at least one item", 400);
-    }
-
-    try {
-      return await db.transaction(async (tx) => {
-        // 1. Validate addresses
-        const [shippingAddress, billingAddress] = await Promise.all([
-          tx.query.addresses.findFirst({
-            where: and(
-              eq(addresses.id, shippingAddressId),
-              eq(addresses.userId, userId)
-            ),
-          }),
-          tx.query.addresses.findFirst({
-            where: and(
-              eq(addresses.id, billingAddressId),
-              eq(addresses.userId, userId)
-            ),
-          }),
-        ]);
-
-        if (!shippingAddress || !billingAddress) {
-          throw new ApiError("Invalid shipping or billing address", 400);
-        }
-
-        // 2. Validate shipping method
-        const shippingMethod = await tx.query.shippingMethods.findFirst({
-          where: eq(shippingMethods.id, shippingMethodId),
-        });
-
-        if (!shippingMethod || !shippingMethod.isActive) {
-          throw new ApiError("Invalid shipping method", 400);
-        }
-
-        // 3. Validate payment method
-        const paymentMethod = await tx.query.paymentMethods.findFirst({
-          where: eq(paymentMethods.id, paymentMethodId),
-        });
-
-        if (!paymentMethod || !paymentMethod.isActive) {
-          throw new ApiError("Invalid payment method", 400);
-        }
-
-        // 4. ตรวจสอบและตัด stock แบบ atomic
-        let subtotal = 0;
-        const orderItemsData = [];
-
-        // ดึงข้อมูล product และ variant ทั้งหมดในครั้งเดียวเพื่อประสิทธิภาพที่ดีขึ้น
-        // แต่ยังคงตรวจสอบ stock และอัปเดตแยกกันในลูปเพื่อ atomicity
-        const productAndVariantData = await Promise.all(
-          items.map(async (item) => {
-            const product = await tx.query.products.findFirst({
-              where: eq(products.id, item.productId),
-            });
-            if (!product) {
-              throw new ApiError(`Product not found: ${item.productId}`, 404);
-            }
-
-            let variant = null;
-            if (item.variantId) {
-              variant = await tx.query.productVariants.findFirst({
-                where: and(
-                  eq(productVariants.id, item.variantId),
-                  eq(productVariants.productId, item.productId)
-                ),
-              });
-              if (!variant) {
-                throw new ApiError(
-                  `Variant not found: ${item.variantId} for product ${product.name}`,
-                  404
-                );
-              }
-            } else {
-              // หากไม่มี variantId และเราได้ตกลงกันว่า stock อยู่ที่ variant เท่านั้น
-              // กรณีนี้ควร throw error หรือบังคับให้สินค้ามี default variant
-              throw new ApiError(
-                `Product ${product.name} requires a variant to be purchased.`,
-                400
-              );
-            }
-            return { item, product, variant };
-          })
-        );
-
-        for (const { item, product, variant } of productAndVariantData) {
-          // ณ จุดนี้ variant จะต้องมีค่าเสมอจากการตรวจสอบข้างต้น
-          const currentPrice = Number(variant.price); // ใช้ราคาจาก variant
-          const currentStock = variant.stock; // ใช้ stock จาก variant
-
-          if (item.quantity <= 0) {
-            throw new ApiError("Item quantity must be positive.", 400);
-          }
-
-          if (item.quantity > currentStock) {
-            throw new ApiError(
-              `Insufficient stock for product ${product.name} (Variant: ${variant.color} ${variant.size}). Available: ${currentStock}, Requested: ${item.quantity}`,
-              400
-            );
-          }
-
-          // ตัด stock แบบ atomic (optimistic locking)
-          const updated = await tx
-            .update(productVariants)
-            .set({ stock: currentStock - item.quantity })
-            .where(
-              and(
-                eq(productVariants.id, variant.id),
-                eq(productVariants.stock, currentStock) // ตรวจสอบ stock ก่อนอัปเดต
-              )
-            )
-            .returning();
-
-          if (!updated.length) {
-            // ถ้า updated.length เป็น 0 แสดงว่า stock มีการเปลี่ยนแปลงไปแล้ว
-            // เนื่องจากมีคนอื่นซื้อไป หรือมีการปรับสต็อก
-            throw new ApiError(
-              `Stock for product ${product.name} (Variant: ${variant.color} ${variant.size}) changed. Please try again.`,
-              409
-            );
-          }
-
-          const itemSubtotal = currentPrice * item.quantity;
-          subtotal += itemSubtotal;
-
-          orderItemsData.push({
-            productId: item.productId,
-            variantId: item.variantId,
-            quantity: item.quantity,
-            price: currentPrice, // ใช้ราคาที่ดึงมาจาก variant
-            subtotal: itemSubtotal,
-          });
-        }
-
-        // 5. คำนวณค่าจัดส่งจริงด้วย shippingService
-        // ตรงนี้ยังคงใช้ shippingAddressId และ items เพื่อให้ shippingService คำนวณได้
-        let shippingCost = orderData.shippingCost; // ถ้า Frontend ส่งมาให้ใช้ (อาจเป็นค่าที่คำนวณแล้ว)
-        if (shippingCost == null) {
-          const shippingCosts = await shippingService.calculateShippingCost(
-            shippingAddressId,
-            items // ส่งรายการสินค้า เพื่อให้ shippingService คำนวณน้ำหนัก/ขนาด
-          );
-          const selected = shippingCosts.find(
-            (m) => m.methodId === shippingMethodId
-          );
-          if (!selected) {
-            throw new ApiError(
-              "Shipping method not available for this address or items",
-              400
-            );
-          }
-          shippingCost = selected.cost;
-        }
-
-        const tax = subtotal * 0.07; // 7% VAT
-        const total = subtotal + shippingCost + tax;
-
-        // 6. Create order
-        const [order] = await tx
-          .insert(orders)
-          .values({
-            userId,
-            orderNumber: generateOrderNumber(), // ตรวจสอบให้แน่ใจว่า generateOrderNumber() พร้อมใช้งาน
-            status: "pending",
-            paymentStatus: "pending",
-            shippingStatus: "pending",
-            subtotal,
-            shippingCost,
-            tax,
-            total,
-            shippingAddressId,
-            billingAddressId,
-            shippingMethodId,
-            paymentMethodId,
-            notes,
-            createdAt: new Date(), // เพิ่ม createdAt ถ้า schema ไม่ได้ defaultNow()
-            updatedAt: new Date(), // เพิ่ม updatedAt
-          })
-          .returning();
-
-        // 7. Create order items
-        await tx.insert(orderItems).values(
-          orderItemsData.map((item) => ({
-            orderId: order.id,
-            productId: item.productId, // ต้องใส่ productId ด้วยใน orderItems
-            variantId: item.variantId,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.subtotal,
-          }))
-        );
-
-        // 8. Create order status history
-        await tx.insert(orderStatusHistory).values({
-          orderId: order.id,
-          status: "pending",
-          comment: "Order created",
-          createdBy: userId,
-          createdAt: new Date(), // เพิ่ม createdAt
-        });
-
-        // 9. Create shipment (เรียก shippingService แบบ production-grade ส่ง tx เข้าไป)
-        let shipment;
-        try {
-          // ควรส่งข้อมูลที่เพียงพอสำหรับ shippingService เช่น address, items details
-          shipment = await shippingService.createShippingLabel(
-            order.id, // Order ID
-            shippingMethodId,
-            shippingAddress, // ส่งข้อมูล address ให้ครบ
-            orderItemsData, // ส่งข้อมูล items ให้ครบ
-            tx // ส่ง transaction object
-          );
-
+    // Charge after the order is committed: a failure then leaves a pending,
+    // retryable order instead of money taken for an order that rolled back.
+    let charge = null;
+    if (ONLINE_PAYMENT_CODES[paymentCode]) {
+      try {
+        ({ charge } = await paymentService.chargePayment(payment, {
+          method: paymentCode,
+          cardToken: orderData.omiseToken,
+          description: `Order ${order.orderNumber}`,
+        }));
+      } catch (error) {
+        await db.transaction(async (tx) => {
+          const current = await tx.query.orders.findFirst({ where: eq(orders.id, order.id) });
           await tx
             .update(orders)
-            .set({
-              trackingNumber: shipment.trackingNumber,
-              carrier: shippingMethod.name, // ใช้ชื่อจาก shippingMethod ที่ validate มาแล้ว
-              estimatedDelivery: shipment.estimatedDelivery || null, // อาจจะไม่มี
-              shippingStatus: "pending", // หรือสถานะที่ได้จาก shipment
-              updatedAt: new Date(),
-            })
+            .set({ paymentStatus: "failed", updatedAt: new Date() })
             .where(eq(orders.id, order.id));
-        } catch (err) {
-          console.error("Error creating shipment:", err); // Log error
-          throw new ApiError("Failed to create shipment", 500);
-        }
-
-        // 10. Create payment transaction (ทุกกรณี, production-grade ส่ง tx เข้าไป)
-        let paymentTx;
-        try {
-          paymentTx = await paymentService.createPayment(
-            userId,
-            order.id,
-            paymentMethod.code,
-            total, // ส่งยอดรวมให้ paymentService
-            tx
-          );
-        } catch (err) {
-          console.error("Error creating payment transaction:", err); // Log error
-          throw new ApiError("Failed to create payment transaction", 500);
-        }
-
-        // 11. รองรับ Omise ทุก code ที่เกี่ยวข้อง
-        const normalizedCode = normalizePaymentCode(paymentMethod.code);
-        console.log(
-          "[OrderService] paymentMethod.code=",
-          paymentMethod.code,
-          "normalized=",
-          normalizedCode,
-          "token=",
-          orderData.omiseToken,
-          "source=",
-          orderData.omiseSource
+          await cancelOrder(tx, current, { reason: `Payment error: ${error.message}` });
+        });
+        throw new ApiError(`Payment failed: ${error.message}`, 402, null, "PAYMENT_FAILED");
+      }
+      if (charge.status === "failed") {
+        // Declined card: release the reservation; the customer can check out again.
+        await db.transaction(async (tx) => {
+          const current = await tx.query.orders.findFirst({ where: eq(orders.id, order.id) });
+          await cancelOrder(tx, current, { reason: `Payment declined: ${charge.failure_message ?? "card declined"}` });
+        });
+        throw new ApiError(
+          `Payment declined: ${charge.failure_message ?? "card declined"}`,
+          402,
+          null,
+          "PAYMENT_DECLINED"
         );
-
-        let createdCharge = null;
-        if (["omise", "card", "promptpay"].includes(normalizedCode)) {
-          try {
-            const chargeParams = {
-              amount: Math.round(total * 100), // Omise ใช้หน่วยสตางค์
-              currency: "thb",
-              description: `Order ${order.orderNumber}`,
-              metadata: {
-                orderId: order.id,
-                userId: userId,
-              },
-            };
-
-            if (normalizedCode === "card") {
-              if (!orderData.omiseToken) {
-                throw new ApiError(
-                  "Missing Omise card token for credit card payment",
-                  400
-                );
-              }
-              chargeParams.card = orderData.omiseToken;
-            }
-            if (normalizedCode === "promptpay") {
-              let sourceId = orderData.omiseSource;
-              if (!sourceId) {
-                try {
-                  const promptpaySource = await omiseService.createSource({
-                    type: "promptpay",
-                    amount: Math.round(total * 100),
-                    currency: "THB",
-                  });
-                  sourceId = promptpaySource?.id;
-                } catch (sourceErr) {
-                  console.error("[OrderService] Failed to auto-create Omise PromptPay source:", sourceErr);
-                }
-              }
-              if (!sourceId) {
-                throw new ApiError(
-                  "Missing or failed to create Omise source for promptpay payment",
-                  400
-                );
-              }
-              chargeParams.source = sourceId;
-            }
-
-            console.log(
-              "[OrderService] Calling omiseService.createCharge",
-              chargeParams
-            );
-
-            const charge = await omiseService.createCharge(chargeParams);
-            createdCharge = charge;
-
-            // อัปเดต payment record
-            await paymentService.updatePayment(
-              paymentTx.id,
-              {
-                transactionId: charge.id,
-                paymentDetails: charge, // เก็บข้อมูล charge ทั้งหมด
-                status:
-                  charge.status === "successful" ? "completed" : "pending",
-                updatedAt: new Date(),
-              },
-              tx
-            ); // ส่ง tx เข้าไปใน paymentService.updatePayment ด้วย
-
-            // อัปเดตสถานะ payment ของ Order
-            await tx
-              .update(orders)
-              .set({
-                paymentStatus:
-                  charge.status === "successful" ? "completed" : "pending",
-                updatedAt: new Date(),
-                ...(charge.status === "successful"
-                  ? { paidAt: new Date() }
-                  : {}),
-              })
-              .where(eq(orders.id, order.id));
-          } catch (err) {
-            console.error("Omise payment error:", err); // Log error
-            // อัปเดต payment record เป็น failed
-            await paymentService.updatePayment(
-              paymentTx.id,
-              {
-                status: "failed",
-                updatedAt: new Date(),
-              },
-              tx
-            ); // ส่ง tx เข้าไป
-
-            // อัปเดตสถานะ payment ของ Order เป็น failed
-            await tx
-              .update(orders)
-              .set({
-                paymentStatus: "failed",
-                updatedAt: new Date(),
-              })
-              .where(eq(orders.id, order.id));
-
-            throw new ApiError("Omise payment failed", 400); // Throw error ให้ transaction roll back
-          }
-        } else {
-          console.log(
-            "[OrderService] Payment method code not supported for Omise charge:",
-            paymentMethod.code,
-            "token=",
-            orderData.omiseToken,
-            "source=",
-            orderData.omiseSource
-          );
-        }
-
-        // Return complete order with items (ใช้ tx)
-        const finalOrder = await this.getOrderById(userId, order.id, tx);
-        if (createdCharge) {
-          finalOrder.charge = createdCharge;
-        }
-        return finalOrder;
-      });
-    } catch (err) {
-      console.error("Error creating order:", err); // Log error
-      // ข้อผิดพลาดจาก transaction จะถูก re-throw ออกมา
-      throw err;
-    }
-  },
-
-  async cancelOrder(userId, orderId, reason, txOrDb = db) {
-    const order = await this.getOrderById(userId, orderId, txOrDb);
-
-    if (order.status !== "pending") {
-      throw new ApiError("Order cannot be cancelled", 400);
-    }
-
-    const [updatedOrder] = await txOrDb
-      .update(orders)
-      .set({
-        status: "cancelled",
-        cancellationReason: reason,
-        cancelledAt: new Date(),
-      })
-      .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
-      .returning();
-
-    return updatedOrder;
-  },
-
-  async refundOrder(
-    userId,
-    orderId,
-    { reason, refundAmount, refundItems },
-    txOrDb = db
-  ) {
-    const order = await this.getOrderById(userId, orderId, txOrDb);
-
-    if (order.status !== "delivered") {
-      throw new ApiError("Order cannot be refunded", 400);
-    }
-
-    // Verify refund amount
-    if (refundAmount > order.total) {
-      throw new ApiError("Refund amount exceeds order total", 400);
-    }
-
-    // Verify refund items
-    if (refundItems) {
-      for (const item of refundItems) {
-        const orderItem = order.items.find((i) => i.id === item.itemId);
-        if (!orderItem) {
-          throw new ApiError(`Invalid order item: ${item.itemId}`, 400);
-        }
-        if (item.quantity > orderItem.quantity) {
-          throw new ApiError(
-            `Refund quantity exceeds order quantity for item: ${item.itemId}`,
-            400
-          );
-        }
       }
     }
 
-    const [updatedOrder] = await txOrDb
-      .update(orders)
-      .set({
-        status: "refunded",
-        refundReason: reason,
-        refundAmount,
-        refundedAt: new Date(),
-      })
-      .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
-      .returning();
-
-    return updatedOrder;
+    const finalOrder = await this.getOrderById(userId, order.id);
+    if (charge) {
+      finalOrder.charge = {
+        id: charge.id,
+        status: charge.status,
+        qrCodeUrl: charge.source?.scannable_code?.image?.download_uri ?? null,
+        // Kept for existing clients that read the raw Omise shape.
+        source: charge.source ?? null,
+      };
+    }
+    return finalOrder;
   },
 
-  async getAllOrders({ page, limit, status, search }, txOrDb = db) {
-    const offset = (page - 1) * limit;
-
-    const whereConditions = [];
-    if (status) {
-      whereConditions.push(eq(orders.status, status));
-    }
-    if (search) {
-      whereConditions.push(
-        or(
-          ilike(orders.orderNumber, `%${search}%`),
-          sql`${orders.id}::text ILIKE ${`%${search}%`}`
-        )
-      );
-    }
-
-    const orderList = await txOrDb.query.orders.findMany({
-      where: whereConditions.length ? and(...whereConditions) : undefined,
-      with: {
-        items: {
-          with: {
-            product: {
-              with: {
-                brand: true,
-                category: true,
-              },
-            },
-            variant: true,
-          },
-        },
-        shippingAddress: true,
-        billingAddress: true,
-        paymentMethod: true,
-      },
-      limit,
-      offset,
-      orderBy: [desc(orders.createdAt)],
+  /** Customers may cancel until the order is paid or being processed. */
+  async cancelOrder(userId, orderId, reason) {
+    return db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({
+        where: and(eq(orders.id, orderId), eq(orders.userId, userId)),
+      });
+      if (!order) throw ApiError.notFound("Order not found");
+      if (order.status !== "pending" || order.paymentStatus === "completed") {
+        throw ApiError.badRequest(
+          "This order can no longer be cancelled. Please request a refund instead."
+        );
+      }
+      return cancelOrder(tx, order, { reason, actorId: userId });
     });
-
-    const total = await txOrDb
-      .select({ count: sql`count(*)` })
-      .from(orders)
-      .where(whereConditions.length ? and(...whereConditions) : undefined);
-
-    return {
-      items: orderList,
-      orders: orderList,
-      pagination: {
-        total: total[0].count,
-        page,
-        limit,
-        pages: Math.ceil(total[0].count / limit),
-      },
-    };
   },
 
-  async getOrderStats({ startDate, endDate }, txOrDb = db) {
-    const whereConditions = [];
-    if (startDate) {
-      whereConditions.push(gte(orders.createdAt, new Date(startDate)));
-    }
-    if (endDate) {
-      whereConditions.push(lte(orders.createdAt, new Date(endDate)));
-    }
-
-    const stats = await txOrDb
-      .select({
-        total: sql`count(*)`,
-        totalAmount: sql`sum(${orders.total})`,
-        pending: sql`count(*) filter (where ${orders.status} = 'pending')`,
-        processing: sql`count(*) filter (where ${orders.status} = 'processing')`,
-        shipped: sql`count(*) filter (where ${orders.status} = 'shipped')`,
-        delivered: sql`count(*) filter (where ${orders.status} = 'delivered')`,
-        cancelled: sql`count(*) filter (where ${orders.status} = 'cancelled')`,
-        refunded: sql`count(*) filter (where ${orders.status} = 'refunded')`,
-      })
-      .from(orders)
-      .where(whereConditions.length ? and(...whereConditions) : undefined);
-
-    return stats[0];
-  },
-
-  async getOrderTracking(userId, orderId, txOrDb = db) {
-    const shipment = await txOrDb.query.shipments.findFirst({
-      where: and(eq(shipments.orderId, orderId)),
+  /** Customer asks for a refund of a delivered order; an admin decides. */
+  async requestRefund(userId, orderId, { amount, reason }) {
+    return db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({
+        where: and(eq(orders.id, orderId), eq(orders.userId, userId)),
+      });
+      if (!order) throw ApiError.notFound("Order not found");
+      if (order.status !== "delivered") {
+        throw ApiError.badRequest("Only delivered orders can be refunded");
+      }
+      const requested = amount == null ? toSatang(order.total) : toSatang(amount);
+      if (requested <= 0 || requested > toSatang(order.total)) {
+        throw ApiError.badRequest("Refund amount exceeds order total");
+      }
+      return setOrderStatus(tx, order, "refund_requested", {
+        comment: `Refund requested: ${reason}`,
+        actorId: userId,
+        extra: { refundReason: reason, refundAmount: fromSatang(requested) },
+      });
     });
-    if (!shipment) {
-      throw new ApiError("ไม่พบข้อมูลการจัดส่งสำหรับออเดอร์นี้", 404);
-    }
-    return shipment;
   },
 
-  // เพิ่มฟังก์ชัน updateOrderStatus สำหรับ webhook/payment
-  async updateOrderStatus(orderId, { status, notes, userId, actorId }) {
-    const existing = await db.query.orders.findFirst({
-      where: eq(orders.id, orderId),
+  /** Customer confirms they received a shipped order. */
+  async confirmDelivery(userId, orderId) {
+    return db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({
+        where: and(eq(orders.id, orderId), eq(orders.userId, userId)),
+      });
+      if (!order) throw ApiError.notFound("Order not found");
+      if (order.status !== "shipped") {
+        throw ApiError.badRequest("Only shipped orders can be marked as delivered");
+      }
+      return setOrderStatus(tx, order, "delivered", {
+        comment: "Delivery confirmed by customer",
+        actorId: userId,
+        extra: { shippingStatus: "delivered" },
+      });
     });
-    if (!existing) {
-      throw ApiError.notFound("ไม่พบออเดอร์");
-    }
-    if (userId && existing.userId !== userId) {
-      throw ApiError.forbidden("ไม่มีสิทธิ์แก้ไขออเดอร์นี้");
-    }
-    assertOrderTransition(existing.status, status);
+  },
 
-    const [updatedOrder] = await db
-      .update(orders)
-      .set({ status, statusNotes: notes || existing.statusNotes, updatedAt: new Date() })
-      .where(eq(orders.id, orderId))
-      .returning();
+  /** Admin status change with the side effects each status implies. */
+  async updateOrderStatus(orderId, { status, notes, trackingNumber, actorId }) {
+    const updated = await db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId) });
+      if (!order) throw ApiError.notFound("ไม่พบออเดอร์");
 
-    await db.insert(orderStatusHistory).values({
-      orderId,
-      status,
-      comment: notes || `Status updated to ${status}`,
-      createdBy: actorId || userId || null,
+      if (status === "refunded" && ["completed", "partially_refunded"].includes(order.paymentStatus)) {
+        throw ApiError.badRequest(
+          "This order was paid online. Refund it with POST /api/payments/:id/refund so the money is returned."
+        );
+      }
+      if (status === "cancelled") {
+        if (order.paymentStatus === "completed") {
+          throw ApiError.badRequest("Refund the payment before cancelling a paid order.");
+        }
+        return cancelOrder(tx, order, { reason: notes, actorId });
+      }
+
+      const extra = {};
+      if (notes) extra.statusNotes = notes;
+      if (trackingNumber) extra.trackingNumber = trackingNumber;
+      if (status === "shipped") extra.shippingStatus = "shipped";
+      if (status === "delivered") extra.shippingStatus = "delivered";
+      return setOrderStatus(tx, order, status, { comment: notes, actorId, extra });
     });
 
     await writeAuditLog({
-      actorId: actorId || userId,
+      actorId,
       entity: "orders",
       entityId: orderId,
       action: "update_status",
-      before: { status: existing.status },
       after: { status },
     });
+    return updated;
+  },
 
-    return updatedOrder;
+  /** Admin: carrier/tracking details, mirrored onto the shipment record. */
+  async updateShippingInfo(orderId, { trackingNumber, carrier, status, estimatedDelivery }, actorId) {
+    return db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId) });
+      if (!order) throw ApiError.notFound("ไม่พบออเดอร์");
+      if (["cancelled", "refunded"].includes(order.status)) {
+        throw ApiError.badRequest(`Cannot update shipping for a ${order.status} order`);
+      }
+
+      const changes = { trackingNumber, updatedAt: new Date() };
+      if (carrier) changes.carrier = carrier;
+      if (status) changes.shippingStatus = status;
+      if (estimatedDelivery) changes.estimatedDelivery = new Date(estimatedDelivery);
+      const [updated] = await tx.update(orders).set(changes).where(eq(orders.id, orderId)).returning();
+
+      const shipment = await tx.query.shipments.findFirst({ where: eq(shipments.orderId, orderId) });
+      const shipmentChanges = {
+        trackingNumber,
+        ...(carrier && { carrier }),
+        ...(status && { status }),
+        ...(estimatedDelivery && { estimatedDelivery: new Date(estimatedDelivery) }),
+        ...(status === "delivered" && { actualDelivery: new Date() }),
+        updatedAt: new Date(),
+      };
+      if (shipment) {
+        await tx.update(shipments).set(shipmentChanges).where(eq(shipments.id, shipment.id));
+      } else {
+        await tx.insert(shipments).values({ orderId, ...shipmentChanges });
+      }
+
+      // Shipping it moves a paid/processing order forward.
+      if (status === "shipped" && ["paid", "confirmed", "processing"].includes(order.status)) {
+        const intermediate =
+          order.status === "processing"
+            ? updated
+            : await setOrderStatus(tx, order, "processing", { actorId, comment: "Preparing shipment" });
+        return setOrderStatus(tx, intermediate, "shipped", {
+          actorId,
+          comment: `Shipped with ${carrier ?? order.carrier ?? "carrier"} (${trackingNumber})`,
+        });
+      }
+      return updated;
+    });
+  },
+
+  async getAllOrders({ status, search }, pagination, txOrDb = db) {
+    const conditions = [];
+    if (status) conditions.push(eq(orders.status, status));
+    if (search) {
+      conditions.push(
+        or(ilike(orders.orderNumber, `%${search}%`), sql`${orders.id}::text ILIKE ${`%${search}%`}`)
+      );
+    }
+    const where = conditions.length ? and(...conditions) : undefined;
+    const [orderList, total] = await Promise.all([
+      txOrDb.query.orders.findMany({
+        where,
+        with: orderDetails,
+        limit: pagination.limit,
+        offset: pagination.offset,
+        orderBy: [desc(orders.createdAt)],
+      }),
+      txOrDb.select({ count: sql`count(*)::int` }).from(orders).where(where),
+    ]);
+    const list = orderList.map(withImageUrls);
+    return { items: list, orders: list, pagination: paginationMeta(total[0].count, pagination) };
+  },
+
+  async getOrderStats({ startDate, endDate }, txOrDb = db) {
+    const conditions = [];
+    if (startDate) conditions.push(gte(orders.createdAt, new Date(startDate)));
+    if (endDate) conditions.push(lte(orders.createdAt, new Date(endDate)));
+
+    const counts = Object.fromEntries(
+      ORDER_STATUSES.map((s) => [s, sql`(count(*) filter (where ${orders.status} = ${s}))::int`])
+    );
+    const [stats] = await txOrDb
+      .select({
+        total: sql`count(*)::int`,
+        // Revenue counts orders that were paid, minus refunds.
+        totalAmount: sql`coalesce(sum(${orders.total}) filter (where ${orders.paymentStatus} in ('completed','partially_refunded','refunded')), 0) - coalesce(sum(${orders.refundAmount}) filter (where ${orders.paymentStatus} in ('partially_refunded','refunded')), 0)`,
+        ...counts,
+      })
+      .from(orders)
+      .where(conditions.length ? and(...conditions) : undefined);
+    return { ...stats, totalAmount: Number(stats.totalAmount) };
+  },
+
+  async getOrderStatus(userId, orderId, { isAdmin = false } = {}) {
+    const order = await this.getOrderById(userId, orderId, db, { isAdmin });
+    const history = await db.query.orderStatusHistory.findMany({
+      where: eq(orderStatusHistory.orderId, orderId),
+      orderBy: [desc(orderStatusHistory.createdAt)],
+    });
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      shippingStatus: order.shippingStatus,
+      history,
+    };
+  },
+
+  async getOrderTracking(userId, orderId, { isAdmin = false } = {}) {
+    await this.getOrderById(userId, orderId, db, { isAdmin }); // ownership
+    const shipment = await db.query.shipments.findFirst({ where: eq(shipments.orderId, orderId) });
+    if (!shipment) {
+      throw ApiError.notFound("ไม่พบข้อมูลการจัดส่งสำหรับออเดอร์นี้");
+    }
+    return shipment;
   },
 };

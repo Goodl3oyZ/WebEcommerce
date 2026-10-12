@@ -1,317 +1,106 @@
 import { paymentService } from "../services/paymentService.js";
-import { omiseService } from "../services/omiseService.js";
+import { parsePagination } from "../utils/pagination.js";
+import { isAdminRole } from "../utils/roles.js";
 import { ApiError } from "../utils/ApiError.js";
-import asyncHandler from "express-async-handler";
 
 export const paymentController = {
-  createPayment: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    // amount/currency from the client are ignored: the charge is always the
-    // order total stored on the server.
+  /** Pay or retry paying an order (amount is always the order total). */
+  async createPayment(req, res) {
     const { orderId, method, cardToken, paymentDetails } = req.body;
-    const token = cardToken || (paymentDetails && paymentDetails.token);
-    const payment = await paymentService.createPayment(
-      userId,
-      orderId,
+    const token = cardToken || paymentDetails?.token || paymentDetails?.cardToken;
+    const payment = await paymentService.createPayment(req.user.id, orderId, method);
+    const result = await paymentService.chargePayment(payment, {
       method,
-      paymentDetails
-    );
-
-    const amountInt = Math.round(Number(payment.amount) * 100);
-    const currency = "thb";
-
-    let charge;
-    if (method === "credit_card") {
-      if (!token) throw new ApiError("Missing card token", 400);
-      charge = await omiseService.createCharge({
-        amount: amountInt,
-        currency,
-        card: token,
-        description: `Payment for order ${orderId}`,
-        metadata: {
-          orderId,
-          paymentId: payment.id,
-        },
-      });
-    } else if (method === "promptpay") {
-      const source = await omiseService.createSource({
-        type: "promptpay",
-        amount: amountInt,
-        currency,
-      });
-      console.log("Omise source object:", source);
-      if (!source || !source.id) {
-        throw new ApiError("Omise source creation failed", 500);
-      }
-      charge = await omiseService.createCharge({
-        amount: amountInt,
-        currency,
-        description: `Payment for order ${orderId}`,
-        metadata: {
-          orderId,
-          paymentId: payment.id,
-        },
-        source: source.id,
-      });
-    }
-
-    await paymentService.updatePayment(payment.id, {
-      transactionId: charge?.id,
-      status: charge?.status,
+      cardToken: token,
+      description: `Payment for order ${orderId}`,
     });
 
+    if (result.charge?.status === "failed") {
+      throw new ApiError(
+        `Payment declined: ${result.charge.failure_message ?? "card declined"}`,
+        402,
+        null,
+        "PAYMENT_DECLINED"
+      );
+    }
     res.status(201).json({
       success: true,
       data: {
-        payment,
-        charge,
+        payment: result.payment,
+        charge: result.charge && {
+          id: result.charge.id,
+          status: result.charge.status,
+          qrCodeUrl: result.charge.source?.scannable_code?.image?.download_uri ?? null,
+          source: result.charge.source ?? null,
+        },
       },
     });
-  }),
+  },
 
-  getPayment: asyncHandler(async (req, res) => {
-    const { paymentId } = req.params;
-    const userId = req.user.id;
-
-    const payment = await paymentService.getPayment(paymentId, userId);
-    if (!payment) {
-      throw new ApiError("Payment not found", 404);
-    }
-
-    const charge = await omiseService.getCharge(payment.chargeId);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        payment,
-        charge,
-      },
-    });
-  }),
-
-  processRefund: asyncHandler(async (req, res) => {
-    const paymentId = req.params.id || req.params.paymentId;
-    const { amount, reason } = req.body;
-    const refund = await paymentService.refundPayment(
-      null,
-      paymentId,
-      amount,
-      reason,
-      req.user.id
-    );
-    res.status(200).json({
-      success: true,
-      data: { refund },
-      message: "คืนเงินสำเร็จ",
-    });
-  }),
-
-  createToken: asyncHandler(async (req, res) => {
-    const { card } = req.body;
-
-    const token = await omiseService.createToken(card);
-
-    res.status(201).json({
-      success: true,
-      data: {
-        token,
-      },
-    });
-  }),
-
-  getPaymentById: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { id } = req.params;
-    const payment = await paymentService.getPaymentById(userId, id);
+  async getPaymentById(req, res) {
+    const payment = isAdminRole(req.user.role)
+      ? await paymentService.getTransactionById(req.params.id)
+      : await paymentService.getPaymentById(req.user.id, req.params.id);
     res.json(payment);
-  }),
+  },
 
-  getOrderPayments: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { orderId } = req.params;
-    const payments = await paymentService.getOrderPayments(userId, orderId);
-    res.json(payments);
-  }),
+  async getOrderPayments(req, res) {
+    res.json(
+      await paymentService.getOrderPayments(req.user.id, req.params.orderId, {
+        isAdmin: isAdminRole(req.user.role),
+      })
+    );
+  },
 
-  updatePaymentStatus: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { id } = req.params;
+  async getPaymentStatus(req, res) {
+    res.json(await paymentService.getPaymentStatus(req.user.id, req.params.id));
+  },
+
+  /** Re-check with Omise, for when a webhook did not arrive. */
+  async verifyPayment(req, res) {
+    res.json(await paymentService.getPaymentStatus(req.user.id, req.params.id));
+  },
+
+  async getPaymentMethods(req, res) {
+    res.json(await paymentService.getPaymentMethods());
+  },
+
+  async getPaymentHistory(req, res) {
+    res.json(await paymentService.getPaymentHistory(req.user.id, parsePagination(req.query)));
+  },
+
+  // --- Admin ---------------------------------------------------------------
+  async updatePaymentStatus(req, res) {
     const { status, transactionId } = req.body;
-    const payment = await paymentService.updatePaymentStatus(
-      userId,
-      id,
-      status,
-      transactionId
-    );
-    res.json(payment);
-  }),
+    res.json(await paymentService.updatePaymentStatus(req.user.id, req.params.id, status, transactionId));
+  },
 
-  refundPayment: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { id } = req.params;
+  async processRefund(req, res) {
     const { amount, reason } = req.body;
-    const refund = await paymentService.refundPayment(
-      userId,
-      id,
-      amount,
-      reason
-    );
-    res.json(refund);
-  }),
+    const refund = await paymentService.refundPayment(req.user.id, req.params.id, amount, reason);
+    res.status(200).json({ success: true, data: refund, message: "คืนเงินสำเร็จ" });
+  },
 
-  getPaymentMethods: asyncHandler(async (req, res) => {
-    const methods = await paymentService.getPaymentMethods();
-    res.json(methods);
-  }),
-
-  validatePaymentMethod: asyncHandler(async (req, res) => {
-    const { paymentMethod, paymentDetails } = req.body;
-    const validation = await paymentService.validatePaymentMethod(
-      paymentMethod,
-      paymentDetails
-    );
-    res.json(validation);
-  }),
-
-  getPaymentHistory: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { page = 1, limit = 10 } = req.query;
-    const history = await paymentService.getPaymentHistory(userId, {
-      page: parseInt(page),
-      limit: parseInt(limit),
-    });
-    res.json(history);
-  }),
-
-  getPaymentStatus: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { id } = req.params;
-    const status = await paymentService.getPaymentStatus(userId, id);
-    res.json(status);
-  }),
-
-  verifyPayment: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { id } = req.params;
-    const { verificationCode } = req.body;
-    const result = await paymentService.verifyPayment(
-      userId,
-      id,
-      verificationCode
-    );
-    res.json(result);
-  }),
-
-  addPaymentMethod: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { type, provider, details } = req.body;
-    const method = await paymentService.addPaymentMethod(
-      userId,
-      type,
-      provider,
-      details
-    );
-    res.status(201).json(method);
-  }),
-
-  updatePaymentMethod: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { methodId } = req.params;
-    const { details } = req.body;
-    const method = await paymentService.updatePaymentMethod(
-      userId,
-      methodId,
-      details
-    );
-    res.json(method);
-  }),
-
-  removePaymentMethod: asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { methodId } = req.params;
-    await paymentService.removePaymentMethod(userId, methodId);
-    res.status(204).send();
-  }),
-
-  getAllTransactions: asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, status, startDate, endDate } = req.query;
-    const transactions = await paymentService.getAllTransactions({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      status,
-      startDate,
-      endDate,
-    });
-    res.json(transactions);
-  }),
-
-  getPaymentStatistics: asyncHandler(async (req, res) => {
-    const { startDate, endDate } = req.query;
-    const statistics = await paymentService.getPaymentStatistics(
-      startDate,
-      endDate
-    );
-    res.json(statistics);
-  }),
-
-  getStorePayments: asyncHandler(async (req, res) => {
-    const { storeId } = req.params;
+  async getAllTransactions(req, res) {
     const { status, startDate, endDate } = req.query;
-    const payments = await paymentService.getStorePayments(storeId, {
-      status,
-      startDate,
-      endDate,
-    });
-    res.json(payments);
-  }),
+    res.json(
+      await paymentService.getAllTransactions({ status, startDate, endDate }, parsePagination(req.query))
+    );
+  },
 
-  getPaymentStats: asyncHandler(async (req, res) => {
-    const { storeId, startDate, endDate } = req.query;
-    const stats = await paymentService.getPaymentStats({
-      storeId,
-      startDate,
-      endDate,
-    });
-    res.json(stats);
-  }),
+  async getPaymentStatistics(req, res) {
+    const { startDate, endDate, storeId } = req.query;
+    res.json(await paymentService.getPaymentStatistics({ startDate, endDate, storeId }));
+  },
 
-  handleOmiseWebhook: async (req, res) => {
-    try {
-      const event = req.body;
-      if (event.object === "event" && event.key && event.data) {
-        const charge = event.data;
-        const chargeId = charge.id;
-        const orderId = charge.metadata?.orderId;
-        const paymentId = charge.metadata?.paymentId;
+  async getStorePayments(req, res) {
+    const { status, startDate, endDate } = req.query;
+    res.json(await paymentService.getStorePayments(req.params.storeId, { status, startDate, endDate }));
+  },
 
-        if (charge.status === "successful") {
-          await paymentService.updatePaymentByChargeId(chargeId, {
-            status: "completed",
-            transactionId: chargeId,
-          });
-          if (orderId) {
-            await (
-              await import("../services/orderService.js")
-            ).orderService.updateOrderStatus(orderId, { status: "paid" });
-          }
-        } else if (charge.status === "failed" || charge.status === "expired") {
-          await paymentService.updatePaymentByChargeId(chargeId, {
-            status: "failed",
-            transactionId: chargeId,
-          });
-          if (orderId) {
-            await (
-              await import("../services/orderService.js")
-            ).orderService.updateOrderStatus(orderId, { status: "cancelled" });
-          }
-        }
-        res.status(200).json({ received: true });
-      } else {
-        res.status(400).json({ error: "Invalid event" });
-      }
-    } catch (err) {
-      console.error("Omise webhook error:", err);
-      res.status(500).json({ error: "Internal server error" });
-    }
+  /** Omise webhook: always 200 for well-formed events so Omise does not retry forever. */
+  async handleOmiseWebhook(req, res) {
+    const result = await paymentService.handleWebhook(req.body);
+    res.status(200).json({ received: true, ...result });
   },
 };

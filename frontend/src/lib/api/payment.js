@@ -58,13 +58,6 @@ export const paymentsAPI = {
   },
 
   // Create credit card token
-  createToken: async (cardData) => {
-    const response = await apiClient.post("/payments/token", {
-      card: cardData,
-    });
-    return response.data;
-  },
-
   // Get payment methods
   getPaymentMethods: async () => {
     const response = await apiClient.get("/payments/methods");

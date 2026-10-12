@@ -1,4 +1,5 @@
 "use client";
+import { createCardToken } from "@/lib/omise";
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -416,29 +417,34 @@ export default function OrderDetailsPage() {
   const handlePay = async () => {
     setIsPaying(true);
     try {
-      let paymentDetails = {};
+      const body = { orderId: order.id, method: paymentMethod };
       if (paymentMethod === "credit_card") {
-        const [mm, yy] = cardInfo.exp.split("/");
-        const tokenRes = await paymentsAPI.createToken({
+        // Tokenized in the browser: the card number never reaches our server.
+        body.cardToken = await createCardToken({
           name: cardInfo.name,
           number: cardInfo.number,
-          expiration_month: mm,
-          expiration_year: yy.length === 2 ? "20" + yy : yy,
-          security_code: cardInfo.cvc,
+          expiry: cardInfo.exp,
+          cvc: cardInfo.cvc,
         });
-        paymentDetails = { cardToken: tokenRes.id };
       }
-      await paymentsAPI.createPayment({
-        orderId: order.id,
-        method: paymentMethod,
-        amount: order.total,
-        paymentDetails,
-      });
-      toast.success("ชำระเงินสำเร็จ!");
-      setShowPaymentModal(false);
-      router.push("/orders");
+      const result = await paymentsAPI.createPayment(body);
+      const { payment, charge } = result?.data || {};
+      if (payment?.status === "completed") {
+        toast.success("ชำระเงินสำเร็จ!");
+        setShowPaymentModal(false);
+        router.push("/orders");
+      } else if (charge?.qrCodeUrl) {
+        window.open(charge.qrCodeUrl, "_blank", "noopener");
+        toast.success("สแกน QR เพื่อชำระเงิน สถานะจะอัปเดตเมื่อชำระแล้ว");
+        setShowPaymentModal(false);
+        loadOrderDetails();
+      } else {
+        toast("รอการยืนยันการชำระเงิน");
+        setShowPaymentModal(false);
+        loadOrderDetails();
+      }
     } catch (err) {
-      toast.error("ชำระเงินไม่สำเร็จ");
+      toast.error(err.response?.data?.message || err.message || "ชำระเงินไม่สำเร็จ");
     } finally {
       setIsPaying(false);
     }

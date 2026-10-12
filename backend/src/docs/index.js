@@ -2,5 +2,6 @@
 import "./auth.docs.js";
 import "./oauth.docs.js";
 import "./users.docs.js";
+import "./commerce.docs.js";
 
 export { buildPaths } from "./registry.js";

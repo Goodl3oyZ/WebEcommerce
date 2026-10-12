@@ -1,61 +1,48 @@
 import { z } from "zod";
 
-// Coupon DTOs
-export const couponDto = {
-  // Create coupon
-  createCoupon: z
-    .object({
-      code: z.string().min(1),
-      type: z.enum(["percentage", "fixed", "fixed_amount"]),
-      value: z.coerce.number().min(0),
-      minPurchase: z.number().min(0).optional(),
-      maxDiscount: z.number().min(0).optional(),
-      startDate: z.string().min(1),
-      endDate: z.string().min(1),
-      usageLimit: z.number().min(0).optional(),
-      perUserLimit: z.number().min(0).optional(),
-      isActive: z.boolean().default(true),
-      conditions: z
-        .object({
-          categories: z.array(z.string().uuid()).optional(),
-          products: z.array(z.string().uuid()).optional(),
-          users: z.array(z.string().uuid()).optional(),
-          userGroups: z.array(z.string()).optional(),
-        })
-        .optional(),
-    })
-    .strict(),
+const COUPON_TYPES = ["percentage", "fixed", "fixed_amount"];
+const date = (label) =>
+  z.string().refine((value) => !Number.isNaN(Date.parse(value)), `${label} must be a valid date`);
+const limit = () => z.number().int().min(1).nullable().optional();
+const money = () => z.coerce.number().min(0);
 
-  // Update coupon
+const couponFields = {
+  code: z.string().trim().min(1).max(50),
+  type: z.enum(COUPON_TYPES),
+  value: money(),
+  minPurchase: money().nullable().optional(),
+  maxDiscount: money().nullable().optional(),
+  startDate: date("startDate"),
+  endDate: date("endDate"),
+  usageLimit: limit().describe("Total uses across all customers (null = unlimited)"),
+  perUserLimit: limit().describe("Uses per customer (null = unlimited)"),
+  isActive: z.boolean(),
+};
+
+const percentageAtMost100 = (data) =>
+  data.type !== "percentage" || data.value == null || data.value <= 100;
+const endAfterStart = (data) =>
+  !data.startDate || !data.endDate || new Date(data.endDate) > new Date(data.startDate);
+
+export const couponDto = {
+  createCoupon: z
+    .object({ ...couponFields, isActive: couponFields.isActive.default(true) })
+    .strict()
+    .refine(percentageAtMost100, { message: "A percentage discount cannot exceed 100", path: ["value"] })
+    .refine(endAfterStart, { message: "endDate must be after startDate", path: ["endDate"] }),
+
+  // Cross-field rules against stored values are re-checked in the service.
   updateCoupon: z
-    .object({
-      code: z.string().min(1).optional(),
-      type: z.enum(["percentage", "fixed", "fixed_amount"]).optional(),
-      value: z.coerce.number().min(0).optional(),
-      minPurchase: z.number().min(0).optional(),
-      maxDiscount: z.number().min(0).optional(),
-      startDate: z.string().min(1).optional(),
-      endDate: z.string().min(1).optional(),
-      usageLimit: z.number().min(0).optional(),
-      perUserLimit: z.number().min(0).optional(),
-      isActive: z.boolean().optional(),
-      conditions: z
-        .object({
-          categories: z.array(z.string().uuid()).optional(),
-          products: z.array(z.string().uuid()).optional(),
-          users: z.array(z.string().uuid()).optional(),
-          userGroups: z.array(z.string()).optional(),
-        })
-        .optional(),
-    })
+    .object(Object.fromEntries(Object.entries(couponFields).map(([k, v]) => [k, v.optional()])))
     .strict()
     .refine((data) => Object.keys(data).length > 0, {
       message: "At least one field must be provided for update",
-    }),
+    })
+    .refine(percentageAtMost100, { message: "A percentage discount cannot exceed 100", path: ["value"] })
+    .refine(endAfterStart, { message: "endDate must be after startDate", path: ["endDate"] }),
 
-  // Apply coupon
-  applyCoupon: z.object({
-    code: z.string().min(1),
-    orderAmount: z.number().min(0),
+  validateQuery: z.object({
+    code: z.string().min(1).describe("Coupon code (case-insensitive)"),
+    amount: z.coerce.number().min(0).describe("Cart subtotal in THB"),
   }),
 };

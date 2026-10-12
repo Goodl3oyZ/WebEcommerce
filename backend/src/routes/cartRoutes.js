@@ -4,8 +4,10 @@ import { cartController } from "../controllers/cartController.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { cartDto } from "../dtos/cart.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("itemId", uuidParam("Cart item not found"));
 
 // Apply rate limiter to all cart routes
 router.use(apiRateLimiter);

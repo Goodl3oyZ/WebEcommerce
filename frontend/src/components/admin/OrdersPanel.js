@@ -8,21 +8,31 @@ import ErrorState from "@/components/ErrorState";
 const STATUS_OPTIONS = [
   "all",
   "pending",
+  "paid",
+  "confirmed",
   "processing",
   "shipped",
   "delivered",
+  "refund_requested",
   "cancelled",
   "refunded",
 ];
 
+// Mirrors backend/src/utils/orderStatus.js. "refunded" is reached by refunding
+// the payment (Refund button), never by setting the status directly.
 const NEXT_STATUS = {
   pending: ["processing", "cancelled"],
+  paid: ["processing"],
+  confirmed: ["processing", "cancelled"],
   processing: ["shipped", "cancelled"],
-  shipped: ["delivered", "cancelled"],
-  delivered: ["refunded"],
+  shipped: ["delivered"],
+  delivered: [],
+  refund_requested: ["delivered"],
   cancelled: [],
   refunded: [],
 };
+
+const REFUNDABLE_ORDER = ["paid", "confirmed", "processing", "delivered", "refund_requested"];
 
 export function OrdersPanel() {
   const [orders, setOrders] = useState([]);
@@ -79,6 +89,28 @@ export function OrdersPanel() {
     }
   };
 
+  // Refund the order's online payment (money goes back through Omise).
+  const refundOrder = async (order) => {
+    const reason = prompt(`เหตุผลการคืนเงินออเดอร์ ${order.orderNumber}`, order.refundReason || "");
+    if (!reason) return;
+    setSubmitting(true);
+    try {
+      const payments = await adminAPI.getOrderPayments(order.id);
+      const payment = payments.find((p) => ["completed", "partially_refunded"].includes(p.status));
+      if (!payment) {
+        toast.error("ไม่พบการชำระเงินที่คืนเงินได้สำหรับออเดอร์นี้");
+        return;
+      }
+      await adminAPI.refundPayment(payment.id, { reason });
+      toast.success("คืนเงินแล้ว");
+      load();
+    } catch (err) {
+      toast.error(err.message || "คืนเงินไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const columns = [
     { key: "orderNumber", header: "Order #", searchValue: (o) => o.orderNumber },
     {
@@ -116,11 +148,13 @@ export function OrdersPanel() {
             >
               ดู/เปลี่ยนสถานะ
             </button>
-            {options.includes("refunded") && (
+            {REFUNDABLE_ORDER.includes(order.status) &&
+              order.paymentStatus === "completed" && (
               <button
                 type="button"
                 className="text-warning hover:underline"
-                onClick={() => changeStatus(order, "refunded")}
+                disabled={submitting}
+                onClick={() => refundOrder(order)}
               >
                 Refund
               </button>

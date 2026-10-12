@@ -1,520 +1,211 @@
 import { db } from "../config/db.js";
-import {
-  carts,
-  cartItems,
-  products,
-  productVariants,
-  orders,
-  orderItems,
-  addresses,
-  paymentMethods,
-  coupons,
-} from "../models/schema.js";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { carts, cartItems, productVariants } from "../models/schema.js";
+import { eq, and } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { FileService } from "./fileService.js";
 import { BUCKETS } from "../config/minio.js";
+import { toSatang, fromSatang } from "../utils/money.js";
+
+export const MAX_QUANTITY_PER_ITEM = 99;
+
+const resolveImages = (images) => {
+  const list = Array.isArray(images) ? images : images ? [images] : [];
+  return list.filter(Boolean).map((img) => FileService.getFileUrl(BUCKETS.PRODUCTS, img));
+};
+
+async function getOrCreateCart(userId, txOrDb = db) {
+  const cart = await txOrDb.query.carts.findFirst({ where: eq(carts.userId, userId) });
+  if (cart) return cart;
+  const [created] = await txOrDb.insert(carts).values({ userId }).returning();
+  return created;
+}
+
+/** The variant to buy, with its product; must exist, belong to the product and be on sale. */
+async function getPurchasableVariant(productId, variantId) {
+  if (!variantId) {
+    throw ApiError.badRequest("Please choose a size/colour (variantId) for this product");
+  }
+  const variant = await db.query.productVariants.findFirst({
+    where: and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)),
+    with: { product: true },
+  });
+  if (!variant || variant.product?.isActive === false) {
+    throw ApiError.notFound("Product variant not found");
+  }
+  return variant;
+}
+
+function assertStock(variant, quantity) {
+  if (quantity > MAX_QUANTITY_PER_ITEM) {
+    throw ApiError.badRequest(`At most ${MAX_QUANTITY_PER_ITEM} of one item per order`);
+  }
+  if (quantity > variant.stock) {
+    throw new ApiError(
+      `Only ${variant.stock} left in stock for ${variant.product.name} (${variant.color} ${variant.size})`,
+      409,
+      null,
+      "INSUFFICIENT_STOCK"
+    );
+  }
+}
 
 export const cartService = {
+  /** Cart with current prices and stock (prices are never taken from the client). */
   async getCart(userId) {
-    // Get cart
-    const cart = await db.query.carts.findFirst({
-      where: eq(carts.userId, userId),
-    });
-
-    if (!cart) {
-      // Create new cart if none exists
-      const [newCart] = await db.insert(carts).values({ userId }).returning();
-      return { ...newCart, items: [], subtotal: 0 };
-    }
-
-    // Get cart items with product and variant info
+    const cart = await getOrCreateCart(userId);
     const items = await db.query.cartItems.findMany({
       where: eq(cartItems.cartId, cart.id),
-      columns: {
-        id: true,
-        cartId: true,
-        productId: true,
-        variantId: true,
-        quantity: true,
-        price: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      with: { product: true, variant: true },
+      orderBy: (item, { asc }) => [asc(item.createdAt)],
     });
 
-    // Get product and variant details for each item
-    const itemsWithDetails = await Promise.all(
-      items.map(async (item) => {
-        const product = await db.query.products.findFirst({
-          where: eq(products.id, item.productId),
-          columns: {
-            id: true,
-            name: true,
-            description: true,
-            price: true,
-            imageUrl: true,
-          },
-        });
+    let subtotal = 0;
+    const lines = items.map((item) => {
+      const currentPrice = toSatang(item.variant?.price ?? item.product?.price);
+      subtotal += currentPrice * item.quantity;
+      return {
+        id: item.id,
+        cartId: item.cartId,
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+        price: fromSatang(currentPrice),
+        priceChanged: currentPrice !== toSatang(item.price),
+        inStock: item.variant ? item.variant.stock >= item.quantity : false,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        product: item.product && {
+          id: item.product.id,
+          name: item.product.name,
+          description: item.product.description,
+          price: item.product.price,
+          isActive: item.product.isActive,
+          imageUrl: resolveImages(item.product.imageUrl),
+        },
+        variant: item.variant && {
+          id: item.variant.id,
+          color: item.variant.color,
+          size: item.variant.size,
+          sku: item.variant.sku,
+          stock: item.variant.stock,
+          images: resolveImages(item.variant.imageUrl),
+        },
+      };
+    });
 
-        let variant = null;
-        if (item.variantId) {
-          variant = await db.query.productVariants.findFirst({
-            where: eq(productVariants.id, item.variantId),
-            columns: {
-              id: true,
-              color: true,
-              size: true,
-              sku: true,
-              stock: true,
-              imageUrl: true,
-            },
-          });
-        }
-
-        // Generate URLs for product images
-        // Handle both full URLs (already stored with http prefix) and relative file paths
-        let productImages = [];
-        if (product && product.imageUrl) {
-          const resolveUrl = (img) => {
-            if (!img) return null;
-            // If already a full URL, use directly
-            if (img.startsWith('http://') || img.startsWith('https://')) return img;
-            // Otherwise build from bucket + path
-            return FileService.getFileUrl(BUCKETS.PRODUCTS, img);
-          };
-          if (Array.isArray(product.imageUrl)) {
-            productImages = product.imageUrl.map(resolveUrl).filter(Boolean);
-          } else if (typeof product.imageUrl === "string") {
-            const resolved = resolveUrl(product.imageUrl);
-            if (resolved) productImages = [resolved];
-          }
-        }
-
-        // Generate URLs for variant images (if any)
-        let variantImages = [];
-        if (variant && variant.imageUrl) {
-          const resolveUrl = (img) => {
-            if (!img) return null;
-            if (img.startsWith('http://') || img.startsWith('https://')) return img;
-            return FileService.getFileUrl(BUCKETS.PRODUCTS, img);
-          };
-          if (Array.isArray(variant.imageUrl)) {
-            variantImages = variant.imageUrl.map(resolveUrl).filter(Boolean);
-          } else if (typeof variant.imageUrl === "string") {
-            const resolved = resolveUrl(variant.imageUrl);
-            if (resolved) variantImages = [resolved];
-          }
-        }
-
-        return {
-          ...item,
-          product: {
-            ...product,
-            imageUrl: productImages,
-          },
-          variant: variant
-            ? {
-                ...variant,
-                images: variantImages,
-              }
-            : null,
-        };
-      })
-    );
-
-    // Calculate subtotal using stored prices
-    const subtotal = itemsWithDetails.reduce((total, item) => {
-      return total + Number(item.price) * item.quantity;
-    }, 0);
-
-    return {
-      ...cart,
-      items: itemsWithDetails,
-      subtotal: Number(subtotal),
-    };
+    return { ...cart, items: lines, subtotal: Number(fromSatang(subtotal)) };
   },
 
   async addItem(userId, { productId, variantId, quantity }) {
-    // Get or create cart
-    let cart = await db.query.carts.findFirst({
-      where: eq(carts.userId, userId),
+    const variant = await getPurchasableVariant(productId, variantId);
+    const cart = await getOrCreateCart(userId);
+    const existing = await db.query.cartItems.findFirst({
+      where: and(eq(cartItems.cartId, cart.id), eq(cartItems.variantId, variantId)),
     });
+    const newQuantity = (existing?.quantity ?? 0) + quantity;
+    assertStock(variant, newQuantity);
 
-    if (!cart) {
-      [cart] = await db.insert(carts).values({ userId }).returning();
-    }
-
-    // Verify product exists
-    const product = await db.query.products.findFirst({
-      where: eq(products.id, productId),
-    });
-
-    if (!product) {
-      throw new ApiError("Product not found", 404);
-    }
-
-    // Get variant and price
-    let price = product.price;
-    if (variantId) {
-      const variant = await db.query.productVariants.findFirst({
-        where: and(
-          eq(productVariants.id, variantId),
-          eq(productVariants.productId, productId)
-        ),
-      });
-
-      if (!variant) {
-        throw new ApiError("Product variant not found", 404);
-      }
-      price = variant.price || product.price;
-    }
-
-    // Check if item already exists in cart
-    const existingItem = await db.query.cartItems.findFirst({
-      where: and(
-        eq(cartItems.cartId, cart.id),
-        eq(cartItems.productId, productId),
-        variantId
-          ? eq(cartItems.variantId, variantId)
-          : sql`${cartItems.variantId} IS NULL`
-      ),
-    });
-
-    if (existingItem) {
-      // Update quantity if item exists
+    if (existing) {
       await db
         .update(cartItems)
-        .set({
-          quantity: existingItem.quantity + quantity,
-          price: price, // Update price in case it changed
-          updatedAt: new Date(),
-        })
-        .where(eq(cartItems.id, existingItem.id));
+        .set({ quantity: newQuantity, price: variant.price, updatedAt: new Date() })
+        .where(eq(cartItems.id, existing.id));
     } else {
-      // Add new item
       await db.insert(cartItems).values({
         cartId: cart.id,
         productId,
         variantId,
         quantity,
-        price,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        price: variant.price,
       });
     }
-
-    // Return updated cart
     return this.getCart(userId);
   },
 
   async updateItem(userId, itemId, quantity) {
-    // Verify cart ownership
-    const cart = await db.query.carts.findFirst({
-      where: eq(carts.userId, userId),
+    const cart = await getOrCreateCart(userId);
+    const item = await db.query.cartItems.findFirst({
+      where: and(eq(cartItems.id, itemId), eq(cartItems.cartId, cart.id)),
     });
-
-    if (!cart) {
-      throw new ApiError("Cart not found", 404);
+    if (!item) {
+      throw ApiError.notFound("Cart item not found");
     }
+    const variant = await getPurchasableVariant(item.productId, item.variantId);
+    assertStock(variant, quantity);
 
-    // Update item quantity
-    const [updatedItem] = await db
+    await db
       .update(cartItems)
-      .set({ quantity })
-      .where(and(eq(cartItems.id, itemId), eq(cartItems.cartId, cart.id)))
-      .returning();
-
-    if (!updatedItem) {
-      throw new ApiError("Cart item not found", 404);
-    }
-
-    // Return updated cart
+      .set({ quantity, price: variant.price, updatedAt: new Date() })
+      .where(eq(cartItems.id, item.id));
     return this.getCart(userId);
   },
 
   async removeItem(userId, itemId) {
-    // Verify cart ownership
-    const cart = await db.query.carts.findFirst({
-      where: eq(carts.userId, userId),
-    });
-
-    if (!cart) {
-      throw new ApiError("Cart not found", 404);
-    }
-
-    // Remove item
-    const [deletedItem] = await db
+    const cart = await getOrCreateCart(userId);
+    const [deleted] = await db
       .delete(cartItems)
       .where(and(eq(cartItems.id, itemId), eq(cartItems.cartId, cart.id)))
       .returning();
-
-    if (!deletedItem) {
-      throw new ApiError("Cart item not found", 404);
+    if (!deleted) {
+      throw ApiError.notFound("Cart item not found");
     }
-
-    // Return updated cart
     return this.getCart(userId);
   },
 
+  /** Idempotent: clearing an empty or missing cart succeeds. */
   async clearCart(userId) {
-    // Verify cart ownership
-    const cart = await db.query.carts.findFirst({
-      where: eq(carts.userId, userId),
-    });
-
-    if (!cart) {
-      throw new ApiError("Cart not found", 404);
-    }
-
-    // Remove all items
-    await db.delete(cartItems).where(eq(cartItems.cartId, cart.id));
+    const cart = await db.query.carts.findFirst({ where: eq(carts.userId, userId) });
+    if (cart) await db.delete(cartItems).where(eq(cartItems.cartId, cart.id));
   },
 
-  async checkout(userId, checkoutData) {
+  /** Items to check out, from the current cart. */
+  async getCheckoutItems(userId) {
     const cart = await this.getCart(userId);
-
-    if (!cart.items.length) {
-      throw new ApiError("Cart is empty", 400);
+    if (cart.items.length === 0) {
+      throw ApiError.badRequest("Cart is empty");
     }
-
-    // Start transaction
-    return await db.transaction(async (tx) => {
-      // 1. Validate addresses
-      const [shippingAddress, billingAddress] = await Promise.all([
-        tx.query.addresses.findFirst({
-          where: and(
-            eq(addresses.id, checkoutData.shippingAddressId),
-            eq(addresses.userId, userId)
-          ),
-        }),
-        tx.query.addresses.findFirst({
-          where: and(
-            eq(addresses.id, checkoutData.billingAddressId),
-            eq(addresses.userId, userId)
-          ),
-        }),
-      ]);
-
-      if (!shippingAddress || !billingAddress) {
-        throw new ApiError("Invalid shipping or billing address", 400);
-      }
-
-      // 2. Validate payment method
-      const paymentMethod = await tx.query.paymentMethods.findFirst({
-        where: and(
-          eq(paymentMethods.id, checkoutData.paymentMethodId),
-          eq(paymentMethods.userId, userId)
-        ),
-      });
-
-      if (!paymentMethod) {
-        throw new ApiError("Invalid payment method", 400);
-      }
-
-      // 3. Calculate totals and validate stock
-      let subtotal = 0;
-      let discount = 0;
-
-      // สำหรับการเก็บข้อมูล items ที่ถูกต้องหลังจากการ fetch เพื่อใช้ในการสร้าง orderItems
-      const finalOrderItems = [];
-
-      for (const item of cart.items) {
-        // ดึง product เสมอเพื่อเอาข้อมูลชื่อและ base price (ถ้าไม่มี variant)
-        const product = await tx.query.products.findFirst({
-          where: eq(products.id, item.productId),
-        });
-
-        if (!product) {
-          throw new ApiError(`Product ${item.productId} not found`, 404);
-        }
-
-        let currentPrice; // ราคาปัจจุบันของ item
-        let currentStock; // สต็อกปัจจุบันของ item
-
-        if (item.variantId) {
-          // ถ้ามี variantId, ดึงข้อมูล variant มา
-          const variant = await tx.query.productVariants.findFirst({
-            where: eq(productVariants.id, item.variantId),
-          });
-
-          if (!variant) {
-            throw new ApiError(
-              `Product variant ${item.variantId} not found`,
-              404
-            );
-          }
-
-          currentPrice = Number(variant.price); // ต้องมั่นใจว่าเป็น Number เพราะ decimal อาจจะ return เป็น string
-          currentStock = variant.stock;
-
-          // อัปเดต stock ของ variant
-          await tx
-            .update(productVariants)
-            .set({ stock: currentStock - item.quantity })
-            .where(eq(productVariants.id, variant.id));
-        } else {
-          // ถ้าไม่มี variantId, ใช้ข้อมูลจาก product โดยตรง (สำหรับสินค้าที่ไม่มี variant)
-          // **ข้อควรระวัง:** ถ้าตาราง products ไม่มี stock แล้ว โค้ดนี้จะใช้ไม่ได้
-          // ดังนั้น สต็อกควรถูกจัดการที่ variant เท่านั้น
-          // หรือถ้า product ไม่มี variant จะต้องมีสต็อกของตัวเองที่ product level (ซึ่งเราตกลงว่าไม่ควรมี)
-          // ทางที่ดีที่สุดคือทุกสินค้าควรมี variant แม้จะมีแค่ 1 variant (เช่น 'default' color/size)
-
-          // **สมมติฐานใหม่:** เมื่อเราลบ stock จาก `products` แล้ว
-          // ทุก item ในตะกร้า **ต้องมี** `variantId` หากต้องการตรวจสอบ stock
-          // ถ้าสินค้าไม่มี variant ในระบบของคุณ (เช่น เป็นสินค้าเดี่ยวๆ ไม่มีสี/ไซส์)
-          // คุณควรสร้าง "variant default" สำหรับสินค้านั้นๆ ในตาราง productVariants
-          // เพื่อให้ stock และ price อยู่ในที่เดียวกันเสมอ
-
-          throw new ApiError(
-            `Product ${product.name} (ID: ${product.id}) requires a variant to be purchased.`,
-            400
-          );
-          // หรือถ้าคุณยืนยันว่าสินค้านั้นไม่มี variant จริงๆ และ stock ควรดึงจาก product:
-          // currentPrice = Number(product.price);
-          // currentStock = product.stock; // **จะ Error เพราะไม่มี column stock ใน products แล้ว**
-        }
-
-        // ตรวจสอบ stock
-        if (currentStock < item.quantity) {
-          throw new ApiError(
-            `Insufficient stock for product ${product.name} (variant: ${
-              item.variantId || "N/A"
-            }) - Available: ${currentStock}, Requested: ${item.quantity}`,
-            400
-          );
-        }
-
-        // เพิ่มราคาสินค้าใน subtotal
-        subtotal += currentPrice * item.quantity;
-
-        // เก็บข้อมูลสำหรับสร้าง Order Item
-        finalOrderItems.push({
-          productId: item.productId, // ควรเก็บ productId ไว้ด้วยเพื่อความสมบูรณ์
-          variantId: item.variantId,
-          quantity: item.quantity,
-          price: currentPrice, // ใช้ราคาที่ดึงมาจริง
-        });
-      }
-
-      // 4. Apply coupon if provided
-      if (checkoutData.couponCode) {
-        const coupon = await tx.query.coupons.findFirst({
-          where: and(
-            eq(coupons.code, checkoutData.couponCode),
-            eq(coupons.isActive, true),
-            gte(coupons.validUntil, new Date())
-          ),
-        });
-
-        if (coupon) {
-          discount = (subtotal * coupon.discountPercentage) / 100;
-        }
-      }
-
-      const total = subtotal - discount;
-
-      // 5. Create order
-      const [order] = await tx
-        .insert(orders)
-        .values({
-          userId,
-          shippingAddressId: checkoutData.shippingAddressId,
-          billingAddressId: checkoutData.billingAddressId,
-          paymentMethodId: checkoutData.paymentMethodId,
-          couponCode: checkoutData.couponCode,
-          notes: checkoutData.notes,
-          subtotal,
-          discount,
-          total,
-          status: "pending",
-        })
-        .returning();
-
-      // 6. Create order items
-      const orderItemsData = finalOrderItems.map((item) => ({
-        orderId: order.id,
-        variantId: item.variantId,
-        quantity: item.quantity,
-        price: item.price, // ใช้ราคาที่คำนวณไว้แล้ว
-      }));
-
-      await tx.insert(orderItems).values(orderItemsData);
-
-      // 7. Clear cart
-      await this.clearCart(userId);
-
-      // 8. Return order details
-      return {
-        orderId: order.id,
-        status: order.status,
-        total: order.total,
-        items: orderItemsData,
-        shippingAddress,
-        billingAddress,
-        paymentMethod,
-      };
-    });
+    return cart.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      quantity: item.quantity,
+    }));
   },
+
+  /**
+   * Merge a guest (browser) cart after login. Prices from the client are
+   * ignored; invalid items are skipped and quantities are capped at stock.
+   */
   async mergeGuestCart(userId, items) {
-    // Get or create cart
-    let cart = await db.query.carts.findFirst({
-      where: eq(carts.userId, userId),
-    });
-
-    if (!cart) {
-      [cart] = await db.insert(carts).values({ userId }).returning();
-    }
-
-    // Process each item from guest cart
-    for (const item of items) {
-      const { productId, variantId, quantity, price } = item;
-
-      // Verify product exists
-      const product = await db.query.products.findFirst({
-        where: eq(products.id, productId),
-      });
-
-      if (!product) {
-        continue; // Skip invalid products
+    const cart = await getOrCreateCart(userId);
+    const skipped = [];
+    for (const { productId, variantId, quantity } of items) {
+      let variant;
+      try {
+        variant = await getPurchasableVariant(productId, variantId);
+      } catch {
+        skipped.push({ productId, variantId, reason: "not available" });
+        continue;
       }
-
-      // Check if item already exists in cart
-      const existingItem = await db.query.cartItems.findFirst({
-        where: and(
-          eq(cartItems.cartId, cart.id),
-          eq(cartItems.productId, productId),
-          variantId
-            ? eq(cartItems.variantId, variantId)
-            : sql`${cartItems.variantId} IS NULL`
-        ),
+      const existing = await db.query.cartItems.findFirst({
+        where: and(eq(cartItems.cartId, cart.id), eq(cartItems.variantId, variantId)),
       });
-
-      if (existingItem) {
-        // Update quantity if item exists
+      const wanted = (existing?.quantity ?? 0) + quantity;
+      const allowed = Math.min(wanted, variant.stock, MAX_QUANTITY_PER_ITEM);
+      if (allowed <= 0) {
+        skipped.push({ productId, variantId, reason: "out of stock" });
+        continue;
+      }
+      if (existing) {
         await db
           .update(cartItems)
-          .set({
-            quantity: existingItem.quantity + quantity,
-            price: price, // Use the price from guest cart
-            updatedAt: new Date(),
-          })
-          .where(eq(cartItems.id, existingItem.id));
+          .set({ quantity: allowed, price: variant.price, updatedAt: new Date() })
+          .where(eq(cartItems.id, existing.id));
       } else {
-        // Add new item
-        await db.insert(cartItems).values({
-          cartId: cart.id,
-          productId,
-          variantId,
-          quantity,
-          price,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        await db
+          .insert(cartItems)
+          .values({ cartId: cart.id, productId, variantId, quantity: allowed, price: variant.price });
       }
     }
-
-    // Return updated cart
-    return this.getCart(userId);
+    return { ...(await this.getCart(userId)), skipped };
   },
 };

@@ -1,57 +1,40 @@
 import { z } from "zod";
 
-// Cart DTOs
-export const cartDto = {
-  // GET cart - no validation needed
-  getCart: z.object({}),
+const quantity = () => z.number().int().min(1).max(99);
 
-  // Add item to cart
+export const cartDto = {
   addItem: z.object({
     productId: z.string().uuid(),
+    // Nullable so the API can explain that a size/colour must be chosen.
     variantId: z.string().uuid().nullable(),
-    quantity: z.number().min(1),
-    options: z.record(z.any()).optional(),
+    quantity: quantity(),
   }),
 
-  // Update cart item
   updateItem: z.object({
-    quantity: z.number().min(1),
-    options: z.record(z.any()).optional(),
+    quantity: quantity(),
   }),
 
-  // Remove item from cart
-  removeItem: z.object({
-    productId: z.string().uuid(),
-    variantId: z.string().uuid().nullable(),
-  }),
-
-  // Clear cart
-  clearCart: z.object({}),
-
-  // Apply coupon
-  applyCoupon: z.object({
-    code: z.string(),
-  }),
-
-  // Remove coupon
-  removeCoupon: z.object({}),
-
+  // Checks out the current cart (same rules as POST /api/orders/checkout).
   checkout: z.object({
     shippingAddressId: z.string().uuid(),
-    billingAddressId: z.string().uuid(),
+    billingAddressId: z.string().uuid().optional(),
+    shippingMethodId: z.string().uuid(),
     paymentMethodId: z.string().uuid(),
-    couponCode: z.string().optional(),
+    couponCode: z.string().trim().min(1).max(50).optional(),
     notes: z.string().max(500).optional(),
+    omiseToken: z.string().optional(),
   }),
 
   mergeGuestCart: z.object({
-    items: z.array(
-      z.object({
-        productId: z.string().uuid(),
-        variantId: z.string().uuid().nullable(),
-        quantity: z.number().min(1),
-        price: z.number().min(0),
-      })
-    ),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().uuid(),
+          variantId: z.string().uuid().nullable(),
+          quantity: quantity(),
+          price: z.number().min(0).optional().describe("Ignored: current prices are used"),
+        })
+      )
+      .max(100),
   }),
 };

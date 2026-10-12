@@ -17,13 +17,13 @@ export const shippingService = {
       where: eq(addresses.id, addressId),
     });
     if (!address) {
-      throw new Error("Address not found");
+      throw ApiError.badRequest("Address not found");
     }
     const zone = await db.query.shippingZones.findFirst({
       where: eq(shippingZones.id, address.shippingZoneId),
     });
     if (!zone) {
-      throw new Error("Shipping zone not found");
+      throw ApiError.badRequest("No shipping is available to this address");
     }
     // Calculate total weight
     let totalWeight = 0;

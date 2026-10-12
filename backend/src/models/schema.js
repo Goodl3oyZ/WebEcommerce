@@ -1077,6 +1077,9 @@ export const coupons = pgTable("coupons", {
   value: decimal("value", { precision: 10, scale: 2 }).notNull(),
   minPurchase: decimal("min_purchase", { precision: 10, scale: 2 }),
   maxDiscount: decimal("max_discount", { precision: 10, scale: 2 }),
+  // null = unlimited. Counted over orders that were not cancelled.
+  usageLimit: integer("usage_limit"),
+  perUserLimit: integer("per_user_limit"),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   isActive: boolean("is_active").default(true),

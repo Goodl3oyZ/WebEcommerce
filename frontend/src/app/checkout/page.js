@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
@@ -163,80 +163,59 @@ export default function CheckoutPage() {
     setQrUrl(null);
   }, [paymentMethodId]);
 
-  // useEffect สำหรับสร้าง QR PromptPay อัตโนมัติเมื่อ modal เปิดและเลือก promptpay
+  // Create the PromptPay order once per payment attempt (the ref also guards
+  // against React running the effect twice in development).
+  const promptPayAttempt = useRef(false);
   useEffect(() => {
-    if (showPaymentModal && modalMethod?.code?.toLowerCase() === "promptpay") {
-      const createPromptPay = async () => {
-        setModalQrUrl(null);
-        setIsSubmitting(true);
-        try {
-          const shippingAddress = addresses.find(
-            (a) => a.id === selectedAddressId
-          );
-          const items = cart.items.map((item) => ({
+    const isPromptPay = modalMethod?.code?.toLowerCase() === "promptpay";
+    if (!showPaymentModal || !isPromptPay || modalOrderId || promptPayAttempt.current) return;
+    promptPayAttempt.current = true;
+    const createPromptPay = async () => {
+      setModalQrUrl(null);
+      setIsSubmitting(true);
+      try {
+        const orderRes = await orderAPI.createOrder({
+          shippingAddressId: selectedAddressId,
+          shippingMethodId,
+          paymentMethodId,
+          items: cart.items.map((item) => ({
             productId: item.product.id,
             variantId: item.variant?.id || null,
             quantity: item.quantity,
-          }));
-          const orderData = {
-            shippingAddressId: shippingAddress.id,
-            billingAddressId: shippingAddress.id,
-            shippingMethodId,
-            paymentMethodId,
-            notes: "กรุณาส่งของในช่วงบ่าย",
-            items,
-            shippingCost: shippingCost,
-            paymentAmount: cart.subtotal + Number(shippingCost),
-          };
-          const orderRes = await orderAPI.createOrder(orderData);
-          const order = orderRes.data || orderRes;
-          if (order?.id) setModalOrderId(order.id);
-          
-          const charge = order?.charge || orderRes?.charge;
-          const qrUri =
-            charge?.source?.scannable_code?.image?.download_uri ||
-            charge?.scannable_code?.image?.download_uri;
-
-          if (qrUri) {
-            setModalQrUrl(qrUri);
-          } else {
-            const paymentRes = await paymentsAPI.createPayment({
-              orderId: order.id,
-              method: "promptpay",
-              amount: Number(order.total || cart.subtotal + Number(shippingCost)),
-            });
-            const pCharge = paymentRes?.data?.charge || paymentRes?.charge;
-            const pQrUri =
-              pCharge?.source?.scannable_code?.image?.download_uri ||
-              pCharge?.scannable_code?.image?.download_uri;
-            if (pQrUri) {
-              setModalQrUrl(pQrUri);
-            } else {
-              toast.error("ไม่สามารถสร้าง QR Code ได้");
-            }
-          }
-        } catch (err) {
-          console.error("Error creating PromptPay QR:", err);
-          toast.error("สร้าง QR ไม่สำเร็จ: " + (err.response?.data?.message || err.message));
-        } finally {
-          setIsSubmitting(false);
+          })),
+        });
+        const order = orderRes.data || orderRes;
+        if (order?.id) setModalOrderId(order.id);
+        const qrUri =
+          order?.charge?.qrCodeUrl || order?.charge?.source?.scannable_code?.image?.download_uri;
+        if (qrUri) {
+          setModalQrUrl(qrUri);
+        } else {
+          toast.error("ไม่สามารถสร้าง QR Code ได้");
         }
-      };
-      createPromptPay();
-    } else if (showPaymentModal) {
-      setModalQrUrl(null);
+      } catch (err) {
+        promptPayAttempt.current = false;
+        console.error("Error creating PromptPay QR:", err);
+        toast.error("สร้าง QR ไม่สำเร็จ: " + (err.response?.data?.message || err.message));
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+    createPromptPay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPaymentModal, modalMethod, modalOrderId]);
+
+  // Closing the modal without paying cancels the PromptPay order so its stock
+  // is released; "done" (after scanning) keeps it pending until paid.
+  const closePaymentModal = async ({ keepOrder = false } = {}) => {
+    setShowPaymentModal(false);
+    if (modalOrderId && !keepOrder) {
+      await orderAPI.cancelOrder(modalOrderId, "Payment cancelled at checkout").catch(() => {});
     }
-  }, [
-    showPaymentModal,
-    modalMethod,
-    selectedAddressId,
-    shippingMethodId,
-    paymentMethodId,
-    cart.items,
-    shippingCost,
-    addresses,
-    cart.subtotal,
-  ]);
+    setModalOrderId(null);
+    setModalQrUrl(null);
+    promptPayAttempt.current = false;
+  };
 
   // ตั้งค่า default paymentMethodId หลังโหลด paymentMethods
   useEffect(() => {
@@ -259,16 +238,6 @@ export default function CheckoutPage() {
         return "cash_on_delivery";
       default:
         return code?.toLowerCase();
-    }
-  }
-
-  // Utility: อัพเดตสถานะ order หลังชำระเงินสำเร็จ
-  async function updateOrderStatus(orderId, status) {
-    try {
-      const paymentStatus = status;
-      await orderAPI.updateOrderStatus(orderId, status);
-    } catch (err) {
-      console.error("Failed to update order status:", err);
     }
   }
 
@@ -354,7 +323,6 @@ export default function CheckoutPage() {
         billingAddressId: shippingAddress.id,
         shippingMethodId,
         paymentMethodId,
-        notes: "กรุณาส่งของในช่วงบ่าย",
         items,
         shippingCost: selectedShipping.cost,
         paymentAmount: cart.subtotal + Number(selectedShipping.cost),
@@ -484,7 +452,6 @@ export default function CheckoutPage() {
         billingAddressId: shippingAddress.id,
         shippingMethodId,
         paymentMethodId,
-        notes: "กรุณาส่งของในช่วงบ่าย",
         items,
         shippingCost: selectedShipping.cost,
         paymentAmount: cart.subtotal + Number(selectedShipping.cost),
@@ -1142,7 +1109,7 @@ export default function CheckoutPage() {
                     <button
                       className="bg-green-600 text-white px-4 py-2 rounded font-bold mt-4"
                       onClick={() => {
-                        setShowPaymentModal(false);
+                        closePaymentModal({ keepOrder: true });
                         router.push("/orders");
                       }}
                     >
@@ -1162,7 +1129,7 @@ export default function CheckoutPage() {
             )}
             <button
               className="bg-gray-300 px-4 py-2 rounded w-full mt-2"
-              onClick={() => setShowPaymentModal(false)}
+              onClick={() => closePaymentModal()}
             >
               ยกเลิก
             </button>

@@ -1,91 +1,36 @@
 import { cartService } from "../services/cartService.js";
-import { ApiError } from "../utils/ApiError.js";
+import { orderService } from "../services/orderService.js";
 
 export const cartController = {
-  // Get user's cart
-  async getCart(req, res, next) {
-    try {
-      const userId = req.user.id;
-      const cart = await cartService.getCart(userId);
-      res.json(cart);
-    } catch (error) {
-      next(error);
-    }
+  async getCart(req, res) {
+    res.json(await cartService.getCart(req.user.id));
   },
 
-  // Add item to cart
-  async addItem(req, res, next) {
-    try {
-      const userId = req.user.id;
-      const { productId, variantId, quantity } = req.body;
-      const cart = await cartService.addItem(userId, {
-        productId,
-        variantId,
-        quantity,
-      });
-      res.json(cart);
-    } catch (error) {
-      next(error);
-    }
+  async addItem(req, res) {
+    res.json(await cartService.addItem(req.user.id, req.body));
   },
 
-  // Update cart item
-  async updateItem(req, res, next) {
-    try {
-      const userId = req.user.id;
-      const { itemId } = req.params;
-      const { quantity } = req.body;
-      const cart = await cartService.updateItem(userId, itemId, quantity);
-      res.json(cart);
-    } catch (error) {
-      next(error);
-    }
+  async updateItem(req, res) {
+    res.json(await cartService.updateItem(req.user.id, req.params.itemId, req.body.quantity));
   },
 
-  // Remove item from cart
-  async removeItem(req, res, next) {
-    try {
-      const userId = req.user.id;
-      const { itemId } = req.params;
-      const cart = await cartService.removeItem(userId, itemId);
-      res.json(cart);
-    } catch (error) {
-      next(error);
-    }
+  async removeItem(req, res) {
+    res.json(await cartService.removeItem(req.user.id, req.params.itemId));
   },
 
-  // Clear cart
-  async clearCart(req, res, next) {
-    try {
-      const userId = req.user.id;
-      await cartService.clearCart(userId);
-      res.status(204).send();
-    } catch (error) {
-      next(error);
-    }
+  async clearCart(req, res) {
+    await cartService.clearCart(req.user.id);
+    res.status(204).send();
   },
 
-  // Checkout
-  async checkout(req, res, next) {
-    try {
-      const userId = req.user.id;
-      const checkoutData = req.body;
-      const order = await cartService.checkout(userId, checkoutData);
-      res.status(201).json(order);
-    } catch (error) {
-      next(error);
-    }
+  /** Check out the whole cart through the same path as POST /api/orders/checkout. */
+  async checkout(req, res) {
+    const items = await cartService.getCheckoutItems(req.user.id);
+    const order = await orderService.createOrder(req.user.id, { ...req.body, items });
+    res.status(201).json({ success: true, data: order });
   },
 
-  // Merge guest cart with user cart
-  async mergeGuestCart(req, res, next) {
-    try {
-      const userId = req.user.id;
-      const { items } = req.body;
-      const cart = await cartService.mergeGuestCart(userId, items);
-      res.json(cart);
-    } catch (error) {
-      next(error);
-    }
+  async mergeGuestCart(req, res) {
+    res.json(await cartService.mergeGuestCart(req.user.id, req.body.items));
   },
 };

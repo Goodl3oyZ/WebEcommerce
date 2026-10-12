@@ -1,143 +1,70 @@
 import { z } from "zod";
 
-// Payment DTOs
+const dateTime = () => z.string().datetime({ offset: true });
+
 export const paymentDto = {
-  // Create payment
+  // Pay (or retry paying) an order. The amount is always the order total; the
+  // amount/currency fields are accepted for compatibility but ignored.
   createPayment: z
     .object({
       orderId: z.string().uuid(),
       method: z.enum(["credit_card", "promptpay", "cash_on_delivery"]),
-      // Accepted for backward compatibility but ignored: the server charges order.total.
-      amount: z.number().min(0).optional(),
-      currency: z.enum(["THB", "USD", "EUR"]).optional(),
-      paymentDetails: z.record(z.any()).optional(),
+      cardToken: z.string().optional().describe("Omise.js card token (credit_card)"),
+      paymentDetails: z
+        .object({ token: z.string().optional(), cardToken: z.string().optional() })
+        .passthrough()
+        .optional(),
+      amount: z.number().min(0).optional().describe("Ignored: the order total is charged"),
+      currency: z.enum(["THB", "USD", "EUR"]).optional().describe("Ignored: always THB"),
     })
     .refine(
-      (data) => {
-        if (data.method === "credit_card") {
-          return (
-            data.paymentDetails &&
-            typeof data.paymentDetails.token === "string" &&
-            data.paymentDetails.token.length > 0
-          );
-        }
-        return true;
-      },
-      {
-        message: "Missing card token in paymentDetails for credit_card payment",
-        path: ["paymentDetails", "token"],
-      }
+      (data) =>
+        data.method !== "credit_card" ||
+        Boolean(data.cardToken || data.paymentDetails?.token || data.paymentDetails?.cardToken),
+      { message: "A card token is required for credit_card payments", path: ["cardToken"] }
     ),
 
-  // Update payment status
-  updatePaymentStatus: z.object({
-    status: z.enum([
-      "pending",
-      "processing",
-      "completed",
-      "failed",
-      "refunded",
-      "cancelled",
-    ]),
-    transactionId: z.string().optional(),
-    notes: z.string().optional(),
-  }),
-
-  // Process refund
-  processRefund: z.object({
-    amount: z.coerce.number().min(0),
-    reason: z.string().min(1),
-    refundDetails: z.record(z.any()).optional(),
-  }),
-
-  // Add payment method
-  addPaymentMethod: z.object({
-    type: z.enum(["credit_card", "bank_account"]),
-    details: z.record(z.any()),
-    isDefault: z.boolean().default(false),
-  }),
-
-  // Update payment method
-  updatePaymentMethod: z
+  // Admin override (refunds go through the refund endpoint).
+  updatePaymentStatus: z
     .object({
-      isDefault: z.boolean().optional(),
-      details: z.record(z.any()).optional(),
-    })
-    .refine((data) => Object.keys(data).length > 0, {
-      message: "At least one field must be provided for update",
-    }),
-
-  // Remove payment method
-  removePaymentMethod: z.object({
-    paymentMethodId: z.string().uuid(),
-  }),
-
-  createToken: z
-    .object({
-      card: z.object({
-        name: z.string().min(1),
-        number: z.string().min(13),
-        expiration_month: z.number().int().min(1).max(12),
-        expiration_year: z.number().int().min(new Date().getFullYear()),
-        security_code: z.string().min(3),
-      }),
+      status: z.enum(["pending", "processing", "completed", "failed", "cancelled"]),
+      transactionId: z.string().optional(),
+      notes: z.string().optional(),
     })
     .strict(),
 
-  verifyPayment: z
+  processRefund: z
     .object({
-      verificationCode: z.string().min(1),
+      amount: z.coerce.number().positive().optional().describe("Defaults to the remaining paid amount"),
+      reason: z.string().trim().min(1).max(1000),
     })
     .strict(),
-};
 
-// Response DTOs
-export const paymentResponseDto = {
-  // Basic payment info
-  basic: z.object({
-    id: z.string().uuid(),
-    orderId: z.string().uuid(),
-    amount: z.number(),
-    status: z.string(),
-    createdAt: z.string().datetime(),
+  // Re-check a payment with Omise. `verificationCode` is accepted for older clients.
+  verifyPayment: z.object({ verificationCode: z.string().optional() }).strict(),
+
+  historyQuery: z.object({
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
   }),
 
-  // Detailed payment info
-  detailed: z.object({
-    id: z.string().uuid(),
-    orderId: z.string().uuid(),
-    method: z.string(),
-    amount: z.number(),
-    currency: z.string(),
-    status: z.string(),
-    transactionId: z.string().optional(),
-    paymentDetails: z.record(z.any()).optional(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
+  adminListQuery: z.object({
+    status: z.string().optional(),
+    startDate: dateTime().optional(),
+    endDate: dateTime().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
   }),
 
-  // Admin view of payment
-  admin: z.object({
-    id: z.string().uuid(),
-    orderId: z.string().uuid(),
-    userId: z.string().uuid(),
-    method: z.string(),
-    amount: z.number(),
-    currency: z.string(),
-    status: z.string(),
-    transactionId: z.string().optional(),
-    paymentDetails: z.record(z.any()).optional(),
-    refundHistory: z
-      .array(
-        z.object({
-          amount: z.number(),
-          reason: z.string(),
-          status: z.string(),
-          createdAt: z.string().datetime(),
-        })
-      )
-      .optional(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
+  statsQuery: z.object({
+    storeId: z.string().uuid().optional(),
+    startDate: dateTime().optional(),
+    endDate: dateTime().optional(),
+  }),
+
+  storeQuery: z.object({
+    status: z.string().optional(),
+    startDate: dateTime().optional(),
+    endDate: dateTime().optional(),
   }),
 };

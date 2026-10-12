@@ -5,14 +5,21 @@ import { couponController } from "../controllers/couponController.js";
 import { validationMiddleware } from "../middlewares/validationMiddleware.js";
 import { couponDto } from "../dtos/coupon.dto.js";
 import { apiRateLimiter } from "../middlewares/rateLimiter.js";
+import { uuidParam } from "../middlewares/uuidParam.js";
 
 const router = express.Router();
+router.param("id", uuidParam("Coupon not found"));
 const requireAdmin = requireRole(ROLES.ADMIN);
 
 router.use(apiRateLimiter);
 
 // User routes (auth required)
-router.get("/validate", authMiddleware, couponController.validateCoupon);
+router.get(
+  "/validate",
+  authMiddleware,
+  validationMiddleware(couponDto.validateQuery, "query"),
+  couponController.validateCoupon
+);
 router.get("/available", authMiddleware, couponController.getAvailableCoupons);
 
 // Admin routes

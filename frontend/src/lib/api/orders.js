@@ -68,7 +68,8 @@ export const orderAPI = {
 
   // Update tracking number
   updateTrackingNumber: async (orderId, trackingNumber) => {
-    const response = await apiClient.patch(`/orders/${orderId}/tracking`, {
+    // Admin only: tracking lives on the order's shipping info.
+    const response = await apiClient.put(`/orders/admin/${orderId}/shipping`, {
       trackingNumber,
     });
     return response.data;

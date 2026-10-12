@@ -1,158 +1,80 @@
 import { z } from "zod";
+import { ORDER_STATUSES } from "../utils/orderStatus.js";
 
-// Order DTOs
+const id = () => z.string().uuid();
+
 export const orderDto = {
-  // Create order (checkout)
+  // Checkout. Money fields the client used to send (shippingCost,
+  // paymentAmount, ...) are accepted for compatibility but ignored: the server
+  // computes every amount.
   checkout: z.object({
-    shippingAddressId: z.string().uuid(),
-    billingAddressId: z.string().uuid(),
-    items: z.array(
-      z.object({
-        productId: z.string().uuid(),
-        variantId: z.string().uuid().optional(),
-        quantity: z.number().min(1),
-      })
-    ),
-    shippingMethodId: z.string().uuid(),
-    shippingCost: z.number().min(0),
-    shippingNotes: z.string().optional(),
-    deliveryInstructions: z.string().optional(),
-    paymentMethodId: z.string().uuid(),
-    paymentDetails: z.record(z.any()).optional(),
-    paymentAmount: z.number().min(0),
-    couponCode: z.string().optional(),
-    notes: z.string().optional(),
-    gift: z.boolean().optional(),
-    giftMessage: z.string().optional(),
+    shippingAddressId: id(),
+    billingAddressId: id().optional().describe("Defaults to the shipping address"),
+    shippingMethodId: id(),
+    paymentMethodId: id(),
+    items: z
+      .array(
+        z.object({
+          productId: id(),
+          variantId: id(),
+          quantity: z.number().int().min(1).max(99),
+        })
+      )
+      .min(1)
+      .max(50),
+    couponCode: z.string().trim().min(1).max(50).optional(),
+    notes: z.string().max(500).optional(),
+    omiseToken: z.string().optional().describe("Card token from Omise.js (credit card only)"),
+    shippingCost: z.number().optional().describe("Ignored: computed by the server"),
+    paymentAmount: z.number().optional().describe("Ignored: computed by the server"),
   }),
 
-  // Update order status (admin only)
+  listQuery: z.object({
+    status: z.enum(ORDER_STATUSES).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
+  }),
+
+  adminListQuery: z.object({
+    status: z.enum(ORDER_STATUSES).optional(),
+    search: z.string().optional().describe("Order number or id"),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
+  }),
+
+  statsQuery: z.object({
+    startDate: z.string().datetime({ offset: true }).optional(),
+    endDate: z.string().datetime({ offset: true }).optional(),
+  }),
+
+  // Admin status change ("paid" is set by the payment flow, not by hand).
   updateOrderStatus: z
     .object({
-      status: z.enum([
-        "pending",
-        "confirmed",
-        "processing",
-        "shipped",
-        "delivered",
-        "cancelled",
-        "refunded",
-      ]),
+      status: z.enum(ORDER_STATUSES.filter((s) => s !== "paid" && s !== "pending")),
       trackingNumber: z.string().optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(1000).optional(),
     })
     .strict(),
 
-  // Cancel order
+  // Customer: the only status change a customer can make is confirming delivery.
+  confirmDelivery: z.object({ status: z.literal("delivered") }).strict(),
+
   cancelOrder: z.object({
-    reason: z.string().min(1),
+    reason: z.string().trim().min(1).max(500),
   }),
 
-  // Update shipping info
   updateShippingInfo: z.object({
-    trackingNumber: z.string().min(1),
-    carrier: z.string().min(1),
-    status: z.enum(["pending", "processing", "shipped", "delivered"]),
-    estimatedDelivery: z.string().datetime().optional(),
-  }),
-
-  // Add order review
-  addReview: z.object({
-    rating: z.number().min(1).max(5),
-    comment: z.string().min(1),
-    images: z.array(z.string().url()).optional(),
+    trackingNumber: z.string().trim().min(1).max(100),
+    carrier: z.string().trim().min(1).max(100).optional(),
+    status: z.enum(["pending", "processing", "shipped", "delivered"]).optional(),
+    estimatedDelivery: z.string().datetime({ offset: true }).optional(),
   }),
 
   refundOrder: z
     .object({
-      amount: z.number().min(0).optional(),
-      reason: z.string().min(1),
-      notes: z.string().optional(),
+      amount: z.number().positive().optional().describe("Defaults to the order total"),
+      reason: z.string().trim().min(1).max(1000),
+      notes: z.string().max(1000).optional(),
     })
     .strict(),
-};
-
-// Response DTOs
-export const orderResponseDto = {
-  // Basic order info
-  basic: z.object({
-    id: z.string().uuid(),
-    orderNumber: z.string(),
-    status: z.string(),
-    totalAmount: z.number(),
-    createdAt: z.string().datetime(),
-  }),
-
-  // Detailed order info
-  detailed: z.object({
-    id: z.string().uuid(),
-    orderNumber: z.string(),
-    status: z.string(),
-    items: z.array(
-      z.object({
-        productId: z.string().uuid(),
-        name: z.string(),
-        quantity: z.number(),
-        price: z.number(),
-        options: z.record(z.any()).optional(),
-      })
-    ),
-    shippingAddress: z.object({
-      address: z.string(),
-      city: z.string(),
-      state: z.string(),
-      country: z.string(),
-      postalCode: z.string(),
-    }),
-    paymentMethod: z.string(),
-    subtotal: z.number(),
-    shippingCost: z.number(),
-    tax: z.number(),
-    totalAmount: z.number(),
-    notes: z.string().optional(),
-    trackingNumber: z.string().optional(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  }),
-
-  // Admin view of order
-  admin: z.object({
-    id: z.string().uuid(),
-    orderNumber: z.string(),
-    userId: z.string().uuid(),
-    status: z.string(),
-    items: z.array(
-      z.object({
-        productId: z.string().uuid(),
-        name: z.string(),
-        quantity: z.number(),
-        price: z.number(),
-        options: z.record(z.any()).optional(),
-      })
-    ),
-    shippingAddress: z.object({
-      address: z.string(),
-      city: z.string(),
-      state: z.string(),
-      country: z.string(),
-      postalCode: z.string(),
-    }),
-    paymentMethod: z.string(),
-    paymentStatus: z.string(),
-    subtotal: z.number(),
-    shippingCost: z.number(),
-    tax: z.number(),
-    totalAmount: z.number(),
-    notes: z.string().optional(),
-    trackingNumber: z.string().optional(),
-    statusHistory: z.array(
-      z.object({
-        status: z.string(),
-        timestamp: z.string().datetime(),
-        notes: z.string().optional(),
-      })
-    ),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  }),
 };

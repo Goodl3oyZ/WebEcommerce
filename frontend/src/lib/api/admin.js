@@ -68,6 +68,10 @@ export const adminAPI = {
       .then((r) => r.data),
   getOrderStats: async (params = {}) =>
     axiosInstance.get("/orders/admin/stats", { params }).then((r) => r.data),
+  updateShippingInfo: async (orderId, data) =>
+    axiosInstance.put(`/orders/admin/${orderId}/shipping`, data).then((r) => r.data),
+  getOrderPayments: async (orderId) =>
+    axiosInstance.get(`/payments/order/${orderId}`).then((r) => r.data),
 
   // --- Shipping (admin only) ---
   getShippingMethods: async () =>

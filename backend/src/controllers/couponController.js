@@ -1,70 +1,57 @@
 import { couponService } from "../services/couponService.js";
-import { catchAsync } from "../utils/catchAsync.js";
+import { parsePagination } from "../utils/pagination.js";
 
 export const couponController = {
-  validateCoupon: catchAsync(async (req, res) => {
+  async validateCoupon(req, res) {
     const { code, amount } = req.query;
-    const result = await couponService.validateCoupon(code, amount);
-    res.json(result);
-  }),
+    res.json(await couponService.validateCoupon(code, amount, req.user.id));
+  },
 
-  getAvailableCoupons: catchAsync(async (req, res) => {
-    const coupons = await couponService.getAvailableCoupons();
-    res.json(coupons);
-  }),
+  async getAvailableCoupons(req, res) {
+    res.json(await couponService.getAvailableCoupons());
+  },
 
-  getCoupons: catchAsync(async (req, res) => {
-    const coupons = await couponService.getCoupons({ search: req.query.search });
-    res.json(coupons);
-  }),
+  async getCoupons(req, res) {
+    res.json(await couponService.getCoupons({ search: req.query.search }));
+  },
 
-  getCouponById: catchAsync(async (req, res) => {
-    const coupon = await couponService.getCouponById(req.params.id);
-    res.json(coupon);
-  }),
+  async getCouponById(req, res) {
+    res.json(await couponService.getCouponById(req.params.id));
+  },
 
-  createCoupon: catchAsync(async (req, res) => {
-    const coupon = await couponService.createCoupon(req.body);
-    res.status(201).json(coupon);
-  }),
+  async createCoupon(req, res) {
+    res.status(201).json(await couponService.createCoupon(req.body));
+  },
 
-  updateCoupon: catchAsync(async (req, res) => {
-    const coupon = await couponService.updateCoupon(req.params.id, req.body);
-    res.json(coupon);
-  }),
+  async updateCoupon(req, res) {
+    res.json(await couponService.updateCoupon(req.params.id, req.body));
+  },
 
-  deleteCoupon: catchAsync(async (req, res) => {
+  async deleteCoupon(req, res) {
     const coupon = await couponService.deleteCoupon(req.params.id);
     res.json({
       success: true,
       data: coupon,
-      message: coupon.disabledInsteadOfDeleted
-        ? "คูปองเคยถูกใช้แล้ว จึงปิดการใช้งานแทนการลบ"
-        : "ปิดการใช้งานคูปองแล้ว",
+      message:
+        coupon.usageCount > 0
+          ? "คูปองเคยถูกใช้แล้ว จึงปิดการใช้งานแทนการลบ"
+          : "ปิดการใช้งานคูปองแล้ว",
     });
-  }),
+  },
 
-  activateCoupon: catchAsync(async (req, res) => {
-    const coupon = await couponService.activateCoupon(req.params.id);
-    res.json(coupon);
-  }),
+  async activateCoupon(req, res) {
+    res.json(await couponService.setActive(req.params.id, true));
+  },
 
-  deactivateCoupon: catchAsync(async (req, res) => {
-    const coupon = await couponService.deactivateCoupon(req.params.id);
-    res.json(coupon);
-  }),
+  async deactivateCoupon(req, res) {
+    res.json(await couponService.setActive(req.params.id, false));
+  },
 
-  getCouponStatistics: catchAsync(async (req, res) => {
-    const stats = await couponService.getCouponStatistics(req.query);
-    res.json(stats);
-  }),
+  async getCouponStatistics(req, res) {
+    res.json(await couponService.getCouponStatistics());
+  },
 
-  getCouponUsage: catchAsync(async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
-    const usage = await couponService.getCouponUsage(req.params.id, {
-      page,
-      limit,
-    });
-    res.json(usage);
-  }),
+  async getCouponUsage(req, res) {
+    res.json(await couponService.getCouponUsage(req.params.id, parsePagination(req.query)));
+  },
 };
