@@ -195,7 +195,7 @@ export default function CheckoutPage() {
         }
       } catch (err) {
         promptPayAttempt.current = false;
-        console.error("Error creating PromptPay QR:", err);
+        console.error("Error creating PromptPay QR:", err.response?.data?.message || err.message, err);
         toast.error("สร้าง QR ไม่สำเร็จ: " + (err.response?.data?.message || err.message));
       } finally {
         setIsSubmitting(false);

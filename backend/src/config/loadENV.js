@@ -137,13 +137,16 @@ const githubConfig = {
 const sessionSecret = process.env.SESSION_SECRET;
 const isProduction = SERVER_CONFIG.NODE_ENV === "production";
 
-// Test keys are only acceptable outside production.
-const omisePublicKey =
-  process.env.OMISE_PUBLIC_KEY ||
-  (isProduction ? undefined : "pkey_test_5u15668b556f8f53703");
-const omiseSecretKey =
-  process.env.OMISE_SECRET_KEY ||
-  (isProduction ? undefined : "skey_test_REMOVED");
+// No fallback keys: a made-up key only fails later with a confusing
+// "authentication failure" from Omise. Required in production (checked below);
+// in development card/PromptPay payments are refused until they are set.
+const omisePublicKey = process.env.OMISE_PUBLIC_KEY || undefined;
+const omiseSecretKey = process.env.OMISE_SECRET_KEY || undefined;
+if (!isProduction && !omiseSecretKey && SERVER_CONFIG.NODE_ENV !== "test") {
+  console.warn(
+    "OMISE_SECRET_KEY is not set: card and PromptPay payments will fail. Add your Omise test keys to backend/.env."
+  );
+}
 
 if (isProduction) {
   const missingProdVars = Object.entries({

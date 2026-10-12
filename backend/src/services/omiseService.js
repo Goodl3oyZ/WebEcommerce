@@ -3,12 +3,32 @@ import { ENV } from "../config/loadENV.js";
 import { ApiError } from "../utils/ApiError.js";
 import Omise from "omise";
 
-// Initialize Omise client
-const omise = Omise({
-  secretKey: ENV.OMISE_SECRET_KEY,
-  publicKey: ENV.OMISE_PUBLIC_KEY,
-  omiseVersion: "2019-05-29",
-});
+// Initialize Omise client (only when configured).
+const omiseClient = ENV.OMISE_SECRET_KEY
+  ? Omise({
+      secretKey: ENV.OMISE_SECRET_KEY,
+      publicKey: ENV.OMISE_PUBLIC_KEY,
+      omiseVersion: "2019-05-29",
+    })
+  : null;
+
+/** The configured client, or a clear 503 instead of Omise's "authentication failure". */
+const omise = new Proxy(
+  {},
+  {
+    get(_target, resource) {
+      if (!omiseClient) {
+        throw new ApiError(
+          503,
+          "Online payment is not configured: set OMISE_SECRET_KEY and OMISE_PUBLIC_KEY",
+          null,
+          "PAYMENT_NOT_CONFIGURED"
+        );
+      }
+      return omiseClient[resource];
+    },
+  }
+);
 
 export const omiseService = {
   // Create charge
