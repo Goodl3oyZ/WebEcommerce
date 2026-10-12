@@ -18,8 +18,12 @@ const requireConfigured = (provider) => (req, res, next) =>
 
 // Login state lives in our own session/cookies, so passport sessions are off.
 const callback = (provider) => (req, res, next) =>
-  passport.authenticate(provider, { session: false }, (err, user) => {
-    if (err || !user) return res.redirect(oauthFailureUrl(err?.code));
+  passport.authenticate(provider, { session: false }, (err, user, info) => {
+    if (err || !user) {
+      // The browser only sees a short code; keep the real cause in the log.
+      console.error(`OAuth ${provider} login failed:`, err ?? info);
+      return res.redirect(oauthFailureUrl(err?.code));
+    }
     req.user = user;
     return oauthController.oauthCallback(req, res, next);
   })(req, res, next);

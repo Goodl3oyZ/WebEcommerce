@@ -13,6 +13,7 @@ import {
   check,
   primaryKey,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -356,7 +357,7 @@ export const districts = pgTable(
     nameEn: varchar("name_en", { length: 100 }),
   },
   (table) => ({
-    uniqueProvinceCode: unique().on(table.provinceId, table.code),
+    uniqueProvinceCode: uniqueIndex("districts_province_id_code_unique").on(table.provinceId, table.code),
   })
 );
 
@@ -372,7 +373,7 @@ export const subdistricts = pgTable(
     zipcode: varchar("zipcode", { length: 10 }),
   },
   (table) => ({
-    uniqueDistrictCode: unique().on(table.districtId, table.code),
+    uniqueDistrictCode: uniqueIndex("subdistricts_district_id_code_unique").on(table.districtId, table.code),
   })
 );
 
@@ -434,7 +435,7 @@ export const orders = pgTable("orders", {
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull(),
   tax: decimal("tax", { precision: 10, scale: 2 }).notNull(),
-  discount: decimal("discount", { precision: 10, scale: 2 }).default(0),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   shippingAddressId: uuid("shipping_address_id").references(() => addresses.id),
   billingAddressId: uuid("billing_address_id").references(() => addresses.id),
