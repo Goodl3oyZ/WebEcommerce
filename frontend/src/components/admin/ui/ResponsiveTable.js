@@ -41,7 +41,7 @@ export function ResponsiveTable({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-3 text-sm text-fg placeholder:text-fg-subtle transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full rounded-xl border border-border bg-surface py-2.5 pl-10 pr-3 text-sm text-fg placeholder:text-fg-subtle transition-colors duration-150 focus:border-fg focus:outline-none focus:ring-2 focus:ring-fg"
           />
         </label>
       )}

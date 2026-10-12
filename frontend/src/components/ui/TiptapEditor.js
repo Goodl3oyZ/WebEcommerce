@@ -19,14 +19,14 @@ const MenuBar = ({ editor }) => {
   }
 
   return (
-    <div className="border-b border-gray-300 p-2 flex flex-wrap gap-2 bg-gray-50">
+    <div className="border-b border-border p-2 flex flex-wrap gap-2 bg-surface-muted">
       <button
         onClick={() => editor.chain().focus().toggleBold().run()}
         disabled={!editor.can().chain().focus().toggleBold().run()}
         className={`p-2 rounded ${
           editor.isActive("bold")
-            ? "bg-blue-500 text-white"
-            : "bg-white hover:bg-gray-100"
+            ? "bg-fg text-canvas"
+            : "bg-surface hover:bg-surface-muted"
         }`}
         title="Bold"
       >
@@ -37,8 +37,8 @@ const MenuBar = ({ editor }) => {
         disabled={!editor.can().chain().focus().toggleItalic().run()}
         className={`p-2 rounded ${
           editor.isActive("italic")
-            ? "bg-blue-500 text-white"
-            : "bg-white hover:bg-gray-100"
+            ? "bg-fg text-canvas"
+            : "bg-surface hover:bg-surface-muted"
         }`}
         title="Italic"
       >
@@ -48,8 +48,8 @@ const MenuBar = ({ editor }) => {
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         className={`p-2 rounded ${
           editor.isActive("bulletList")
-            ? "bg-blue-500 text-white"
-            : "bg-white hover:bg-gray-100"
+            ? "bg-fg text-canvas"
+            : "bg-surface hover:bg-surface-muted"
         }`}
         title="Bullet List"
       >
@@ -59,8 +59,8 @@ const MenuBar = ({ editor }) => {
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         className={`p-2 rounded ${
           editor.isActive("orderedList")
-            ? "bg-blue-500 text-white"
-            : "bg-white hover:bg-gray-100"
+            ? "bg-fg text-canvas"
+            : "bg-surface hover:bg-surface-muted"
         }`}
         title="Numbered List"
       >
@@ -75,18 +75,18 @@ const MenuBar = ({ editor }) => {
         }}
         className={`p-2 rounded ${
           editor.isActive("link")
-            ? "bg-blue-500 text-white"
-            : "bg-white hover:bg-gray-100"
+            ? "bg-fg text-canvas"
+            : "bg-surface hover:bg-surface-muted"
         }`}
         title="Add Link"
       >
         <FaLink size={14} />
       </button>
-      <div className="border-l border-gray-300 mx-2"></div>
+      <div className="border-l border-border mx-2"></div>
       <button
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().chain().focus().undo().run()}
-        className="p-2 rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+        className="p-2 rounded bg-surface hover:bg-surface-muted disabled:opacity-50"
         title="Undo"
       >
         <FaUndo size={14} />
@@ -94,7 +94,7 @@ const MenuBar = ({ editor }) => {
       <button
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().chain().focus().redo().run()}
-        className="p-2 rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+        className="p-2 rounded bg-surface hover:bg-surface-muted disabled:opacity-50"
         title="Redo"
       >
         <FaRedo size={14} />
@@ -114,7 +114,7 @@ export default function TiptapEditor({
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: "text-blue-600 underline hover:text-blue-800",
+          class: "text-fg underline hover:text-fg",
         },
       }),
     ],
@@ -132,11 +132,11 @@ export default function TiptapEditor({
   });
 
   return (
-    <div className="border border-gray-300 rounded-md overflow-hidden relative">
+    <div className="border border-border rounded-md overflow-hidden relative">
       <MenuBar editor={editor} />
       <EditorContent editor={editor} />
       {!value && !editor?.getText().trim() && (
-        <div className="absolute top-16 left-4 text-gray-400 pointer-events-none">
+        <div className="absolute top-16 left-4 text-fg-subtle pointer-events-none">
           {placeholder}
         </div>
       )}

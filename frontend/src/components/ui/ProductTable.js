@@ -111,11 +111,11 @@ export default function ProductTable({
   };
 
   const SortIcon = ({ field }) => {
-    if (sortField !== field) return <FaSort className="text-gray-400" />;
+    if (sortField !== field) return <FaSort className="text-fg-subtle" />;
     return sortDirection === "asc" ? (
-      <FaSortUp className="text-blue-500" />
+      <FaSortUp className="text-fg" />
     ) : (
-      <FaSortDown className="text-blue-500" />
+      <FaSortDown className="text-fg" />
     );
   };
 
@@ -124,15 +124,15 @@ export default function ProductTable({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div className="bg-surface rounded-xl shadow-lg overflow-hidden">
       {/* Header with Title and Results Summary */}
-      <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+      <div className="px-6 py-4 bg-gradient-to-r from-surface-muted to-surface-muted border-b border-border">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-fg">
               รายการสินค้า
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-fg-muted mt-1">
               แสดง {startIndex + 1}-
               {Math.min(startIndex + itemsPerPage, sortedProducts.length)} จาก{" "}
               {sortedProducts.length} รายการ
@@ -140,7 +140,7 @@ export default function ProductTable({
                 selectedCategory ||
                 selectedBrand ||
                 statusFilter) && (
-                <span className="ml-2 text-blue-600 font-medium">
+                <span className="ml-2 text-fg font-medium">
                   (กรองแล้ว)
                 </span>
               )}
@@ -152,7 +152,7 @@ export default function ProductTable({
             statusFilter) && (
             <button
               onClick={clearFilters}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border text-fg rounded-lg hover:bg-surface-muted transition-colors text-sm font-medium shadow-sm"
             >
               <FaTimes size={12} />
               ล้างตัวกรอง
@@ -162,17 +162,17 @@ export default function ProductTable({
       </div>
 
       {/* Filters Section */}
-      <div className="p-6 border-b border-gray-200 bg-gray-50">
+      <div className="p-6 border-b border-border bg-surface-muted">
         <div className="space-y-4">
           {/* Search Bar */}
           <div className="relative">
-            <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-fg-subtle" />
             <input
               type="text"
               placeholder="ค้นหาสินค้า"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
+              className="w-full pl-12 pr-4 py-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-fg focus:border-transparent bg-surface shadow-sm"
             />
           </div>
 
@@ -180,13 +180,13 @@ export default function ProductTable({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
             {/* Category Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg mb-2">
                 หมวดหมู่
               </label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-fg focus:border-transparent bg-surface shadow-sm"
               >
                 <option value="">หมวดหมู่</option>
                 {categories.map((category) => (
@@ -199,13 +199,13 @@ export default function ProductTable({
 
             {/* Brand Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg mb-2">
                 แบรนด์
               </label>
               <select
                 value={selectedBrand}
                 onChange={(e) => setSelectedBrand(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-fg focus:border-transparent bg-surface shadow-sm"
               >
                 <option value="">แบรนด์</option>
                 {brands.map((brand) => (
@@ -218,13 +218,13 @@ export default function ProductTable({
 
             {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg mb-2">
                 สถานะ
               </label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-fg focus:border-transparent bg-surface shadow-sm"
               >
                 <option value="">ทุกสถานะ</option>
                 <option value="active">เปิดใช้งาน</option>
@@ -234,12 +234,12 @@ export default function ProductTable({
 
             {/* Items Per Page */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg mb-2">
                 แสดงต่อหน้า
               </label>
               <select
                 value={itemsPerPage}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-fg focus:border-transparent bg-surface shadow-sm"
                 disabled
               >
                 <option value={10}>10 รายการ</option>
@@ -252,13 +252,13 @@ export default function ProductTable({
       {/* Table */}
       <div className="hidden max-h-[70vh] overflow-auto md:block">
         <table className="w-full">
-          <thead className="sticky top-0 z-10 bg-gray-50">
+          <thead className="sticky top-0 z-10 bg-surface-muted">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-fg-muted uppercase tracking-wider">
                 สินค้า
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                className="px-6 py-4 text-left text-xs font-semibold text-fg-muted uppercase tracking-wider cursor-pointer hover:bg-surface-muted transition-colors"
                 onClick={() => handleSort("category")}
               >
                 <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function ProductTable({
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                className="px-6 py-4 text-left text-xs font-semibold text-fg-muted uppercase tracking-wider cursor-pointer hover:bg-surface-muted transition-colors"
                 onClick={() => handleSort("brand")}
               >
                 <div className="flex items-center gap-2">
@@ -276,7 +276,7 @@ export default function ProductTable({
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                className="px-6 py-4 text-left text-xs font-semibold text-fg-muted uppercase tracking-wider cursor-pointer hover:bg-surface-muted transition-colors"
                 onClick={() => handleSort("price")}
               >
                 <div className="flex items-center gap-2">
@@ -285,7 +285,7 @@ export default function ProductTable({
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                className="px-6 py-4 text-left text-xs font-semibold text-fg-muted uppercase tracking-wider cursor-pointer hover:bg-surface-muted transition-colors"
                 onClick={() => handleSort("stock")}
               >
                 <div className="flex items-center gap-2">
@@ -294,7 +294,7 @@ export default function ProductTable({
                 </div>
               </th>
               <th
-                className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                className="px-6 py-4 text-left text-xs font-semibold text-fg-muted uppercase tracking-wider cursor-pointer hover:bg-surface-muted transition-colors"
                 onClick={() => handleSort("isActive")}
               >
                 <div className="flex items-center gap-2">
@@ -302,20 +302,20 @@ export default function ProductTable({
                   <SortIcon field="isActive" />
                 </div>
               </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-fg-muted uppercase tracking-wider">
                 จัดการ
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-surface divide-y divide-border">
             {paginatedProducts.map((product) => (
               <tr
                 key={product.id}
-                className="hover:bg-gray-50 transition-colors"
+                className="hover:bg-surface-muted transition-colors"
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center">
-                    <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-gray-200 shadow-sm">
+                    <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-border shadow-sm">
                       {resolveProductImageUrl(product.imageUrl) ? (
                         <Image
                           className="object-cover"
@@ -326,43 +326,43 @@ export default function ProductTable({
                         />
                       ) : (
                         <div className="flex h-16 w-16 items-center justify-center">
-                          <FaImage className="text-gray-400 text-xl" />
+                          <FaImage className="text-fg-subtle text-xl" />
                         </div>
                       )}
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-semibold text-gray-900 mb-1">
+                      <div className="text-sm font-semibold text-fg mb-1">
                         {product.name}
                       </div>
-                      <div className="text-sm text-gray-500 truncate max-w-xs">
+                      <div className="text-sm text-fg-muted truncate max-w-xs">
                         {product.description}
                       </div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <td className="px-6 py-4 text-sm text-fg">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-fg">
                     {categories.find((cat) => cat.id == product.categoryId)
                       ?.name || "N/A"}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <td className="px-6 py-4 text-sm text-fg">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-fg">
                     {brands.find((brand) => brand.id == product.brandId)
                       ?.name || "N/A"}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                <td className="px-6 py-4 text-sm font-semibold text-fg">
                   ฿{Number(product.price).toLocaleString()}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900">
+                <td className="px-6 py-4 text-sm text-fg">
                   <span
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       product.stock > 10
-                        ? "bg-green-100 text-green-800"
+                        ? "bg-success-soft text-success"
                         : product.stock > 0
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"
+                        ? "bg-warning-soft text-warning"
+                        : "bg-danger-soft text-danger"
                     }`}
                   >
                     {product.stock} ชิ้น
@@ -372,8 +372,8 @@ export default function ProductTable({
                   <span
                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                       product.isActive
-                        ? "bg-green-100 text-green-800 border border-green-200"
-                        : "bg-gray-100 text-gray-600 border border-gray-200"
+                        ? "bg-success-soft text-success border border-border"
+                        : "bg-surface-muted text-fg-muted border border-border"
                     }`}
                   >
                     {product.isActive ? "แสดงอยู่" : "ซ่อนอยู่"}
@@ -384,7 +384,7 @@ export default function ProductTable({
                     {onEdit && (
                       <button
                         onClick={() => onEdit(product)}
-                        className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+                        className="px-3 py-1.5 bg-surface-muted text-fg hover:bg-surface-muted rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
                         title="แก้ไขสินค้า"
                       >
                         <FaEdit size={13} />
@@ -396,8 +396,8 @@ export default function ProductTable({
                         onClick={() => onDelete ? onDelete(product) : onView(product)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
                           product.isActive
-                            ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                            : "bg-green-50 text-green-700 hover:bg-green-100"
+                            ? "bg-warning-soft text-warning hover:bg-warning-soft"
+                            : "bg-success-soft text-success hover:bg-success-soft"
                         }`}
                         title={product.isActive ? "ซ่อนสินค้าจากหน้าร้าน" : "เปิดแสดงสินค้าหน้าร้าน"}
                       >
@@ -417,10 +417,10 @@ export default function ProductTable({
         {paginatedProducts.map((product) => (
           <li
             key={product.id}
-            className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+            className="rounded-2xl border border-border bg-surface p-4 shadow-sm"
           >
             <div className="flex gap-3">
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-200">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-border">
                 {resolveProductImageUrl(product.imageUrl) ? (
                   <Image
                     src={resolveProductImageUrl(product.imageUrl)}
@@ -431,13 +431,13 @@ export default function ProductTable({
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center">
-                    <FaImage className="text-gray-400" />
+                    <FaImage className="text-fg-subtle" />
                   </div>
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-gray-900">{product.name}</p>
-                <p className="text-sm text-gray-500">
+                <p className="font-semibold text-fg">{product.name}</p>
+                <p className="text-sm text-fg-muted">
                   ฿{Number(product.price).toLocaleString()} · {product.stock} ชิ้น
                 </p>
               </div>
@@ -447,7 +447,7 @@ export default function ProductTable({
                 <button
                   type="button"
                   onClick={() => onView(product)}
-                  className="rounded-lg p-2 text-blue-600"
+                  className="rounded-lg p-2 text-fg"
                   aria-label="ดูรายละเอียด"
                 >
                   <FaEye />
@@ -457,7 +457,7 @@ export default function ProductTable({
                 <button
                   type="button"
                   onClick={() => onEdit(product)}
-                  className="rounded-lg p-2 text-indigo-600"
+                  className="rounded-lg p-2 text-fg"
                   aria-label="แก้ไข"
                 >
                   <FaEdit />
@@ -467,7 +467,7 @@ export default function ProductTable({
                 <button
                   type="button"
                   onClick={() => onDelete(product)}
-                  className={`rounded-lg p-2 ${product.isActive ? 'text-amber-600' : 'text-green-600'}`}
+                  className={`rounded-lg p-2 ${product.isActive ? 'text-warning' : 'text-success'}`}
                   aria-label={product.isActive ? 'ซ่อนสินค้า' : 'แสดงสินค้า'}
                 >
                   <FaEye />
@@ -480,9 +480,9 @@ export default function ProductTable({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-border bg-surface-muted">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-fg">
               แสดง {startIndex + 1} ถึง{" "}
               {Math.min(startIndex + itemsPerPage, sortedProducts.length)} จาก{" "}
               {sortedProducts.length} รายการ
@@ -491,7 +491,7 @@ export default function ProductTable({
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                className="px-3 py-2 border border-border rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-muted transition-colors"
               >
                 <FaChevronLeft size={12} />
               </button>
@@ -514,8 +514,8 @@ export default function ProductTable({
                     onClick={() => setCurrentPage(pageNum)}
                     className={`px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
                       currentPage === pageNum
-                        ? "bg-blue-500 text-white border-blue-500 shadow-sm"
-                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                        ? "bg-fg text-canvas border-fg shadow-sm"
+                        : "border-border text-fg hover:bg-surface-muted"
                     }`}
                   >
                     {pageNum}
@@ -528,7 +528,7 @@ export default function ProductTable({
                   setCurrentPage(Math.min(totalPages, currentPage + 1))
                 }
                 disabled={currentPage === totalPages}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                className="px-3 py-2 border border-border rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-muted transition-colors"
               >
                 <FaChevronRight size={12} />
               </button>

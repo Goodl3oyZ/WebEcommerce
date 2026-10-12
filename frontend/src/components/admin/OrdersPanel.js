@@ -253,7 +253,7 @@ export function OrdersPanel() {
                 <button
                   type="button"
                   disabled={submitting || !nextStatus}
-                  className="flex-1 rounded-xl bg-primary-600 py-2 text-white disabled:opacity-60"
+                  className="flex-1 rounded-xl bg-fg py-2 text-canvas disabled:opacity-60"
                   onClick={() => changeStatus(selected, nextStatus)}
                 >
                   {submitting ? "กำลังบันทึก..." : "บันทึก"}

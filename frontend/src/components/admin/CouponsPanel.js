@@ -170,10 +170,10 @@ export function CouponsPanel() {
     <div className="p-2">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">จัดการคูปองส่วนลด</h2>
+        <h2 className="text-2xl font-bold text-fg">จัดการคูปองส่วนลด</h2>
         <button
           onClick={openCreate}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition"
+          className="bg-fg hover:bg-fg text-canvas px-4 py-2 rounded-lg font-medium transition"
         >
           + เพิ่มคูปองใหม่
         </button>
@@ -182,23 +182,23 @@ export function CouponsPanel() {
       {/* Statistics Cards */}
       {statistics && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-          <div className="bg-blue-50 rounded-xl p-4 text-center shadow-sm">
-            <div className="text-3xl font-bold text-blue-700">
+          <div className="bg-surface-muted rounded-xl p-4 text-center shadow-sm">
+            <div className="text-3xl font-bold text-fg">
               {statistics.totalCoupons ?? 0}
             </div>
-            <div className="text-sm text-blue-600 mt-1">คูปองทั้งหมด</div>
+            <div className="text-sm text-fg mt-1">คูปองทั้งหมด</div>
           </div>
-          <div className="bg-green-50 rounded-xl p-4 text-center shadow-sm">
-            <div className="text-3xl font-bold text-green-700">
+          <div className="bg-success-soft rounded-xl p-4 text-center shadow-sm">
+            <div className="text-3xl font-bold text-success">
               {statistics.activeCoupons ?? 0}
             </div>
-            <div className="text-sm text-green-600 mt-1">คูปองที่ใช้งานอยู่</div>
+            <div className="text-sm text-success mt-1">คูปองที่ใช้งานอยู่</div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-4 text-center shadow-sm">
-            <div className="text-3xl font-bold text-gray-700">
+          <div className="bg-surface-muted rounded-xl p-4 text-center shadow-sm">
+            <div className="text-3xl font-bold text-fg">
               {(statistics.totalCoupons ?? 0) - (statistics.activeCoupons ?? 0)}
             </div>
-            <div className="text-sm text-gray-600 mt-1">คูปองที่ปิดอยู่</div>
+            <div className="text-sm text-fg-muted mt-1">คูปองที่ปิดอยู่</div>
           </div>
         </div>
       )}
@@ -206,10 +206,10 @@ export function CouponsPanel() {
       {/* Create/Edit Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 relative">
+          <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-lg p-6 relative">
             <button
               onClick={() => setShowForm(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
+              className="absolute top-4 right-4 text-fg-subtle hover:text-fg-muted text-xl"
             >
               ✕
             </button>
@@ -218,40 +218,40 @@ export function CouponsPanel() {
             </h3>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-gray-700">
-                  รหัสคูปอง <span className="text-red-500">*</span>
+                <label className="text-sm font-medium text-fg">
+                  รหัสคูปอง <span className="text-danger">*</span>
                 </label>
                 <input
                   name="code"
                   value={form.code}
                   onChange={handleFormChange}
-                  className={`w-full border rounded-lg px-3 py-2 mt-1 uppercase focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.code ? "border-red-400" : "border-gray-300"}`}
+                  className={`w-full border rounded-lg px-3 py-2 mt-1 uppercase focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.code ? "border-danger" : "border-border"}`}
                   placeholder="เช่น WELCOME10"
                   disabled={!!editingCoupon}
                 />
                 {formErrors.code && (
-                  <p className="text-xs text-red-500 mt-1">{formErrors.code}</p>
+                  <p className="text-xs text-danger mt-1">{formErrors.code}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    ประเภทส่วนลด <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-fg">
+                    ประเภทส่วนลด <span className="text-danger">*</span>
                   </label>
                   <select
                     name="type"
                     value={form.type}
                     onChange={handleFormChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="w-full border border-border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg"
                   >
                     <option value="percentage">ลด % (เปอร์เซ็นต์)</option>
                     <option value="fixed_amount">ลดเงิน (บาท)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    มูลค่า <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-fg">
+                    มูลค่า <span className="text-danger">*</span>
                   </label>
                   <input
                     name="value"
@@ -260,18 +260,18 @@ export function CouponsPanel() {
                     step="0.01"
                     value={form.value}
                     onChange={handleFormChange}
-                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.value ? "border-red-400" : "border-gray-300"}`}
+                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.value ? "border-danger" : "border-border"}`}
                     placeholder={form.type === "percentage" ? "เช่น 10" : "เช่น 50"}
                   />
                   {formErrors.value && (
-                    <p className="text-xs text-red-500 mt-1">{formErrors.value}</p>
+                    <p className="text-xs text-danger mt-1">{formErrors.value}</p>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-fg">
                     ยอดซื้อขั้นต่ำ (บาท)
                   </label>
                   <input
@@ -281,15 +281,15 @@ export function CouponsPanel() {
                     step="0.01"
                     value={form.minPurchase}
                     onChange={handleFormChange}
-                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.minPurchase ? "border-red-400" : "border-gray-300"}`}
+                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.minPurchase ? "border-danger" : "border-border"}`}
                     placeholder="เช่น 100"
                   />
                   {formErrors.minPurchase && (
-                    <p className="text-xs text-red-500 mt-1">{formErrors.minPurchase}</p>
+                    <p className="text-xs text-danger mt-1">{formErrors.minPurchase}</p>
                   )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-fg">
                     ส่วนลดสูงสุด (บาท)
                   </label>
                   <input
@@ -299,44 +299,44 @@ export function CouponsPanel() {
                     step="0.01"
                     value={form.maxDiscount}
                     onChange={handleFormChange}
-                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.maxDiscount ? "border-red-400" : "border-gray-300"}`}
+                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.maxDiscount ? "border-danger" : "border-border"}`}
                     placeholder="ว่างหมายถึงไม่จำกัด"
                   />
                   {formErrors.maxDiscount && (
-                    <p className="text-xs text-red-500 mt-1">{formErrors.maxDiscount}</p>
+                    <p className="text-xs text-danger mt-1">{formErrors.maxDiscount}</p>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    วันเริ่มต้น <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-fg">
+                    วันเริ่มต้น <span className="text-danger">*</span>
                   </label>
                   <input
                     name="startDate"
                     type="date"
                     value={form.startDate}
                     onChange={handleFormChange}
-                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.startDate ? "border-red-400" : "border-gray-300"}`}
+                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.startDate ? "border-danger" : "border-border"}`}
                   />
                   {formErrors.startDate && (
-                    <p className="text-xs text-red-500 mt-1">{formErrors.startDate}</p>
+                    <p className="text-xs text-danger mt-1">{formErrors.startDate}</p>
                   )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    วันสิ้นสุด <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-fg">
+                    วันสิ้นสุด <span className="text-danger">*</span>
                   </label>
                   <input
                     name="endDate"
                     type="date"
                     value={form.endDate}
                     onChange={handleFormChange}
-                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.endDate ? "border-red-400" : "border-gray-300"}`}
+                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.endDate ? "border-danger" : "border-border"}`}
                   />
                   {formErrors.endDate && (
-                    <p className="text-xs text-red-500 mt-1">{formErrors.endDate}</p>
+                    <p className="text-xs text-danger mt-1">{formErrors.endDate}</p>
                   )}
                 </div>
               </div>
@@ -345,14 +345,14 @@ export function CouponsPanel() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition"
+                  className="flex-1 border border-border text-fg px-4 py-2 rounded-lg hover:bg-surface-muted transition"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
+                  className="flex-1 bg-fg hover:bg-fg text-canvas px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
                 >
                   {submitting ? "กำลังบันทึก..." : editingCoupon ? "บันทึกการแก้ไข" : "สร้างคูปอง"}
                 </button>
@@ -379,22 +379,22 @@ export function CouponsPanel() {
           <table className="min-w-full bg-surface text-sm">
             <thead className="sticky top-0 z-10 bg-surface-muted">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">รหัสคูปอง</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">ประเภท</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-600">มูลค่า</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-600">ซื้อขั้นต่ำ</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">ช่วงเวลา</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">สถานะ</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">รหัสคูปอง</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">ประเภท</th>
+                <th className="px-4 py-3 text-right font-semibold text-fg-muted">มูลค่า</th>
+                <th className="px-4 py-3 text-right font-semibold text-fg-muted">ซื้อขั้นต่ำ</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">ช่วงเวลา</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">สถานะ</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {coupons.map((coupon) => (
                   <tr key={coupon.id} className="hover:bg-surface-muted transition">
-                    <td className="px-4 py-3 font-mono font-bold text-blue-700">
+                    <td className="px-4 py-3 font-mono font-bold text-fg">
                       {coupon.code}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className="px-4 py-3 text-fg-muted">
                       {COUPON_TYPE_LABELS[coupon.type] || coupon.type}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">
@@ -402,10 +402,10 @@ export function CouponsPanel() {
                         ? `${Number(coupon.value).toFixed(0)}%`
                         : `฿${Number(coupon.value).toFixed(2)}`}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-600">
+                    <td className="px-4 py-3 text-right text-fg-muted">
                       {coupon.minPurchase ? `฿${Number(coupon.minPurchase).toFixed(0)}` : "-"}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 text-xs text-fg-muted">
                       {coupon.startDate
                         ? new Date(coupon.startDate).toLocaleDateString("th-TH")
                         : "-"}{" "}
@@ -416,7 +416,7 @@ export function CouponsPanel() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${coupon.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${coupon.isActive ? "bg-success-soft text-success" : "bg-surface-muted text-fg-muted"}`}
                       >
                         {coupon.isActive ? "ใช้งานอยู่" : "ปิดใช้งาน"}
                       </span>
@@ -425,19 +425,19 @@ export function CouponsPanel() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => openEdit(coupon)}
-                          className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded transition"
+                          className="text-xs bg-surface-muted text-fg hover:bg-surface-muted px-2 py-1 rounded transition"
                         >
                           แก้ไข
                         </button>
                         <button
                           onClick={() => handleToggle(coupon)}
-                          className={`text-xs px-2 py-1 rounded transition ${coupon.isActive ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200" : "bg-green-100 text-green-700 hover:bg-green-200"}`}
+                          className={`text-xs px-2 py-1 rounded transition ${coupon.isActive ? "bg-warning-soft text-warning hover:bg-warning-soft" : "bg-success-soft text-success hover:bg-success-soft"}`}
                         >
                           {coupon.isActive ? "ปิด" : "เปิด"}
                         </button>
                         <button
                           onClick={() => handleDelete(coupon.id)}
-                          className="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded transition"
+                          className="text-xs bg-danger-soft text-danger hover:bg-danger-soft px-2 py-1 rounded transition"
                         >
                           ลบ
                         </button>

@@ -54,7 +54,7 @@ export default function TopProductsList({ products = [], onAddProduct }) {
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
               <div
-                className="h-full rounded-full bg-primary-500 transition-all duration-200"
+                className="h-full rounded-full bg-fg transition-all duration-200"
                 style={{ width }}
               />
             </div>

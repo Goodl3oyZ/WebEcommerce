@@ -56,7 +56,7 @@ export function TabsTrigger({ value, children, className = "", onClick }) {
         setValue(value);
         onClick?.(e);
       }}
-      className={`rounded-xl px-4 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${className}`}
+      className={`rounded-xl px-4 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${className}`}
     >
       {children}
     </button>

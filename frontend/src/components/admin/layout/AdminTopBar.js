@@ -14,7 +14,7 @@ export function AdminTopBar({ onOpenSidebar, onOpenSearch }) {
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-surface/90 px-3 py-3 backdrop-blur sm:px-4">
       <button
         type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border text-fg md:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border text-fg md:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg"
         onClick={onOpenSidebar}
         aria-label="เปิดเมนู"
       >
@@ -32,7 +32,7 @@ export function AdminTopBar({ onOpenSidebar, onOpenSearch }) {
       <button
         type="button"
         onClick={onOpenSearch}
-        className="hidden items-center gap-2 rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm text-fg-muted transition-colors duration-150 hover:bg-border sm:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="hidden items-center gap-2 rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm text-fg-muted transition-colors duration-150 hover:bg-border sm:inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg"
       >
         <FaSearch className="h-3.5 w-3.5" />
         ค้นหา
@@ -43,14 +43,14 @@ export function AdminTopBar({ onOpenSidebar, onOpenSearch }) {
       <button
         type="button"
         onClick={onOpenSearch}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border text-fg sm:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border text-fg sm:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg"
         aria-label="ค้นหา"
       >
         <FaSearch />
       </button>
       <Link
         href="/"
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm text-fg transition-colors duration-150 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm text-fg transition-colors duration-150 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg"
         aria-label="กลับหน้าร้าน"
       >
         <FaStore className="h-3.5 w-3.5" aria-hidden />

@@ -566,15 +566,15 @@ export function ProductsPanel() {
           <div
             className={`flex items-center justify-center w-10 h-10 rounded-full ${
               index <= currentStep
-                ? "bg-blue-600 text-white"
-                : "bg-gray-300 text-gray-600"
+                ? "bg-fg text-canvas"
+                : "bg-border text-fg-muted"
             }`}
           >
             {index < currentStep ? <FaCheckCircle /> : <step.icon />}
           </div>
           <span
             className={`ml-2 text-sm font-medium ${
-              index <= currentStep ? "text-blue-600" : "text-gray-500"
+              index <= currentStep ? "text-fg" : "text-fg-muted"
             }`}
           >
             {step.title}
@@ -582,7 +582,7 @@ export function ProductsPanel() {
           {index < steps.length - 1 && (
             <div
               className={`w-16 h-1 mx-4 ${
-                index < currentStep ? "bg-blue-600" : "bg-gray-300"
+                index < currentStep ? "bg-fg" : "bg-border"
               }`}
             />
           )}
@@ -763,12 +763,12 @@ export function ProductsPanel() {
   if (!user) {
     return (
       <div className="max-w-7xl mx-auto p-6">
-        <div className="bg-white rounded-xl shadow-lg">
+        <div className="bg-surface rounded-xl shadow-lg">
           <div className="p-6 text-center">
-            <h1 className="text-2xl font-bold text-gray-800 mb-4">
+            <h1 className="text-2xl font-bold text-fg mb-4">
               Product Management System
             </h1>
-            <p className="text-gray-600">
+            <p className="text-fg-muted">
               คุณต้องเข้าสู่ระบบก่อนเข้าถึงหน้าจัดการสินค้า
             </p>
           </div>
@@ -781,12 +781,12 @@ export function ProductsPanel() {
     <>
       {" "}
       <div className="max-w-7xl mx-auto p-4 sm:p-6">
-        <div className="bg-white rounded-xl shadow-lg">
+        <div className="bg-surface rounded-xl shadow-lg">
           <div className="p-4 sm:p-6 border-b">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+            <h1 className="text-xl sm:text-2xl font-bold text-fg">
               Product Management System
             </h1>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            <p className="text-fg-muted mt-1 text-sm sm:text-base">
               จัดการสินค้าและตัวเลือกสินค้า
             </p>
           </div>
@@ -799,16 +799,16 @@ export function ProductsPanel() {
               <div className="lg:col-span-2">
                 {/* Step 1: Basic Information */}
                 {currentStep === 0 && (
-                  <div className="bg-gray-50 rounded-lg p-6">
+                  <div className="bg-surface-muted rounded-lg p-6">
                     {editingProduct && (
-                      <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
+                      <div className="bg-surface-muted border border-border text-fg px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
                         <span className="font-semibold text-sm">
                           ✏️ กำลังแก้ไขสินค้า: <span className="underline">{editingProduct.name}</span>
                         </span>
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1.5 rounded-md transition"
+                          className="text-xs bg-fg hover:bg-fg text-canvas font-medium px-3 py-1.5 rounded-md transition"
                         >
                           ยกเลิกการแก้ไข (สร้างใหม่)
                         </button>
@@ -823,25 +823,25 @@ export function ProductsPanel() {
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-fg mb-1">
                             ชื่อสินค้า *
                           </label>
                           <input
                             {...register("name", {
                               required: "กรุณากรอกชื่อสินค้า",
                             })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                             placeholder="ชื่อสินค้า"
                           />
                           {errors.name && (
-                            <p className="mt-1 text-sm text-red-600">
+                            <p className="mt-1 text-sm text-danger">
                               {errors.name.message}
                             </p>
                           )}
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-fg mb-1">
                             สถานะ
                           </label>
                           <Controller
@@ -858,7 +858,7 @@ export function ProductsPanel() {
                                     : field.value
                                 }
                                 onChange={(e) => field.onChange(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                               >
                                 <option value="true">เปิดใช้งาน</option>
                                 <option value="false">ปิดใช้งาน</option>
@@ -869,7 +869,7 @@ export function ProductsPanel() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-fg mb-1">
                           รายละเอียดสินค้า *
                         </label>
                         <RichTextEditor
@@ -878,7 +878,7 @@ export function ProductsPanel() {
                           placeholder="รายละเอียดสินค้า..."
                         />
                         {errors.description && (
-                          <p className="mt-1 text-sm text-red-600">
+                          <p className="mt-1 text-sm text-danger">
                             {errors.description.message}
                           </p>
                         )}
@@ -886,7 +886,7 @@ export function ProductsPanel() {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-fg mb-1">
                             หมวดหมู่ *
                           </label>
                           <Controller
@@ -896,7 +896,7 @@ export function ProductsPanel() {
                             render={({ field }) => (
                               <select
                                 {...field}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                               >
                                 <option value="">เลือกหมวดหมู่</option>
                                 {categories.map((category) => (
@@ -908,14 +908,14 @@ export function ProductsPanel() {
                             )}
                           />
                           {errors.categoryId && (
-                            <p className="mt-1 text-sm text-red-600">
+                            <p className="mt-1 text-sm text-danger">
                               {errors.categoryId.message}
                             </p>
                           )}
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-fg mb-1">
                             แบรนด์ *
                           </label>
                           <Controller
@@ -925,7 +925,7 @@ export function ProductsPanel() {
                             render={({ field }) => (
                               <select
                                 {...field}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                               >
                                 <option value="">เลือกแบรนด์</option>
                                 {brands.map((brand) => (
@@ -937,7 +937,7 @@ export function ProductsPanel() {
                             )}
                           />
                           {errors.brandId && (
-                            <p className="mt-1 text-sm text-red-600">
+                            <p className="mt-1 text-sm text-danger">
                               {errors.brandId.message}
                             </p>
                           )}
@@ -950,11 +950,11 @@ export function ProductsPanel() {
                           type="checkbox"
                           id="hasVariants"
                           {...register("hasVariants")}
-                          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          className="h-4 w-4 text-fg border-border rounded focus:ring-fg"
                         />
                         <label
                           htmlFor="hasVariants"
-                          className="text-sm font-medium text-gray-700"
+                          className="text-sm font-medium text-fg"
                         >
                           สินค้ามีหลายตัวเลือก (เช่น สี, ขนาด)
                         </label>
@@ -964,7 +964,7 @@ export function ProductsPanel() {
                       {!watchHasVariants && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-fg mb-1">
                               ราคา *
                             </label>
                             <input
@@ -974,19 +974,19 @@ export function ProductsPanel() {
                                 min: { value: 0, message: "ราคาต้องไม่ติดลบ" },
                                 valueAsNumber: true,
                               })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                               placeholder="ราคา"
                               min="0"
                               step="0.01"
                             />
                             {errors.price && (
-                              <p className="mt-1 text-sm text-red-600">
+                              <p className="mt-1 text-sm text-danger">
                                 {errors.price.message}
                               </p>
                             )}
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-fg mb-1">
                               สต็อก *
                             </label>
                             <input
@@ -995,13 +995,13 @@ export function ProductsPanel() {
                                 required: "กรุณากรอกสต็อก",
                                 min: { value: 0, message: "สต็อกต้องไม่ติดลบ" },
                               })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                               placeholder="สต็อก"
                               min="0"
                               step="1"
                             />
                             {errors.stock && (
-                              <p className="mt-1 text-sm text-red-600">
+                              <p className="mt-1 text-sm text-danger">
                                 {errors.stock.message}
                               </p>
                             )}
@@ -1010,7 +1010,7 @@ export function ProductsPanel() {
                       )}
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-fg mb-1">
                           รูปภาพสินค้า
                         </label>
                         <ImageUploader
@@ -1024,7 +1024,7 @@ export function ProductsPanel() {
                         <button
                           type="submit"
                           disabled={isLoading}
-                          className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                          className="bg-fg text-canvas px-6 py-2 rounded-md hover:bg-fg disabled:opacity-50 flex items-center gap-2"
                         >
                           <FaArrowRight />
                           ถัดไป
@@ -1036,7 +1036,7 @@ export function ProductsPanel() {
 
                 {/* Step 2: Variant Management (Conditional based on hasVariants) */}
                 {currentStep === 1 && watchHasVariants && (
-                  <div className="bg-gray-50 rounded-lg p-6">
+                  <div className="bg-surface-muted rounded-lg p-6">
                     <h2 className="text-lg font-semibold mb-4">
                       จัดการตัวเลือกสินค้า
                     </h2>
@@ -1053,12 +1053,12 @@ export function ProductsPanel() {
                           value={newAttributeName}
                           onChange={(e) => setNewAttributeName(e.target.value)}
                           placeholder="ชื่อคุณสมบัติ (เช่น สี, ขนาด)"
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                         />
                         <button
                           type="button"
                           onClick={addAttribute}
-                          className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-1"
+                          className="bg-success text-white px-4 py-2 rounded-md hover:bg-success flex items-center gap-1"
                         >
                           <FaPlus />
                           เพิ่ม
@@ -1070,14 +1070,14 @@ export function ProductsPanel() {
                           {Object.keys(attributes).map((attributeName) => (
                             <div
                               key={attributeName}
-                              className="border rounded-md p-3 bg-white"
+                              className="border rounded-md p-3 bg-surface"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <h4 className="font-medium">{attributeName}</h4>
                                 <button
                                   type="button"
                                   onClick={() => removeAttribute(attributeName)}
-                                  className="text-red-600 hover:text-red-800"
+                                  className="text-danger hover:text-danger"
                                 >
                                   <FaTrash />
                                 </button>
@@ -1096,12 +1096,12 @@ export function ProductsPanel() {
                                     setNewAttributeValue(e.target.value);
                                   }}
                                   placeholder="ค่าของคุณสมบัติ"
-                                  className="flex-1 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="flex-1 px-3 py-1 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-fg"
                                 />
                                 <button
                                   type="button"
                                   onClick={addAttributeValue}
-                                  className="bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 text-sm"
+                                  className="bg-fg text-canvas px-3 py-1 rounded-md hover:bg-fg text-sm"
                                 >
                                   เพิ่ม
                                 </button>
@@ -1111,7 +1111,7 @@ export function ProductsPanel() {
                                 {attributes[attributeName].map((value) => (
                                   <span
                                     key={value}
-                                    className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
+                                    className="inline-flex items-center gap-1 bg-surface-muted text-fg px-2 py-1 rounded-full text-sm"
                                   >
                                     {value}
                                     <button
@@ -1122,7 +1122,7 @@ export function ProductsPanel() {
                                           value
                                         )
                                       }
-                                      className="text-blue-600 hover:text-blue-800"
+                                      className="text-fg hover:text-fg"
                                     >
                                       ×
                                     </button>
@@ -1135,7 +1135,7 @@ export function ProductsPanel() {
                           <button
                             type="button"
                             onClick={generateVariants}
-                            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center gap-2"
+                            className="bg-fg text-canvas px-4 py-2 rounded-md hover:bg-fg flex items-center gap-2"
                           >
                             <FaEdit />
                             สร้าง Variants จากคุณสมบัติ
@@ -1153,7 +1153,7 @@ export function ProductsPanel() {
                         <button
                           type="button"
                           onClick={addManualVariant}
-                          className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 flex items-center gap-1 text-sm"
+                          className="bg-success text-white px-3 py-1 rounded-md hover:bg-success flex items-center gap-1 text-sm"
                         >
                           <FaPlus />
                           เพิ่ม Manual
@@ -1161,25 +1161,25 @@ export function ProductsPanel() {
                       </div>
 
                       <div className="overflow-x-auto">
-                        <table className="w-full border border-gray-300 rounded-md">
+                        <table className="w-full border border-border rounded-md">
                           <thead>
-                            <tr className="bg-gray-100">
-                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                            <tr className="bg-surface-muted">
+                              <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                 สี / ขนาด
                               </th>
-                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                              <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                 SKU
                               </th>
-                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                              <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                 ราคา
                               </th>
-                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                              <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                 สต็อก
                               </th>
-                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                              <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                 สถานะ
                               </th>
-                              <th className="px-3 py-2 text-center text-sm font-medium text-gray-700">
+                              <th className="px-3 py-2 text-center text-sm font-medium text-fg">
                                 จัดการ
                               </th>
                             </tr>
@@ -1200,7 +1200,7 @@ export function ProductsPanel() {
                                         )
                                       }
                                       placeholder="สี"
-                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                      className="w-full px-2 py-1 border border-border rounded text-sm"
                                     />
                                     <input
                                       type="text"
@@ -1213,7 +1213,7 @@ export function ProductsPanel() {
                                         )
                                       }
                                       placeholder="ขนาด"
-                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                      className="w-full px-2 py-1 border border-border rounded text-sm"
                                     />
                                   </div>
                                 </td>
@@ -1228,7 +1228,7 @@ export function ProductsPanel() {
                                         e.target.value
                                       )
                                     }
-                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    className="w-full px-2 py-1 border border-border rounded text-sm"
                                   />
                                 </td>
                                 <td className="px-3 py-2">
@@ -1242,7 +1242,7 @@ export function ProductsPanel() {
                                         parseFloat(e.target.value) || 0
                                       )
                                     }
-                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    className="w-full px-2 py-1 border border-border rounded text-sm"
                                     min="0"
                                     step="0.01"
                                   />
@@ -1258,7 +1258,7 @@ export function ProductsPanel() {
                                         parseInt(e.target.value) || 0
                                       )
                                     }
-                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    className="w-full px-2 py-1 border border-border rounded text-sm"
                                     min="0"
                                   />
                                 </td>
@@ -1272,7 +1272,7 @@ export function ProductsPanel() {
                                         e.target.value === "true"
                                       )
                                     }
-                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                    className="w-full px-2 py-1 border border-border rounded text-sm"
                                   >
                                     <option value={true}>เปิดใช้งาน</option>
                                     <option value={false}>ปิดใช้งาน</option>
@@ -1282,7 +1282,7 @@ export function ProductsPanel() {
                                   <button
                                     type="button"
                                     onClick={() => removeVariant(index)}
-                                    className="text-red-600 hover:text-red-800"
+                                    className="text-danger hover:text-danger"
                                     disabled={
                                       variants.length === 1 &&
                                       Object.keys(attributes).length === 0
@@ -1297,8 +1297,8 @@ export function ProductsPanel() {
                         </table>
                       </div>
 
-                      <div className="mt-3 p-3 bg-blue-50 rounded-md">
-                        <p className="text-sm text-blue-800">
+                      <div className="mt-3 p-3 bg-surface-muted rounded-md">
+                        <p className="text-sm text-fg">
                           <strong>รวมสต็อกทั้งหมด:</strong>{" "}
                           {calculateProductStock(variants)} ชิ้น
                         </p>
@@ -1309,7 +1309,7 @@ export function ProductsPanel() {
                       <button
                         type="button"
                         onClick={() => setCurrentStep(0)}
-                        className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 flex items-center gap-2"
+                        className="bg-fg-subtle text-white px-6 py-2 rounded-md hover:bg-fg flex items-center gap-2"
                       >
                         <FaArrowLeft />
                         กลับ
@@ -1317,7 +1317,7 @@ export function ProductsPanel() {
                       <button
                         type="button"
                         onClick={() => setCurrentStep(2)}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2"
+                        className="bg-fg text-canvas px-6 py-2 rounded-md hover:bg-fg flex items-center gap-2"
                       >
                         <FaArrowRight />
                         ถัดไป
@@ -1328,7 +1328,7 @@ export function ProductsPanel() {
 
                 {/* Step 3: Review & Save */}
                 {currentStep === 2 && (
-                  <div className="bg-gray-50 rounded-lg p-6">
+                  <div className="bg-surface-muted rounded-lg p-6">
                     <h2 className="text-lg font-semibold mb-4">
                       ตรวจสอบข้อมูลและบันทึก
                     </h2>
@@ -1379,7 +1379,7 @@ export function ProductsPanel() {
                                     className="w-full h-20 object-cover rounded-md"
                                   />
                                   {image.isPrimary && (
-                                    <div className="absolute top-1 right-1 bg-blue-500 text-white px-1 py-0.5 rounded text-xs">
+                                    <div className="absolute top-1 right-1 bg-fg text-canvas px-1 py-0.5 rounded text-xs">
                                       Primary
                                     </div>
                                   )}
@@ -1393,22 +1393,22 @@ export function ProductsPanel() {
                           ข้อมูลตัวเลือกสินค้า
                         </h3>
                         <div className="overflow-x-auto">
-                          <table className="w-full border border-gray-300 rounded-md">
+                          <table className="w-full border border-border rounded-md">
                             <thead>
-                              <tr className="bg-gray-100">
-                                <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                              <tr className="bg-surface-muted">
+                                <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                   สี / ขนาด
                                 </th>
-                                <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                                <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                   SKU
                                 </th>
-                                <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                                <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                   ราคา
                                 </th>
-                                <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                                <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                   สต็อก
                                 </th>
-                                <th className="px-3 py-2 text-left text-sm font-medium text-gray-700">
+                                <th className="px-3 py-2 text-left text-sm font-medium text-fg">
                                   สถานะ
                                 </th>
                               </tr>
@@ -1439,8 +1439,8 @@ export function ProductsPanel() {
                             </tbody>
                           </table>
                         </div>
-                        <div className="mt-3 p-3 bg-blue-50 rounded-md">
-                          <p className="text-sm text-blue-800">
+                        <div className="mt-3 p-3 bg-surface-muted rounded-md">
+                          <p className="text-sm text-fg">
                             <strong>รวมสต็อกทั้งหมด:</strong>{" "}
                             {calculateProductStock(variants)} ชิ้น
                           </p>
@@ -1452,7 +1452,7 @@ export function ProductsPanel() {
                       <button
                         type="button"
                         onClick={() => setCurrentStep(watchHasVariants ? 1 : 0)} // Go back to step 1 if hasVariants, else step 0
-                        className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 flex items-center gap-2"
+                        className="bg-fg-subtle text-white px-6 py-2 rounded-md hover:bg-fg flex items-center gap-2"
                       >
                         <FaArrowLeft />
                         กลับ
@@ -1461,7 +1461,7 @@ export function ProductsPanel() {
                         type="button"
                         onClick={handleFinalSave}
                         disabled={isLoading}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                        className="bg-fg text-canvas px-6 py-2 rounded-md hover:bg-fg disabled:opacity-50 flex items-center gap-2"
                       >
                         <FaSave />
                         บันทึกสินค้า
@@ -1473,7 +1473,7 @@ export function ProductsPanel() {
 
               {/* Product List Section */}
               <div className="lg:col-span-1">
-                <div className="bg-gray-50 rounded-lg p-6">
+                <div className="bg-surface-muted rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold">สินค้าทั้งหมด</h2>
                     <div className="flex items-center gap-2">
@@ -1481,8 +1481,8 @@ export function ProductsPanel() {
                         onClick={() => setViewMode("table")}
                         className={`p-2 rounded ${
                           viewMode === "table"
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200 text-gray-600"
+                            ? "bg-fg text-canvas"
+                            : "bg-border text-fg-muted"
                         }`}
                         title="Table View"
                       >
@@ -1492,8 +1492,8 @@ export function ProductsPanel() {
                         onClick={() => setViewMode("grid")}
                         className={`p-2 rounded ${
                           viewMode === "grid"
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-200 text-gray-600"
+                            ? "bg-fg text-canvas"
+                            : "bg-border text-fg-muted"
                         }`}
                         title="Grid View"
                       >
@@ -1520,14 +1520,14 @@ export function ProductsPanel() {
                       {products.map((product) => (
                         <div
                           key={product.id}
-                          className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                          className="bg-surface rounded-lg shadow-sm border border-border p-4 hover:shadow-md transition-shadow"
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-gray-800 text-sm line-clamp-2">
+                              <h3 className="font-semibold text-fg text-sm line-clamp-2">
                                 {product.name}
                               </h3>
-                              <p className="text-xs text-gray-500 mt-1">
+                              <p className="text-xs text-fg-muted mt-1">
                                 {categories.find(
                                   (cat) => cat.id == product.categoryId
                                 )?.name || "N/A"}
@@ -1536,14 +1536,14 @@ export function ProductsPanel() {
                             <div className="flex gap-1 ml-2">
                               <button
                                 onClick={() => handleEditProduct(product)}
-                                className="text-blue-600 hover:text-blue-800 p-1"
+                                className="text-fg hover:text-fg p-1"
                                 title="แก้ไข"
                               >
                                 <FaEdit size={12} />
                               </button>
                               <button
                                 onClick={() => handleToggleActiveProduct(product)}
-                                className={`p-1 ${product.isActive ? 'text-amber-600 hover:text-amber-800' : 'text-green-600 hover:text-green-800'}`}
+                                className={`p-1 ${product.isActive ? 'text-warning hover:text-warning' : 'text-success hover:text-success'}`}
                                 title={product.isActive ? 'ซ่อนสินค้า' : 'แสดงสินค้า'}
                               >
                                 <FaEye size={12} />
@@ -1551,7 +1551,7 @@ export function ProductsPanel() {
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-xs text-gray-600">
+                          <div className="flex items-center justify-between text-xs text-fg-muted">
                             <span>
                               ฿{Number(product.price).toLocaleString()}
                             </span>
@@ -1559,8 +1559,8 @@ export function ProductsPanel() {
                             <span
                               className={`px-2 py-1 rounded-full text-xs ${
                                 product.isActive
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
+                                  ? "bg-success-soft text-success"
+                                  : "bg-danger-soft text-danger"
                               }`}
                             >
                               {product.isActive ? "เปิด" : "ปิด"}
@@ -1574,7 +1574,7 @@ export function ProductsPanel() {
                   <div className="mt-6 text-center">
                     <button
                       onClick={resetForm}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 mx-auto"
+                      className="bg-fg text-canvas px-6 py-2 rounded-md hover:bg-fg flex items-center gap-2 mx-auto"
                     >
                       <FaPlusCircle />
                       เพิ่มสินค้าใหม่

@@ -273,7 +273,7 @@ export function ShippingPanel() {
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-xl bg-primary-600 px-4 py-2 text-white disabled:opacity-60"
+              className="rounded-xl bg-fg px-4 py-2 text-canvas disabled:opacity-60"
             >
               {submitting ? "กำลังบันทึก..." : "บันทึก"}
             </button>
@@ -340,7 +340,7 @@ export function ShippingPanel() {
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-xl bg-primary-600 px-4 py-2 text-white disabled:opacity-60"
+              className="rounded-xl bg-fg px-4 py-2 text-canvas disabled:opacity-60"
             >
               {submitting ? "กำลังบันทึก..." : "บันทึก"}
             </button>

@@ -83,7 +83,7 @@ export function SeedDataPanel() {
       description: "นำเข้าข้อมูล จังหวัด, อำเภอ, ตำบล และรหัสไปรษณีย์ จากไฟล์ CSV (seed-address-thai.js)",
       icon: FaMapMarkedAlt,
       badge: "seed-address-thai.js",
-      color: "bg-blue-600 hover:bg-blue-700",
+      color: "bg-fg hover:bg-fg",
     },
     {
       id: "shipping",
@@ -91,7 +91,7 @@ export function SeedDataPanel() {
       description: "นำเข้าช่องทางจัดส่ง (Flash, Kerry, EMS), พื้นที่จัดส่ง และช่องทางชำระเงิน (บัตรเครดิต, PromptPay)",
       icon: FaShippingFast,
       badge: "seed-shipping-payment.js",
-      color: "bg-indigo-600 hover:bg-indigo-700",
+      color: "bg-fg hover:bg-fg",
     },
     {
       id: "main",
@@ -99,7 +99,7 @@ export function SeedDataPanel() {
       description: "นำเข้า หมวดหมู่สินค้า, แบรนด์, สินค้าตัวอย่าง, บัญชีผู้ใช้ทดสอบ (Admin/User), คูปองส่วนลด และออเดอร์ตัวอย่าง",
       icon: FaBoxOpen,
       badge: "seed.js",
-      color: "bg-purple-600 hover:bg-purple-700",
+      color: "bg-fg hover:bg-fg",
     },
     {
       id: "all",
@@ -107,7 +107,7 @@ export function SeedDataPanel() {
       description: "รัน Script Seed ทั้งหมดต่อเนื่องตามลำดับเพื่อรีเซ็ตระบบและสร้างข้อมูลทดสอบครบถ้วน",
       icon: FaDatabase,
       badge: "seed:all",
-      color: "bg-emerald-600 hover:bg-emerald-700",
+      color: "bg-success hover:bg-success",
     },
   ];
 
@@ -115,11 +115,11 @@ export function SeedDataPanel() {
     <div className="space-y-6">
       <div className="flex items-center justify-between border-b pb-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FaDatabase className="text-blue-600" />
+          <h2 className="text-xl font-bold text-fg flex items-center gap-2">
+            <FaDatabase className="text-fg" />
             ระบบ Seed ข้อมูลเริ่มต้น (Database Seeder)
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-fg-muted mt-1">
             เรียกใช้ Script สำหรับสร้างข้อมูลเริ่มต้นและข้อมูลทดสอบสำหรับระบบ e-Commerce
           </p>
         </div>
@@ -135,25 +135,25 @@ export function SeedDataPanel() {
           return (
             <div
               key={opt.id}
-              className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+              className="bg-surface rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-blue-50 rounded-lg text-blue-600">
+                    <div className="p-2.5 bg-surface-muted rounded-lg text-fg">
                       <Icon className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-800 text-base">
+                      <h3 className="font-bold text-fg text-base">
                         {opt.title}
                       </h3>
-                      <span className="text-[11px] font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                      <span className="text-[11px] font-mono bg-surface-muted text-fg-muted px-2 py-0.5 rounded">
                         {opt.badge}
                       </span>
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed mb-4">
+                <p className="text-xs text-fg-muted leading-relaxed mb-4">
                   {opt.description}
                 </p>
               </div>
@@ -187,14 +187,14 @@ export function SeedDataPanel() {
         <div
           className={`p-4 rounded-xl border flex items-start gap-3 ${
             status.type === "success"
-              ? "bg-green-50 border-green-200 text-green-800"
-              : "bg-red-50 border-red-200 text-red-800"
+              ? "bg-success-soft border-border text-success"
+              : "bg-danger-soft border-border text-danger"
           }`}
         >
           {status.type === "success" ? (
-            <FaCheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+            <FaCheckCircle className="w-5 h-5 text-success mt-0.5 flex-shrink-0" />
           ) : (
-            <FaExclamationTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <FaExclamationTriangle className="w-5 h-5 text-danger mt-0.5 flex-shrink-0" />
           )}
           <div>
             <h4 className="font-bold text-sm">
@@ -207,10 +207,10 @@ export function SeedDataPanel() {
 
       {/* Console Output Log */}
       {output && (
-        <div className="bg-gray-950 rounded-xl p-4 border border-gray-800 text-gray-200 shadow-inner">
-          <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-800 text-xs text-gray-400">
+        <div className="bg-fg rounded-xl p-4 border border-fg-subtle text-fg-subtle shadow-inner">
+          <div className="flex items-center justify-between mb-2 pb-2 border-b border-fg-subtle text-xs text-fg-subtle">
             <span className="flex items-center gap-2 font-mono">
-              <FaTerminal className="text-green-400" /> Console Logs / Output
+              <FaTerminal className="text-success" /> Console Logs / Output
             </span>
             <button
               onClick={() => setOutput("")}
@@ -219,7 +219,7 @@ export function SeedDataPanel() {
               ล้าง Log
             </button>
           </div>
-          <pre className="font-mono text-xs text-green-400 leading-relaxed overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
+          <pre className="font-mono text-xs text-success leading-relaxed overflow-x-auto max-h-60 overflow-y-auto whitespace-pre-wrap">
             {output}
           </pre>
         </div>

@@ -70,6 +70,21 @@
     text-wrap: balance;
   }
 
+  /* @tailwindcss/forms paints every field white with dark text, which is
+     unreadable in dark mode. Same specificity as the plugin, so utility
+     classes on a field still win. */
+  [type="text"], [type="email"], [type="search"], [type="number"], [type="password"],
+  [type="tel"], [type="url"], [type="date"], [type="datetime-local"], [type="time"],
+  input:where(:not([type])), select, textarea, [multiple] {
+    background-color: hsl(var(--surface));
+    border-color: hsl(var(--border));
+    color: hsl(var(--fg));
+  }
+  ::placeholder {
+    color: hsl(var(--fg-subtle));
+    opacity: 1;
+  }
+
   /* One visible focus style for the storefront (keyboard users only). */
   :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
     outline: 2px solid hsl(var(--fg));

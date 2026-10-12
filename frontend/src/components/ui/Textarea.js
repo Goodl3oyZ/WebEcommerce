@@ -11,7 +11,7 @@ export const Textarea = React.forwardRef(function Textarea(
     <textarea
       ref={ref}
       className={classNames(
-        "w-full px-4 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500",
+        "w-full px-4 py-2 border border-border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-fg",
         className
       )}
       rows={4}

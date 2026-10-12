@@ -60,7 +60,7 @@ export function AdminSidebar({ onNavigate }) {
               <TabsTrigger
                 value={item.value}
                 onClick={() => onNavigate?.()}
-                className="flex w-full items-center justify-start gap-3 px-3 py-2.5 text-left text-sm text-fg-muted hover:bg-primary-50 hover:text-primary-700 data-[state=active]:bg-primary-600 data-[state=active]:text-white data-[state=active]:shadow-sm dark:hover:bg-primary-900/40 dark:hover:text-primary-200"
+                className="flex w-full items-center justify-start gap-3 px-3 py-2.5 text-left text-sm text-fg-muted hover:bg-surface-muted hover:text-fg data-[state=active]:bg-fg data-[state=active]:text-white data-[state=active]:shadow-sm dark:hover:bg-fg/40 dark:hover:text-fg-muted"
               >
                 {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
                 {item.label}

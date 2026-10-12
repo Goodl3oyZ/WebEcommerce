@@ -44,7 +44,7 @@ const SortableImageItem = ({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative group bg-white border border-gray-300 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+      className="relative group bg-surface border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
     >
       {/* Drag Handle */}
       <div
@@ -57,7 +57,7 @@ const SortableImageItem = ({
 
       {/* Primary Badge */}
       {isPrimary && (
-        <div className="absolute top-2 right-2 z-10 bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+        <div className="absolute top-2 right-2 z-10 bg-fg text-canvas px-2 py-1 rounded-full text-xs font-medium">
           <FaStarOfLife size={10} className="inline mr-1" />
           Primary
         </div>
@@ -76,7 +76,7 @@ const SortableImageItem = ({
           {!isPrimary && (
             <button
               onClick={() => onSetPrimary(index)}
-              className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition-colors"
+              className="bg-fg text-canvas p-2 rounded-full hover:bg-fg transition-colors"
               title="Set as primary"
             >
               <FaStar size={14} />
@@ -84,7 +84,7 @@ const SortableImageItem = ({
           )}
           <button
             onClick={() => onRemove(index)}
-            className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
+            className="bg-danger text-white p-2 rounded-full hover:bg-danger transition-colors"
             title="Remove image"
           >
             <FaTrash size={14} />
@@ -184,22 +184,22 @@ export default function ImageUploader({
       <div
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
           isDragOver
-            ? "border-blue-500 bg-blue-50"
-            : "border-gray-300 hover:border-gray-400"
+            ? "border-fg bg-surface-muted"
+            : "border-border hover:border-border"
         }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => fileInputRef.current?.click()}
       >
-        <FaImage className="mx-auto text-gray-400 text-3xl mb-3" />
-        <p className="text-gray-600 mb-2">
+        <FaImage className="mx-auto text-fg-subtle text-3xl mb-3" />
+        <p className="text-fg-muted mb-2">
           ลากวางรูปภาพที่นี่ หรือคลิกเพื่อเลือกไฟล์
         </p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-fg-muted">
           รองรับ JPG, PNG, GIF ขนาดสูงสุด 5MB
         </p>
-        <p className="text-sm text-gray-500">สูงสุด {maxImages} รูปภาพ</p>
+        <p className="text-sm text-fg-muted">สูงสุด {maxImages} รูปภาพ</p>
 
         <input
           ref={fileInputRef}
@@ -214,7 +214,7 @@ export default function ImageUploader({
       {/* Image Grid */}
       {images.length > 0 && (
         <div className="mt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">
+          <h4 className="text-sm font-medium text-fg mb-3">
             รูปภาพ ({images.length}/{maxImages})
           </h4>
 
@@ -242,7 +242,7 @@ export default function ImageUploader({
             </SortableContext>
           </DndContext>
 
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-fg-muted mt-2">
             💡 ลากรูปเพื่อจัดเรียงใหม่ • คลิกดาวเพื่อตั้งเป็นรูปหลัก
           </p>
         </div>

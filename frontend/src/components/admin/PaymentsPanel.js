@@ -7,10 +7,10 @@ import ErrorState from "@/components/ErrorState";
 import EmptyState from "@/components/EmptyState";
 
 const STATUS_BADGE = {
-  pending: "bg-yellow-100 text-yellow-700",
-  completed: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-600",
-  refunded: "bg-blue-100 text-blue-700",
+  pending: "bg-warning-soft text-warning",
+  completed: "bg-success-soft text-success",
+  failed: "bg-danger-soft text-danger",
+  refunded: "bg-surface-muted text-fg",
 };
 
 const STATUS_LABEL = {
@@ -109,13 +109,13 @@ export function PaymentsPanel() {
     <div className="p-2">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">จัดการการชำระเงิน</h2>
+        <h2 className="text-2xl font-bold text-fg">จัดการการชำระเงิน</h2>
         <div className="flex gap-2 items-center">
-          <label className="text-sm text-gray-600">กรองสถานะ:</label>
+          <label className="text-sm text-fg-muted">กรองสถานะ:</label>
           <select
             value={filterStatus}
             onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fg"
           >
             <option value="">ทั้งหมด</option>
             <option value="pending">รอดำเนินการ</option>
@@ -127,29 +127,29 @@ export function PaymentsPanel() {
       </div>
 
       {/* Stats summary */}
-      <div className="mb-4 text-sm text-gray-500">
+      <div className="mb-4 text-sm text-fg-muted">
         ทั้งหมด {pagination.total ?? 0} รายการ
       </div>
 
       {/* Update Status Modal */}
       {selectedPayment && !showRefundModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+          <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
             <button
               onClick={() => setSelectedPayment(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
+              className="absolute top-4 right-4 text-fg-subtle hover:text-fg-muted text-xl"
             >✕</button>
             <h3 className="text-lg font-bold mb-2">อัปเดตสถานะการชำระเงิน</h3>
-            <p className="text-xs text-gray-500 mb-3 font-mono">ID: {selectedPayment.id?.slice(0, 8)}...</p>
-            <p className="text-sm text-gray-600 mb-4">
-              ยอด: <span className="font-bold text-gray-800">
+            <p className="text-xs text-fg-muted mb-3 font-mono">ID: {selectedPayment.id?.slice(0, 8)}...</p>
+            <p className="text-sm text-fg-muted mb-4">
+              ยอด: <span className="font-bold text-fg">
                 ฿{Number(selectedPayment.amount || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
               </span>
             </p>
             <select
               value={newStatus}
               onChange={(e) => setNewStatus(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-fg"
             >
               <option value="pending">รอดำเนินการ</option>
               <option value="completed">สำเร็จ</option>
@@ -159,12 +159,12 @@ export function PaymentsPanel() {
             <div className="flex gap-2">
               <button
                 onClick={() => setSelectedPayment(null)}
-                className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition"
+                className="flex-1 border border-border text-fg px-4 py-2 rounded-lg hover:bg-surface-muted transition"
               >ยกเลิก</button>
               <button
                 onClick={handleUpdateStatus}
                 disabled={submitting}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
+                className="flex-1 bg-fg hover:bg-fg text-canvas px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
               >{submitting ? "กำลังบันทึก..." : "บันทึก"}</button>
             </div>
           </div>
@@ -174,34 +174,34 @@ export function PaymentsPanel() {
       {/* Refund Modal */}
       {selectedPayment && showRefundModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+          <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
             <button
               onClick={() => { setSelectedPayment(null); setShowRefundModal(false); }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
+              className="absolute top-4 right-4 text-fg-subtle hover:text-fg-muted text-xl"
             >✕</button>
             <h3 className="text-lg font-bold mb-2">คืนเงิน</h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-fg-muted mb-4">
               ยอดเต็ม: <span className="font-bold">฿{Number(selectedPayment.amount || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
             </p>
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium text-gray-700">จำนวนเงินที่คืน (บาท) <span className="text-red-500">*</span></label>
+                <label className="text-sm font-medium text-fg">จำนวนเงินที่คืน (บาท) <span className="text-danger">*</span></label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={refundAmount}
                   onChange={(e) => setRefundAmount(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-full border border-border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg"
                   placeholder="เช่น 100"
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">เหตุผล</label>
+                <label className="text-sm font-medium text-fg">เหตุผล</label>
                 <textarea
                   value={refundReason}
                   onChange={(e) => setRefundReason(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 h-20 resize-none"
+                  className="w-full border border-border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg h-20 resize-none"
                   placeholder="เหตุผลในการคืนเงิน..."
                 />
               </div>
@@ -209,12 +209,12 @@ export function PaymentsPanel() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => { setSelectedPayment(null); setShowRefundModal(false); }}
-                className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition"
+                className="flex-1 border border-border text-fg px-4 py-2 rounded-lg hover:bg-surface-muted transition"
               >ยกเลิก</button>
               <button
                 onClick={handleRefund}
                 disabled={submitting}
-                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
+                className="flex-1 bg-warning hover:bg-warning text-white px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
               >{submitting ? "กำลังดำเนินการ..." : "คืนเงิน"}</button>
             </div>
           </div>
@@ -236,42 +236,42 @@ export function PaymentsPanel() {
           <table className="min-w-full bg-surface text-sm">
             <thead className="sticky top-0 z-10 bg-surface-muted">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Transaction ID</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">Order ID</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">วิธีชำระ</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-600">ยอด (บาท)</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">สถานะ</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">วันที่</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">Transaction ID</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">Order ID</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">วิธีชำระ</th>
+                <th className="px-4 py-3 text-right font-semibold text-fg-muted">ยอด (บาท)</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">สถานะ</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">วันที่</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {payments.map((p) => (
                   <tr key={p.id} className="hover:bg-surface-muted transition">
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.id?.slice(0, 8)}...</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.orderId?.slice(0, 8)}...</td>
-                    <td className="px-4 py-3 text-gray-600">{METHOD_LABEL[p.paymentMethod] || p.paymentMethod || "-"}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                    <td className="px-4 py-3 font-mono text-xs text-fg-muted">{p.id?.slice(0, 8)}...</td>
+                    <td className="px-4 py-3 font-mono text-xs text-fg-muted">{p.orderId?.slice(0, 8)}...</td>
+                    <td className="px-4 py-3 text-fg-muted">{METHOD_LABEL[p.paymentMethod] || p.paymentMethod || "-"}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-fg">
                       {Number(p.amount || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[p.status] || "bg-gray-100 text-gray-600"}`}>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[p.status] || "bg-surface-muted text-fg-muted"}`}>
                         {STATUS_LABEL[p.status] || p.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 text-xs text-fg-muted">
                       {p.createdAt ? new Date(p.createdAt).toLocaleDateString("th-TH") : "-"}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => { setSelectedPayment(p); setShowRefundModal(false); }}
-                          className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded transition"
+                          className="text-xs bg-surface-muted text-fg hover:bg-surface-muted px-2 py-1 rounded transition"
                         >อัปเดต</button>
                         {p.status === "completed" && (
                           <button
                             onClick={() => { setSelectedPayment(p); setRefundAmount(""); setRefundReason(""); setShowRefundModal(true); }}
-                            className="text-xs bg-orange-100 text-orange-700 hover:bg-orange-200 px-2 py-1 rounded transition"
+                            className="text-xs bg-warning-soft text-warning hover:bg-warning-soft px-2 py-1 rounded transition"
                           >คืนเงิน</button>
                         )}
                       </div>
@@ -286,13 +286,13 @@ export function PaymentsPanel() {
       {/* Pagination */}
       <div className="flex justify-between items-center mt-4">
         <button
-          className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition"
+          className="px-4 py-2 border border-border rounded-lg text-sm disabled:opacity-40 hover:bg-surface-muted transition"
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page <= 1}
         >← ก่อนหน้า</button>
-        <span className="text-sm text-gray-500">หน้า {page} / {pagination.pages || 1}</span>
+        <span className="text-sm text-fg-muted">หน้า {page} / {pagination.pages || 1}</span>
         <button
-          className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-40 hover:bg-gray-50 transition"
+          className="px-4 py-2 border border-border rounded-lg text-sm disabled:opacity-40 hover:bg-surface-muted transition"
           onClick={() => setPage((p) => Math.min(pagination.pages || 1, p + 1))}
           disabled={page >= (pagination.pages || 1)}
         >ถัดไป →</button>

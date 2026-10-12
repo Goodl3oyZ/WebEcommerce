@@ -13,7 +13,7 @@ const EmptyState = ({
     <div
       className={`flex flex-col items-center justify-center px-4 py-12 text-center ${className}`}
     >
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-muted text-fg">
         <Icon className="h-8 w-8" aria-hidden />
       </div>
       <h3 className="mb-2 text-lg font-semibold text-fg">{title}</h3>
@@ -22,7 +22,7 @@ const EmptyState = ({
         <button
           type="button"
           onClick={onAction}
-          className="inline-flex items-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+          className="inline-flex items-center rounded-xl bg-fg px-4 py-2 text-sm font-medium text-canvas transition-colors duration-150 hover:bg-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg focus-visible:ring-offset-2"
         >
           <FiPlus className="mr-2 h-4 w-4" />
           {actionLabel}

@@ -102,21 +102,21 @@ export function ReviewsPanel() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-2xl shadow-lg flex flex-col gap-4">
+        <div className="bg-surface p-8 rounded-2xl shadow-lg flex flex-col gap-4">
           <div className="flex items-center gap-2 mb-2">
-            <FaStar className="text-yellow-500 text-2xl" />
-            <h2 className="text-xl font-bold text-gray-800">
+            <FaStar className="text-warning text-2xl" />
+            <h2 className="text-xl font-bold text-fg">
               {editingId ? "Edit Review" : "Add New Review"}
             </h2>
           </div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-fg mb-1">
                 Product
               </label>
               <select
                 {...register("productId", { required: "Product is required" })}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 text-base px-3 py-2"
+                className="mt-1 block w-full rounded-lg border border-border bg-surface-muted focus:border-warning focus:ring-2 focus:ring-border text-base px-3 py-2"
               >
                 <option value="">Select product</option>
                 {products.map((p) => (
@@ -127,7 +127,7 @@ export function ReviewsPanel() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-fg mb-1">
                 Rating (1-5)
               </label>
               <input
@@ -139,23 +139,23 @@ export function ReviewsPanel() {
                   min: 1,
                   max: 5,
                 })}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 text-base px-3 py-2"
+                className="mt-1 block w-full rounded-lg border border-border bg-surface-muted focus:border-warning focus:ring-2 focus:ring-border text-base px-3 py-2"
                 placeholder="1-5"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-fg mb-1">
                 Comment
               </label>
               <textarea
                 {...register("comment", { required: "Comment is required" })}
                 rows={4}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 text-base px-3 py-2"
+                className="mt-1 block w-full rounded-lg border border-border bg-surface-muted focus:border-warning focus:ring-2 focus:ring-border text-base px-3 py-2"
                 placeholder="Write your review..."
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-fg mb-1">
                 User ID
               </label>
               <input
@@ -167,7 +167,7 @@ export function ReviewsPanel() {
             <div className="flex gap-2 mt-2">
               <button
                 type="submit"
-                className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white text-base px-5 py-2 rounded-lg shadow transition font-semibold"
+                className="flex items-center gap-2 bg-warning hover:bg-warning text-white text-base px-5 py-2 rounded-lg shadow transition font-semibold"
               >
                 {editingId ? <FaEdit /> : <FaPlusCircle />}
                 {editingId ? "Update" : "Create"}
@@ -179,7 +179,7 @@ export function ReviewsPanel() {
                     setEditingId(null);
                     reset();
                   }}
-                  className="flex items-center gap-2 bg-gray-400 hover:bg-gray-500 text-white text-base px-5 py-2 rounded-lg shadow transition"
+                  className="flex items-center gap-2 bg-fg-subtle hover:bg-fg-subtle text-white text-base px-5 py-2 rounded-lg shadow transition"
                 >
                   <FaTimesCircle /> Cancel
                 </button>
@@ -187,10 +187,10 @@ export function ReviewsPanel() {
             </div>
           </form>
         </div>
-        <div className="bg-white p-8 rounded-2xl shadow-lg">
+        <div className="bg-surface p-8 rounded-2xl shadow-lg">
           <div className="flex items-center gap-2 mb-4">
-            <FaStar className="text-yellow-500 text-2xl" />
-            <h2 className="text-xl font-bold text-gray-800">Reviews List</h2>
+            <FaStar className="text-warning text-2xl" />
+            <h2 className="text-xl font-bold text-fg">Reviews List</h2>
           </div>
           <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
             {reviews.map((review) => (
@@ -200,42 +200,42 @@ export function ReviewsPanel() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <div className="flex text-yellow-400 text-lg">
+                    <div className="flex text-warning text-lg">
                       {[...Array(review.rating)].map((_, i) => (
                         <FaStar key={i} />
                       ))}
                       {[...Array(5 - review.rating)].map((_, i) => (
                         <FaStar
                           key={i + review.rating}
-                          className="text-gray-200"
+                          className="text-fg-subtle"
                         />
                       ))}
                     </div>
-                    <span className="ml-2 text-sm text-gray-600 flex items-center gap-1">
-                      <FaUserCircle className="text-gray-400" /> User #
+                    <span className="ml-2 text-sm text-fg-muted flex items-center gap-1">
+                      <FaUserCircle className="text-fg-subtle" /> User #
                       {review.user_id}
                     </span>
-                    <span className="ml-2 text-xs text-blue-600 font-semibold">
+                    <span className="ml-2 text-xs text-fg font-semibold">
                       Product: {review.product?.name}
                     </span>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEdit(review)}
-                      className="flex items-center gap-1 text-yellow-600 hover:underline text-sm font-medium"
+                      className="flex items-center gap-1 text-warning hover:underline text-sm font-medium"
                     >
                       <FaEdit /> Edit
                     </button>
                     <button
                       onClick={() => handleDelete(review)}
-                      className="flex items-center gap-1 text-red-600 hover:underline text-sm font-medium"
+                      className="flex items-center gap-1 text-danger hover:underline text-sm font-medium"
                     >
                       <FaTrash /> Delete
                     </button>
                   </div>
                 </div>
-                <p className="text-gray-700 text-base">{review.comment}</p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-fg text-base">{review.comment}</p>
+                <p className="text-sm text-fg-muted mt-1">
                   {review.createdAt
                     ? new Date(review.createdAt).toLocaleDateString()
                     : "-"}
@@ -243,7 +243,7 @@ export function ReviewsPanel() {
               </div>
             ))}
             {reviews.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+              <div className="flex flex-col items-center justify-center py-10 text-fg-subtle">
                 <FaStar className="text-5xl mb-2" />
                 <p className="text-base">No reviews found.</p>
               </div>

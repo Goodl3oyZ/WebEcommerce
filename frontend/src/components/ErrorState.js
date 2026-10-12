@@ -38,7 +38,7 @@ const ErrorState = ({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            className="inline-flex items-center rounded-xl bg-fg px-4 py-2 text-sm font-medium text-canvas transition-colors duration-150 hover:bg-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg"
           >
             <FiRefreshCw className="mr-2 h-4 w-4" />
             {retryLabel}
@@ -48,7 +48,7 @@ const ErrorState = ({
           <button
             type="button"
             onClick={onGoBack}
-            className="inline-flex items-center rounded-xl bg-surface-muted px-4 py-2 text-sm font-medium text-fg transition-colors duration-150 hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            className="inline-flex items-center rounded-xl bg-surface-muted px-4 py-2 text-sm font-medium text-fg transition-colors duration-150 hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg"
           >
             <FiArrowLeft className="mr-2 h-4 w-4" />
             {goBackLabel}

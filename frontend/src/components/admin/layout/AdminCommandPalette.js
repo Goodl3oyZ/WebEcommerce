@@ -78,7 +78,7 @@ export function AdminCommandPalette({ open, onClose }) {
                 <button
                   type="button"
                   onClick={() => go(item.value)}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-fg transition-colors duration-150 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-fg transition-colors duration-150 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fg"
                 >
                   <span>{item.label}</span>
                   <span className="text-xs text-fg-subtle">{item.group}</span>

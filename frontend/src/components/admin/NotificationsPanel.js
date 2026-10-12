@@ -15,9 +15,9 @@ const NOTIFICATION_TYPES = [
 ];
 
 const PRIORITY_BADGE = {
-  high: "bg-red-100 text-red-700",
-  medium: "bg-yellow-100 text-yellow-700",
-  low: "bg-gray-100 text-gray-600",
+  high: "bg-danger-soft text-danger",
+  medium: "bg-warning-soft text-warning",
+  low: "bg-surface-muted text-fg-muted",
 };
 
 const PRIORITY_LABEL = {
@@ -27,11 +27,11 @@ const PRIORITY_LABEL = {
 };
 
 const TYPE_BADGE = {
-  order: "bg-blue-100 text-blue-700",
-  payment: "bg-green-100 text-green-700",
-  shipping: "bg-purple-100 text-purple-700",
-  system: "bg-gray-100 text-gray-700",
-  promotion: "bg-orange-100 text-orange-700",
+  order: "bg-surface-muted text-fg",
+  payment: "bg-success-soft text-success",
+  shipping: "bg-surface-muted text-fg",
+  system: "bg-surface-muted text-fg",
+  promotion: "bg-warning-soft text-warning",
 };
 
 const initialForm = {
@@ -128,10 +128,10 @@ export function NotificationsPanel() {
     <div className="p-2">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">จัดการการแจ้งเตือน</h2>
+        <h2 className="text-2xl font-bold text-fg">จัดการการแจ้งเตือน</h2>
         <button
           onClick={() => { setForm(initialForm); setFormErrors({}); setShowForm(true); }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition"
+          className="bg-fg hover:bg-fg text-canvas px-4 py-2 rounded-lg font-medium transition"
         >
           + ส่งการแจ้งเตือน
         </button>
@@ -140,37 +140,37 @@ export function NotificationsPanel() {
       {/* Create Notification Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+          <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
             <button
               onClick={() => setShowForm(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
+              className="absolute top-4 right-4 text-fg-subtle hover:text-fg-muted text-xl"
             >✕</button>
             <h3 className="text-lg font-bold mb-4">ส่งการแจ้งเตือนใหม่</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">
-                    ประเภท <span className="text-red-500">*</span>
+                  <label className="text-sm font-medium text-fg">
+                    ประเภท <span className="text-danger">*</span>
                   </label>
                   <select
                     name="type"
                     value={form.type}
                     onChange={handleFormChange}
-                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.type ? "border-red-400" : "border-gray-300"}`}
+                    className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.type ? "border-danger" : "border-border"}`}
                   >
                     {NOTIFICATION_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
                   </select>
-                  {formErrors.type && <p className="text-xs text-red-500 mt-1">{formErrors.type}</p>}
+                  {formErrors.type && <p className="text-xs text-danger mt-1">{formErrors.type}</p>}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">ความสำคัญ</label>
+                  <label className="text-sm font-medium text-fg">ความสำคัญ</label>
                   <select
                     name="priority"
                     value={form.priority}
                     onChange={handleFormChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="w-full border border-border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg"
                   >
                     <option value="low">ต่ำ</option>
                     <option value="medium">ปานกลาง</option>
@@ -180,44 +180,44 @@ export function NotificationsPanel() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700">
-                  ชื่อ <span className="text-red-500">*</span>
+                <label className="text-sm font-medium text-fg">
+                  ชื่อ <span className="text-danger">*</span>
                 </label>
                 <input
                   name="title"
                   value={form.title}
                   onChange={handleFormChange}
-                  className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 ${formErrors.title ? "border-red-400" : "border-gray-300"}`}
+                  className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg ${formErrors.title ? "border-danger" : "border-border"}`}
                   placeholder="เช่น แจ้งเตือนโปรโมชันใหม่"
                 />
-                {formErrors.title && <p className="text-xs text-red-500 mt-1">{formErrors.title}</p>}
+                {formErrors.title && <p className="text-xs text-danger mt-1">{formErrors.title}</p>}
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700">
-                  ข้อความ <span className="text-red-500">*</span>
+                <label className="text-sm font-medium text-fg">
+                  ข้อความ <span className="text-danger">*</span>
                 </label>
                 <textarea
                   name="message"
                   value={form.message}
                   onChange={handleFormChange}
                   rows={3}
-                  className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none ${formErrors.message ? "border-red-400" : "border-gray-300"}`}
+                  className={`w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-fg resize-none ${formErrors.message ? "border-danger" : "border-border"}`}
                   placeholder="รายละเอียดการแจ้งเตือน..."
                 />
-                {formErrors.message && <p className="text-xs text-red-500 mt-1">{formErrors.message}</p>}
+                {formErrors.message && <p className="text-xs text-danger mt-1">{formErrors.message}</p>}
               </div>
 
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition"
+                  className="flex-1 border border-border text-fg px-4 py-2 rounded-lg hover:bg-surface-muted transition"
                 >ยกเลิก</button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
+                  className="flex-1 bg-fg hover:bg-fg text-canvas px-4 py-2 rounded-lg font-medium transition disabled:opacity-60"
                 >{submitting ? "กำลังส่ง..." : "ส่งการแจ้งเตือน"}</button>
               </div>
             </form>
@@ -246,36 +246,36 @@ export function NotificationsPanel() {
           <table className="min-w-full bg-surface text-sm">
             <thead className="sticky top-0 z-10 bg-surface-muted">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">ชื่อ</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">ข้อความ</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">ประเภท</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">ความสำคัญ</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">วันที่</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-600">Actions</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">ชื่อ</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">ข้อความ</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">ประเภท</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">ความสำคัญ</th>
+                <th className="px-4 py-3 text-left font-semibold text-fg-muted">วันที่</th>
+                <th className="px-4 py-3 text-center font-semibold text-fg-muted">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {notifications.map((n) => (
                   <tr key={n.id} className="hover:bg-surface-muted transition">
-                    <td className="px-4 py-3 font-medium text-gray-800 max-w-[180px] truncate">{n.title}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[250px] truncate">{n.message}</td>
+                    <td className="px-4 py-3 font-medium text-fg max-w-[180px] truncate">{n.title}</td>
+                    <td className="px-4 py-3 text-fg-muted max-w-[250px] truncate">{n.message}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${TYPE_BADGE[n.type] || "bg-gray-100 text-gray-600"}`}>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${TYPE_BADGE[n.type] || "bg-surface-muted text-fg-muted"}`}>
                         {NOTIFICATION_TYPES.find((t) => t.value === n.type)?.label || n.type}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${PRIORITY_BADGE[n.priority] || "bg-gray-100 text-gray-600"}`}>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${PRIORITY_BADGE[n.priority] || "bg-surface-muted text-fg-muted"}`}>
                         {PRIORITY_LABEL[n.priority] || n.priority || "-"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 text-xs text-fg-muted">
                       {n.createdAt ? new Date(n.createdAt).toLocaleDateString("th-TH") : "-"}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => handleDelete(n.id)}
-                        className="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded transition"
+                        className="text-xs bg-danger-soft text-danger hover:bg-danger-soft px-2 py-1 rounded transition"
                       >ลบ</button>
                     </td>
                   </tr>

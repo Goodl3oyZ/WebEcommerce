@@ -9,7 +9,7 @@ const Input = forwardRef(({ className, type, error, ...props }, ref) => {
       type={type}
       className={clsx(
         "input-primary",
-        error && "border-red-500 focus-visible:ring-red-500",
+        error && "border-danger focus-visible:ring-danger",
         className
       )}
       ref={ref}

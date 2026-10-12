@@ -74,52 +74,52 @@ export function BrandsPanel() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Form Panel */}
-        <div className="bg-white border rounded-2xl shadow-lg p-8 flex flex-col gap-4">
+        <div className="bg-surface border rounded-2xl shadow-lg p-8 flex flex-col gap-4">
           <div className="flex items-center gap-2 mb-2">
-            <FaBuilding className="text-purple-500 text-2xl" />
-            <h2 className="text-xl font-bold text-gray-800">
+            <FaBuilding className="text-fg text-2xl" />
+            <h2 className="text-xl font-bold text-fg">
               {editingId ? "Edit Brand" : "Add New Brand"}
             </h2>
           </div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-fg mb-1">
                 Name
               </label>
               <input
                 {...register("name", { required: "Brand name is required" })}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-base px-3 py-2"
+                className="mt-1 block w-full rounded-lg border border-border bg-surface-muted focus:border-fg focus:ring-2 focus:ring-border text-base px-3 py-2"
                 placeholder="Brand name"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-fg mb-1">
                 Description
               </label>
               <textarea
                 {...register("description")}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-base px-3 py-2"
+                className="mt-1 block w-full rounded-lg border border-border bg-surface-muted focus:border-fg focus:ring-2 focus:ring-border text-base px-3 py-2"
                 placeholder="Brand description"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-fg mb-1">
                 Logo URL
               </label>
               <div className="flex gap-2 items-center">
                 <input
                   type="url"
                   {...register("logo_url")}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-base px-3 py-2"
+                  className="mt-1 block w-full rounded-lg border border-border bg-surface-muted focus:border-fg focus:ring-2 focus:ring-border text-base px-3 py-2"
                   placeholder="https://..."
                 />
-                <FaImage className="text-gray-400 text-xl" />
+                <FaImage className="text-fg-subtle text-xl" />
               </div>
             </div>
             <div className="flex gap-2 mt-2">
               <button
                 type="submit"
-                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-base px-5 py-2 rounded-lg shadow transition font-semibold"
+                className="flex items-center gap-2 bg-fg hover:bg-fg text-canvas text-base px-5 py-2 rounded-lg shadow transition font-semibold"
               >
                 {editingId ? <FaEdit /> : <FaPlusCircle />}{" "}
                 {editingId ? "Update" : "Create"}
@@ -131,7 +131,7 @@ export function BrandsPanel() {
                     setEditingId(null);
                     reset();
                   }}
-                  className="flex items-center gap-2 bg-gray-400 hover:bg-gray-500 text-white text-base px-5 py-2 rounded-lg shadow transition"
+                  className="flex items-center gap-2 bg-fg-subtle hover:bg-fg-subtle text-white text-base px-5 py-2 rounded-lg shadow transition"
                 >
                   <FaTimesCircle /> Cancel
                 </button>
@@ -140,10 +140,10 @@ export function BrandsPanel() {
           </form>
         </div>
         {/* Brands List Panel */}
-        <div className="bg-white border rounded-2xl shadow-lg p-8">
+        <div className="bg-surface border rounded-2xl shadow-lg p-8">
           <div className="flex items-center gap-2 mb-4">
-            <FaBuilding className="text-purple-500 text-2xl" />
-            <h2 className="text-xl font-bold text-gray-800">Brands List</h2>
+            <FaBuilding className="text-fg text-2xl" />
+            <h2 className="text-xl font-bold text-fg">Brands List</h2>
           </div>
           <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
             {brands.map((brand) => (
@@ -161,27 +161,27 @@ export function BrandsPanel() {
                       style={{ objectFit: "cover" }}
                     />
                   ) : (
-                    <FaImage className="w-10 h-10 text-gray-300" />
+                    <FaImage className="w-10 h-10 text-fg-subtle" />
                   )}
                   <div>
-                    <div className="font-semibold text-gray-900 flex items-center gap-2">
+                    <div className="font-semibold text-fg flex items-center gap-2">
                       {brand.name}
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           brand.isActive
-                            ? "bg-green-100 text-green-600"
-                            : "bg-gray-200 text-gray-500"
+                            ? "bg-success-soft text-success"
+                            : "bg-border text-fg-muted"
                         }`}
                       >
                         {brand.isActive ? (
-                          <FaCheckCircle className="inline mr-1 text-green-500" />
+                          <FaCheckCircle className="inline mr-1 text-success" />
                         ) : (
-                          <FaTimesCircle className="inline mr-1 text-gray-400" />
+                          <FaTimesCircle className="inline mr-1 text-fg-subtle" />
                         )}{" "}
                         {brand.isActive ? "Active" : "Inactive"}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-fg-muted mt-1">
                       {brand.description}
                     </p>
                   </div>
@@ -189,13 +189,13 @@ export function BrandsPanel() {
                 <div className="flex flex-col gap-1 text-right">
                   <button
                     onClick={() => handleEdit(brand)}
-                    className="flex items-center gap-1 text-purple-600 hover:underline text-sm font-medium"
+                    className="flex items-center gap-1 text-fg hover:underline text-sm font-medium"
                   >
                     <FaEdit /> Edit
                   </button>
                   <button
                     onClick={() => handleDelete(brand.id)}
-                    className="flex items-center gap-1 text-red-600 hover:underline text-sm font-medium"
+                    className="flex items-center gap-1 text-danger hover:underline text-sm font-medium"
                   >
                     <FaTrash /> Delete
                   </button>
@@ -203,7 +203,7 @@ export function BrandsPanel() {
               </div>
             ))}
             {brands.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+              <div className="flex flex-col items-center justify-center py-10 text-fg-subtle">
                 <FaBuilding className="text-5xl mb-2" />
                 <p className="text-base">No brands found.</p>
               </div>
