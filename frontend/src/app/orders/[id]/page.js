@@ -19,6 +19,7 @@ import {
 import { paymentsAPI } from "@/lib/api/payment";
 import useCartStore from "@/store/cartStore";
 import Image from "next/image";
+import ProductImage from "@/components/ui/ProductImage";
 
 const ORDER_STATUS = {
   PENDING: "รอการชำระเงิน",
@@ -139,13 +140,9 @@ function OrderStatusBadge({ status, tracking }) {
 function OrderItem({ item }) {
   return (
     <div className="flex items-center gap-4 py-4 border-b last:border-b-0">
-      <Image
-        src={item.product.imageUrl?.[0] || "/placeholder.png"}
-        alt={item.product.name}
-        className="w-20 h-20 object-cover rounded border shadow-sm"
-        fill
-        style={{ objectFit: "cover" }}
-      />
+      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
+        <ProductImage imageUrl={item.product?.imageUrl} alt={item.product?.name} fill className="object-cover" sizes="80px" />
+      </div>
       <div className="flex-1">
         <div className="font-medium text-gray-900">{item.product.name}</div>
         <div className="text-xs text-gray-500 mb-1">
@@ -456,7 +453,7 @@ export default function OrderDetailsPage() {
   // Cancelled orders cannot be paid; put the same items back in the cart instead.
   const handleReorder = async () => {
     setIsReordering(true);
-    let failed = 0;
+    const problems = [];
     for (const item of order.items) {
       try {
         await addToCart({
@@ -469,16 +466,17 @@ export default function OrderDetailsPage() {
           variant: item.variant,
           variantName: item.variant ? [item.variant.color, item.variant.size].filter(Boolean).join(" - ") : null,
         });
-      } catch {
-        failed += 1; // e.g. out of stock or no longer sold
+      } catch (err) {
+        // e.g. not enough stock (the cart may already hold some) or no longer sold
+        problems.push(`${item.product?.name ?? "สินค้า"}: ${err.message}`);
       }
     }
     setIsReordering(false);
-    if (failed === order.items.length) {
-      toast.error("เพิ่มสินค้าลงตะกร้าไม่ได้ (สินค้าอาจหมดหรือเลิกขายแล้ว)");
+    if (problems.length === order.items.length) {
+      toast.error(["เพิ่มสินค้าลงตะกร้าไม่ได้", ...problems].join("\n"), { duration: 6000 });
       return;
     }
-    if (failed > 0) toast(`เพิ่มลงตะกร้าแล้ว ยกเว้น ${failed} รายการที่สินค้าหมดหรือเลิกขาย`);
+    if (problems.length > 0) toast(["เพิ่มลงตะกร้าแล้ว ยกเว้น:", ...problems].join("\n"), { duration: 6000 });
     else toast.success("เพิ่มสินค้าลงตะกร้าแล้ว");
     router.push("/cart");
   };

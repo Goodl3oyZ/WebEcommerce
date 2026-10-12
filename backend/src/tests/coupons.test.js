@@ -63,6 +63,46 @@ describe("customer coupon endpoints", () => {
     expect(codes).not.toContain(future.code);
   });
 
+  test("GET /validate says why a coupon cannot be used", async () => {
+    const { agent } = await loginAs("user");
+    const expired = await createCoupon({ startDate: new Date(Date.now() - 3 * DAY), endDate: new Date(Date.now() - DAY) });
+    const future = await createCoupon({ startDate: new Date(Date.now() + DAY), endDate: new Date(Date.now() + 2 * DAY) });
+    const cases = [
+      [expired.code, "COUPON_EXPIRED", /expired on/],
+      [future.code, "COUPON_NOT_STARTED", /starts on/],
+      ["NO-SUCH-CODE", "COUPON_NOT_FOUND", /not found/],
+    ];
+    for (const [code, errorCode, message] of cases) {
+      const res = await agent.get("/api/coupons/validate").query({ code, amount: 100 });
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ code: errorCode });
+      expect(res.body.message).toMatch(message);
+    }
+  });
+
+  test("personal coupons are visible and usable only by their owner", async () => {
+    const owner = await loginAs("user");
+    const other = await loginAs("user");
+    const mine = await createCoupon({ userId: owner.user.id });
+
+    expect((await owner.agent.get("/api/coupons/available")).body.map((c) => c.code)).toContain(mine.code);
+    expect((await other.agent.get("/api/coupons/available")).body.map((c) => c.code)).not.toContain(mine.code);
+
+    expect((await owner.agent.get("/api/coupons/validate").query({ code: mine.code, amount: 100 })).status).toBe(200);
+    const stolen = await other.agent.get("/api/coupons/validate").query({ code: mine.code, amount: 100 });
+    expect(stolen.status).toBe(400);
+    expect(stolen.body.code).toBe("COUPON_NOT_FOUND");
+  });
+
+  test("GET /available hides coupons the user has used up", async () => {
+    const { agent, user } = await loginAs("user");
+    const once = await createCoupon({ perUserLimit: 1 });
+    expect((await agent.get("/api/coupons/available")).body.map((c) => c.code)).toContain(once.code);
+    const setup = await checkoutSetup(user);
+    expect((await agent.post("/api/orders/checkout").send(setup.body({ couponCode: once.code }))).status).toBe(201);
+    expect((await agent.get("/api/coupons/available")).body.map((c) => c.code)).not.toContain(once.code);
+  });
+
   test("customer endpoints need login; admin endpoints need admin", async () => {
     expect((await (await newAgent()).get("/api/coupons/available")).status).toBe(401);
     const { agent } = await loginAs("user");

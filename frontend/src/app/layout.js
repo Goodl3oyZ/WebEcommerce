@@ -55,6 +55,7 @@ export default function RootLayout({ children }) {
                 position="top-center"
                 toastOptions={{
                   className: "!rounded-xl !bg-fg !text-canvas !text-sm !shadow-lg",
+                  style: { whiteSpace: "pre-line" },
                   success: { iconTheme: { primary: "hsl(77 96% 56%)", secondary: "#111" } },
                 }}
               />

@@ -57,7 +57,6 @@ const useCartStore = create(
             }
           }
         } catch (error) {
-          console.error("Error adding item:", error.message);
           set({ error: error.message });
           // Let the caller show the reason (and not a "success" toast).
           throw error;
@@ -85,7 +84,6 @@ const useCartStore = create(
             set({ items: updatedItems });
           }
         } catch (error) {
-          console.error("Error removing item:", error.message);
           set({ error: error.message });
           throw error;
         } finally {
@@ -112,7 +110,6 @@ const useCartStore = create(
             set({ items: updatedItems });
           }
         } catch (error) {
-          console.error("Error updating quantity:", error.message);
           set({ error: error.message });
           throw error;
         } finally {

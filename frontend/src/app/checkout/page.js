@@ -9,6 +9,8 @@ import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { Banknote, Check, CreditCard, Loader2, Lock, MapPin, QrCode, Tag, Truck, X } from "lucide-react";
 import { addressAPI, cartAPI, couponsAPI, orderAPI, paymentsAPI, shippingAPI } from "@/lib/api";
 import { createCardToken } from "@/lib/omise";
+import { couponErrorMessage } from "@/lib/api/coupons";
+import CouponList, { useAvailableCoupons } from "@/components/shop/CouponList";
 import useCartStore from "@/store/cartStore";
 import Container from "@/components/shop/Container";
 import ProductImage from "@/components/ui/ProductImage";
@@ -133,6 +135,7 @@ export default function CheckoutPage() {
   const [formError, setFormError] = useState(null);
   const [qr, setQr] = useState(null); // { orderId, url, total }
   const [cancelling, setCancelling] = useState(false);
+  const available = useAvailableCoupons();
 
   // Initial data
   useEffect(() => {
@@ -204,9 +207,12 @@ export default function CheckoutPage() {
     };
   }, [cart.subtotal, coupon, shippingCost]);
 
-  const applyCoupon = async (e) => {
+  const applyCoupon = (e) => {
     e.preventDefault();
-    const code = couponInput.trim();
+    applyCode(couponInput.trim());
+  };
+
+  const applyCode = async (code) => {
     if (!code) {
       setCouponState({ loading: false, error: "กรุณากรอกโค้ดส่วนลด" });
       return;
@@ -219,7 +225,7 @@ export default function CheckoutPage() {
       setCouponState({ loading: false, error: null });
     } catch (err) {
       setCoupon(null);
-      setCouponState({ loading: false, error: apiMessage(err, "ใช้โค้ดนี้ไม่ได้") });
+      setCouponState({ loading: false, error: couponErrorMessage(err) });
     }
   };
 
@@ -616,6 +622,25 @@ export default function CheckoutPage() {
                   </p>
                 )}
               </form>
+            )}
+            {available.coupons.length > 0 && (
+              <details className="group mt-3" open={!coupon}>
+                <summary className="cursor-pointer list-none text-xs font-semibold text-fg-muted hover:text-fg">
+                  คูปองที่ใช้ได้ ({available.coupons.length})
+                  <span className="ml-1 inline-block transition-transform group-open:rotate-180" aria-hidden>
+                    ▾
+                  </span>
+                </summary>
+                <div className="mt-2">
+                  <CouponList
+                    compact
+                    coupons={available.coupons}
+                    subtotal={cart.subtotal}
+                    appliedCode={coupon?.code}
+                    onApply={applyCode}
+                  />
+                </div>
+              </details>
             )}
           </div>
 

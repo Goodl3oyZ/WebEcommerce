@@ -8,7 +8,7 @@ export const couponController = {
   },
 
   async getAvailableCoupons(req, res) {
-    res.json(await couponService.getAvailableCoupons());
+    res.json(await couponService.getAvailableCoupons(req.user.id));
   },
 
   async getCoupons(req, res) {

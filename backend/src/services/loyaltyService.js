@@ -160,6 +160,7 @@ export const loyaltyService = {
         .insert(coupons)
         .values({
           code: `LOYAL-${randomBytes(4).toString("hex").toUpperCase()}`,
+          userId,
           type: reward.coupon.type,
           value: String(reward.coupon.value),
           maxDiscount: reward.coupon.maxDiscount != null ? String(reward.coupon.maxDiscount) : null,

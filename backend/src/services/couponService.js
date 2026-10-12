@@ -1,6 +1,6 @@
 import { db } from "../config/db.js";
 import { coupons, orderCoupons, orders, users } from "../models/schema.js";
-import { eq, and, desc, sql, gte, lte, ilike, ne } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, gte, lte, ilike, ne, isNull, notLike } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { toSatang, fromSatang, percentOf } from "../utils/money.js";
 import { paginationMeta } from "../utils/pagination.js";
@@ -8,18 +8,26 @@ import { paginationMeta } from "../utils/pagination.js";
 export const normalizeCouponCode = (code) => String(code ?? "").trim().toUpperCase();
 const normalizeType = (type) => (type === "fixed" ? "fixed_amount" : type);
 
-function isCouponActive(coupon, now = new Date()) {
-  if (!coupon.isActive) return false;
-  if (coupon.startDate && new Date(coupon.startDate) > now) return false;
-  if (coupon.endDate && new Date(coupon.endDate) < now) return false;
-  return true;
+const couponError = (message, code) => new ApiError(400, message, null, code);
+const formatDate = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/** Why a coupon cannot be used right now (null when it can). */
+function inactiveReason(coupon, now = new Date()) {
+  if (!coupon.isActive) return couponError("This coupon is no longer available", "COUPON_INACTIVE");
+  if (coupon.startDate && new Date(coupon.startDate) > now) {
+    return couponError(`This coupon starts on ${formatDate(coupon.startDate)}`, "COUPON_NOT_STARTED");
+  }
+  if (coupon.endDate && new Date(coupon.endDate) < now) {
+    return couponError(`This coupon expired on ${formatDate(coupon.endDate)}`, "COUPON_EXPIRED");
+  }
+  return null;
 }
 
 /** Discount in satang for an amount in satang; never more than the amount. */
 function discountSatang(coupon, amountSatang) {
   const minPurchase = toSatang(coupon.minPurchase);
   if (amountSatang < minPurchase) {
-    throw ApiError.badRequest(`Minimum purchase amount is ${fromSatang(minPurchase)}`);
+    throw couponError(`Minimum purchase amount is ${fromSatang(minPurchase)}`, "COUPON_MIN_PURCHASE");
   }
   let discount =
     coupon.type === "percentage"
@@ -52,8 +60,13 @@ const publicCoupon = (coupon) => ({
   value: Number(coupon.value),
   minPurchase: coupon.minPurchase != null ? Number(coupon.minPurchase) : null,
   maxDiscount: coupon.maxDiscount != null ? Number(coupon.maxDiscount) : null,
+  startDate: coupon.startDate,
   endDate: coupon.endDate,
+  personal: coupon.userId != null,
 });
+
+/** Loyalty coupons issued before coupons had an owner: never list them. */
+const LEGACY_PERSONAL_PREFIX = "LOYAL-";
 
 export const couponService = {
   /**
@@ -64,16 +77,19 @@ export const couponService = {
     const coupon = await txOrDb.query.coupons.findFirst({
       where: eq(coupons.code, normalizeCouponCode(code)),
     });
-    if (!coupon || !isCouponActive(coupon)) {
-      throw ApiError.badRequest("Invalid or expired coupon");
+    // Someone else's personal coupon looks exactly like an unknown code.
+    if (!coupon || (coupon.userId && coupon.userId !== userId)) {
+      throw couponError("Coupon code not found", "COUPON_NOT_FOUND");
     }
+    const inactive = inactiveReason(coupon);
+    if (inactive) throw inactive;
     if (coupon.usageLimit != null || coupon.perUserLimit != null) {
       const uses = await countUses(coupon.id, userId, txOrDb);
       if (coupon.usageLimit != null && uses.total >= coupon.usageLimit) {
-        throw ApiError.badRequest("This coupon has reached its usage limit");
+        throw couponError("This coupon has reached its usage limit", "COUPON_USAGE_LIMIT");
       }
       if (coupon.perUserLimit != null && uses.mine >= coupon.perUserLimit) {
-        throw ApiError.badRequest("You have already used this coupon");
+        throw couponError("You have already used this coupon", "COUPON_ALREADY_USED");
       }
     }
     return { coupon, discountSatang: discountSatang(coupon, amountSatang) };
@@ -91,13 +107,28 @@ export const couponService = {
     return { valid: true, discount: Number(fromSatang(discount)), coupon: publicCoupon(coupon) };
   },
 
-  async getAvailableCoupons() {
+  /** Coupons this user can use now: public ones plus their own, minus used-up ones. */
+  async getAvailableCoupons(userId) {
     const now = new Date();
     const active = await db.query.coupons.findMany({
-      where: and(eq(coupons.isActive, true), lte(coupons.startDate, now), gte(coupons.endDate, now)),
-      orderBy: [desc(coupons.createdAt)],
+      where: and(
+        eq(coupons.isActive, true),
+        lte(coupons.startDate, now),
+        gte(coupons.endDate, now),
+        or(eq(coupons.userId, userId), and(isNull(coupons.userId), notLike(coupons.code, `${LEGACY_PERSONAL_PREFIX}%`)))
+      ),
+      orderBy: [asc(coupons.endDate)],
     });
-    return active.map(publicCoupon);
+    const usable = [];
+    for (const coupon of active) {
+      if (coupon.usageLimit != null || coupon.perUserLimit != null) {
+        const uses = await countUses(coupon.id, userId, db);
+        if (coupon.usageLimit != null && uses.total >= coupon.usageLimit) continue;
+        if (coupon.perUserLimit != null && uses.mine >= coupon.perUserLimit) continue;
+      }
+      usable.push(publicCoupon(coupon));
+    }
+    return usable;
   },
 
   async getCoupons({ search } = {}) {

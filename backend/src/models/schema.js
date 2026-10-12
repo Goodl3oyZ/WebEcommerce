@@ -1083,6 +1083,8 @@ export const coupons = pgTable("coupons", {
   // null = unlimited. Counted over orders that were not cancelled.
   usageLimit: integer("usage_limit"),
   perUserLimit: integer("per_user_limit"),
+  // Personal coupons (e.g. loyalty rewards) belong to one user; null = public.
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   isActive: boolean("is_active").default(true),

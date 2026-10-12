@@ -6,6 +6,8 @@ import { usersAPI } from "@/lib/api/users";
 import { addressAPI } from "@/lib/api/address";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import ProductImage from "@/components/ui/ProductImage";
+import { CouponWallet } from "@/components/shop/CouponList";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
@@ -1222,17 +1224,15 @@ export default function Profile() {
                         className="flex items-center justify-between bg-white rounded-xl border p-4 mb-4 shadow-sm hover:shadow transition"
                       >
                         {/* รูปสินค้า */}
-                        <Image
-                          src={
-                            firstItem?.product?.imageUrl?.[0] ||
-                            "/placeholder.png"
-                          }
-                          alt={firstItem?.product?.name || "Product"}
-                          className="w-16 h-16 object-cover rounded border mr-4"
-                          width={64}
-                          height={64}
-                          style={{ objectFit: "cover" }}
-                        />
+                        <div className="relative mr-4 h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
+                          <ProductImage
+                            imageUrl={firstItem?.product?.imageUrl}
+                            alt={firstItem?.product?.name || "สินค้า"}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                          />
+                        </div>
                         {/* ข้อมูลออเดอร์ */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
@@ -1275,6 +1275,16 @@ export default function Profile() {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+        {activeTab === "coupons" && (
+          <Card className="animate-fade-in">
+            <CardHeader className="border-b pb-4">
+              <h2 className="text-xl font-bold text-gray-800">คูปองของฉัน</h2>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <CouponWallet />
             </CardContent>
           </Card>
         )}
