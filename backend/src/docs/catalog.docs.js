@@ -154,6 +154,7 @@ const uploadDocs = [
   ["review", "Review photo", "user", null, "Stored under the uploader's folder; customers can only replace or delete their own files."],
   ["product", "Product image", "admin", "productId", "Optional productId groups the file; use the returned url/fileName in the product's imageUrl."],
   ["brand", "Brand logo", "admin", "brandId", "Optional brandId groups the file; use the returned url in the brand's logo."],
+  ["category", "Category image", "admin", "categoryId", "Optional categoryId groups the file; use the returned url in the category's imageUrl."],
   ["store", "Store image", "admin", "storeId", "Optional storeId groups the file."],
 ];
 

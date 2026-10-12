@@ -3,6 +3,7 @@ import { z } from "zod";
 const fields = {
   name: z.string().trim().min(1).max(255),
   description: z.string().max(2000).optional().nullable(),
+  imageUrl: z.string().max(500).optional().nullable().describe("url/fileName from POST /api/uploads/category; null removes it"),
 };
 
 export const categoryDto = {

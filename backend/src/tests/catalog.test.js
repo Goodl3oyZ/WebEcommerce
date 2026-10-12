@@ -23,6 +23,23 @@ describe("categories", () => {
     expect((await agent.get("/api/categories/x")).status).toBe(404);
   });
 
+  test("category cover image: stored as a key, returned as a public URL", async () => {
+    const { agent } = await loginAs("admin");
+    const created = await agent
+      .post("/api/categories")
+      .send({ name: name("Running"), imageUrl: "categories-unassigned/abc-run.png" });
+    expect(created.status).toBe(201);
+    expect(created.body.imageUrl).toMatch(/^https?:\/\/.+\/categories\/categories-unassigned\/abc-run\.png$/);
+
+    // A full URL from the upload endpoint is accepted and stored as the same key.
+    const updated = await agent.patch(`/api/categories/${created.body.id}`).send({ imageUrl: created.body.imageUrl });
+    expect(updated.body.imageUrl).toBe(created.body.imageUrl);
+    const listed = (await (await newAgent()).get("/api/categories")).body.categories.find((c) => c.id === created.body.id);
+    expect(listed.imageUrl).toBe(created.body.imageUrl);
+
+    expect((await agent.patch(`/api/categories/${created.body.id}`).send({ imageUrl: null })).body.imageUrl).toBeNull();
+  });
+
   test("admin create/update/delete with duplicate-name and in-use checks", async () => {
     const { agent } = await loginAs("admin");
     const { agent: customer } = await loginAs("user");

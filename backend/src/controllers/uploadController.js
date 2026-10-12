@@ -77,6 +77,7 @@ const adminImage = (type, idField) => ({
 const review = ownImage("reviews");
 const product = adminImage("products", "productId");
 const brand = adminImage("brands", "brandId");
+const category = adminImage("categories", "categoryId");
 const store = adminImage("stores", "storeId");
 
 export const uploadController = {
@@ -103,6 +104,10 @@ export const uploadController = {
   uploadBrandLogo: brand.upload,
   updateBrandLogo: brand.update,
   deleteBrandLogo: brand.remove,
+
+  uploadCategoryImage: category.upload,
+  updateCategoryImage: category.update,
+  deleteCategoryImage: category.remove,
 
   uploadStoreImage: store.upload,
   updateStoreImage: store.update,

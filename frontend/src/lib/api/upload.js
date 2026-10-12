@@ -30,6 +30,17 @@ export const uploadAPI = {
     return res.data;
   },
 
+  /** { url, fileName } — store the url in the category's imageUrl. */
+  uploadCategoryImage: async (file, categoryId) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    if (categoryId) formData.append("categoryId", categoryId);
+    const res = await axiosInstance.post("/uploads/category", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
+
   uploadStoreImage: async (file) => {
     const formData = new FormData();
     formData.append("image", file);

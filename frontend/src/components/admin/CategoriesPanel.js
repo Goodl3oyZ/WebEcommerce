@@ -1,203 +1,243 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
-import { categoriesAPI } from "@/lib/api"; // Adjust the import path as needed
+import { FaEdit, FaImage, FaPlusCircle, FaTags, FaTimesCircle, FaTrash } from "react-icons/fa";
+import { categoriesAPI } from "@/lib/api";
 import { adminAPI } from "@/lib/api/admin";
-import {
-  FaTags,
-  FaEdit,
-  FaTrash,
-  FaPlusCircle,
-  FaChevronDown,
-  FaTimesCircle,
-} from "react-icons/fa";
+import { uploadAPI } from "@/lib/api/upload";
+import CategoryArt from "@/components/shop/CategoryArt";
+
+const EMPTY = { name: "", description: "", imageUrl: null };
+const card = "rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-6";
+const input =
+  "mt-1.5 block w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-subtle focus:border-fg focus:ring-fg";
 
 export function CategoriesPanel() {
   const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
-  const { register, handleSubmit, reset, setValue } = useForm();
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
 
-  const loadCategories = async () => {
+  const load = async () => {
     try {
-      const response = await categoriesAPI.getAllCategories();
-      setCategories(response.categories || []);
-    } catch (error) {
-      toast.error("Failed to load categories");
+      const res = await categoriesAPI.getAllCategories();
+      setCategories(res?.categories ?? []);
+    } catch (e) {
+      toast.error(`โหลดหมวดหมู่ไม่สำเร็จ: ${e?.response?.data?.message || e.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCategories();
+    load();
   }, []);
 
-  const onSubmit = async (data) => {
+  const resetForm = () => {
+    setForm(EMPTY);
+    setEditingId(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
     try {
-      const payload = {
-        name: data.name,
-        description: data.description,
-      };
-      if (editingId) {
-        await adminAPI.updateCategory(editingId, payload);
-        toast.success("Category updated!");
-      } else {
-        await adminAPI.createCategory(payload);
-        toast.success("Category created!");
-      }
-      reset();
-      setEditingId(null);
-      loadCategories();
-    } catch (error) {
-      toast.error(error?.message || "Failed to save category");
+      const res = await uploadAPI.uploadCategoryImage(file, editingId);
+      setForm((f) => ({ ...f, imageUrl: res.url }));
+      toast.success("อัปโหลดรูปแล้ว กดบันทึกเพื่อใช้รูปนี้");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "อัปโหลดรูปไม่สำเร็จ");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
     }
   };
 
-  const handleEdit = (category) => {
-    setEditingId(category.id);
-    setValue("name", category.name);
-    setValue("description", category.description);
-    setValue("parent_id", category.parent_id);
+  const save = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      toast.error("กรุณากรอกชื่อหมวดหมู่");
+      return;
+    }
+    setSaving(true);
+    const payload = { name: form.name.trim(), description: form.description, imageUrl: form.imageUrl };
+    try {
+      if (editingId) await adminAPI.updateCategory(editingId, payload);
+      else await adminAPI.createCategory(payload);
+      toast.success(editingId ? "บันทึกหมวดหมู่แล้ว" : "เพิ่มหมวดหมู่แล้ว");
+      resetForm();
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || "บันทึกไม่สำเร็จ");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this category?")) return;
+  const edit = (c) => {
+    setEditingId(c.id);
+    setForm({ name: c.name, description: c.description ?? "", imageUrl: c.imageUrl ?? null });
+  };
 
+  const remove = async (c) => {
+    if (!confirm(`ลบหมวดหมู่ "${c.name}"?`)) return;
     try {
-      await adminAPI.deleteCategory(id);
-      toast.success("Category deleted!");
-      loadCategories();
-    } catch (error) {
-      toast.error(error?.message || "Failed to delete category");
+      await adminAPI.deleteCategory(c.id);
+      toast.success("ลบหมวดหมู่แล้ว");
+      if (editingId === c.id) resetForm();
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || "ลบไม่สำเร็จ");
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-2xl shadow-lg flex flex-col gap-4">
-          <div className="flex items-center gap-2 mb-2">
-            <FaTags className="text-green-500 text-2xl" />
-            <h2 className="text-xl font-bold text-gray-800">
-              {editingId ? "Edit Category" : "Add New Category"}
-            </h2>
-          </div>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Name
-              </label>
-              <input
-                {...register("name", { required: "Category name is required" })}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-green-500 focus:ring-2 focus:ring-green-200 text-base px-3 py-2"
-                placeholder="Category name"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                {...register("description")}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-green-500 focus:ring-2 focus:ring-green-200 text-base px-3 py-2"
-                placeholder="Category description"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Parent Category
-              </label>
-              <div className="relative">
-                <select
-                  {...register("parent_id")}
-                  className="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 focus:border-green-500 focus:ring-2 focus:ring-green-200 text-base px-3 py-2 appearance-none"
-                >
-                  <option value="">None</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                <FaChevronDown className="absolute right-3 top-3 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-            <div className="flex gap-2 mt-2">
-              <button
-                type="submit"
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-base px-5 py-2 rounded-lg shadow transition font-semibold"
-              >
-                {editingId ? <FaEdit /> : <FaPlusCircle />}{" "}
-                {editingId ? "Update" : "Create"}
-              </button>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingId(null);
-                    reset();
-                  }}
-                  className="flex items-center gap-2 bg-gray-400 hover:bg-gray-500 text-white text-base px-5 py-2 rounded-lg shadow transition"
-                >
-                  <FaTimesCircle /> Cancel
-                </button>
-              )}
-            </div>
-          </form>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+      <form className={`${card} space-y-5 self-start`} onSubmit={save} aria-labelledby="cat-form-title">
+        <h2 id="cat-form-title" className="flex items-center gap-2 text-lg font-bold text-fg">
+          <FaTags aria-hidden /> {editingId ? "แก้ไขหมวดหมู่" : "เพิ่มหมวดหมู่"}
+        </h2>
+
+        <div>
+          <label htmlFor="cat-name" className="text-sm font-medium text-fg">
+            ชื่อหมวดหมู่
+          </label>
+          <input
+            id="cat-name"
+            className={input}
+            value={form.name}
+            maxLength={255}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="เช่น รองเท้าวิ่ง, อุปกรณ์ฟิตเนส"
+          />
         </div>
-        <div className="bg-white p-8 rounded-2xl shadow-lg">
-          <div className="flex items-center gap-2 mb-4">
-            <FaTags className="text-green-500 text-2xl" />
-            <h2 className="text-xl font-bold text-gray-800">Categories List</h2>
+
+        <div>
+          <label htmlFor="cat-desc" className="text-sm font-medium text-fg">
+            คำอธิบาย
+          </label>
+          <textarea
+            id="cat-desc"
+            rows={3}
+            className={input}
+            value={form.description}
+            maxLength={2000}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-fg">รูปหน้าปก</p>
+          <div className="mt-2 grid grid-cols-[8rem_1fr] items-start gap-4">
+            <div className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-border">
+              <CategoryArt category={{ name: form.name, description: form.description, imageUrl: form.imageUrl }} sizes="128px" />
+            </div>
+            <div className="space-y-2 text-xs text-fg-muted">
+              <p>
+                {form.imageUrl
+                  ? "รูปนี้จะแสดงในหน้าแรก (Shop by category)"
+                  : "ยังไม่มีรูป: หน้าร้านจะใช้ไอคอนที่เลือกจากชื่อหมวดแทน (ตามตัวอย่าง)"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-2 font-medium text-fg hover:bg-surface-muted">
+                  <FaImage aria-hidden /> {uploading ? "กำลังอัปโหลด…" : form.imageUrl ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="sr-only"
+                    onChange={onFile}
+                    disabled={uploading}
+                  />
+                </label>
+                {form.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, imageUrl: null }))}
+                    className="rounded-xl px-3 py-2 font-medium text-danger hover:bg-danger-soft"
+                  >
+                    เอารูปออก
+                  </button>
+                )}
+              </div>
+              <p className="text-fg-subtle">JPEG/PNG/WebP แนะนำแนวนอน 4:3 ขนาด 1200×900 ขึ้นไป</p>
+            </div>
           </div>
-          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="flex items-center justify-between border-b pb-3 gap-4"
-              >
-                <div className="flex-1">
-                  <div className="font-semibold text-gray-900 flex items-center gap-2">
-                    {category.name}
-                    {category.parent_id && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                        Parent:{" "}
-                        {
-                          categories.find((c) => c.id === category.parent_id)
-                            ?.name
-                        }
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {category.description}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={saving || uploading}
+            className="inline-flex items-center gap-2 rounded-xl bg-fg px-5 py-2.5 text-sm font-semibold text-canvas hover:bg-fg/85 disabled:opacity-50"
+          >
+            {editingId ? <FaEdit aria-hidden /> : <FaPlusCircle aria-hidden />}
+            {saving ? "กำลังบันทึก…" : editingId ? "บันทึก" : "เพิ่มหมวดหมู่"}
+          </button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="inline-flex items-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-medium text-fg hover:bg-surface-muted"
+            >
+              <FaTimesCircle aria-hidden /> ยกเลิก
+            </button>
+          )}
+        </div>
+      </form>
+
+      <section className={card} aria-labelledby="cat-list-title">
+        <h2 id="cat-list-title" className="mb-4 text-lg font-bold text-fg">
+          หมวดหมู่ทั้งหมด ({categories.length})
+        </h2>
+        {loading ? (
+          <div className="space-y-3" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-xl bg-surface-muted" />
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
+          <p className="py-10 text-center text-sm text-fg-muted">ยังไม่มีหมวดหมู่</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {categories.map((c) => (
+              <li key={c.id} className={`flex items-center gap-4 py-3 ${editingId === c.id ? "bg-surface-muted/60" : ""}`}>
+                <div className="group relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border">
+                  <CategoryArt category={c} sizes="80px" className="[&_svg]:h-7 [&_svg]:w-7" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-fg">{c.name}</p>
+                  <p className="truncate text-xs text-fg-muted">
+                    {c.productCount ?? 0} สินค้า{c.description ? ` · ${c.description}` : ""}
                   </p>
                 </div>
-                <div className="flex flex-col gap-1 text-right">
+                <div className="flex shrink-0 gap-1">
                   <button
-                    onClick={() => handleEdit(category)}
-                    className="flex items-center gap-1 text-green-600 hover:underline text-sm font-medium"
+                    type="button"
+                    onClick={() => edit(c)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-fg hover:bg-surface-muted"
                   >
-                    <FaEdit /> Edit
+                    <FaEdit aria-hidden /> แก้ไข<span className="sr-only"> {c.name}</span>
                   </button>
                   <button
-                    onClick={() => handleDelete(category.id)}
-                    className="flex items-center gap-1 text-red-600 hover:underline text-sm font-medium"
+                    type="button"
+                    onClick={() => remove(c)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-danger hover:bg-danger-soft"
                   >
-                    <FaTrash /> Delete
+                    <FaTrash aria-hidden /> ลบ<span className="sr-only"> {c.name}</span>
                   </button>
                 </div>
-              </div>
+              </li>
             ))}
-            {categories.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                <FaTags className="text-5xl mb-2" />
-                <p className="text-base">No categories found.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

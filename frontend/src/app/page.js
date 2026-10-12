@@ -10,6 +10,7 @@ import { brandsAPI } from "@/lib/api/brands";
 import ProductCard, { ProductCardSkeleton, ProductGrid } from "@/components/ProductCard";
 import Container from "@/components/shop/Container";
 import SectionHeader from "@/components/shop/SectionHeader";
+import CategoryArt from "@/components/shop/CategoryArt";
 import { buttonClasses } from "@/components/ui/Button";
 
 const listOf = (res, key) => {
@@ -83,24 +84,28 @@ function CategoryTiles({ categories, loading }) {
         <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {loading
             ? Array.from({ length: 4 }).map((_, i) => (
-                <li key={i} className="h-28 animate-pulse rounded-card bg-surface-muted sm:h-36" aria-hidden />
+                <li key={i} aria-hidden>
+                  <div className="aspect-[4/3] animate-pulse rounded-card bg-surface-muted" />
+                  <div className="mt-3 h-4 w-1/2 animate-pulse rounded bg-surface-muted" />
+                </li>
               ))
             : categories.slice(0, 8).map((c) => (
                 <li key={c.id}>
-                  <Link
-                    href={`/products?category=${c.id}`}
-                    className="group relative flex h-28 flex-col justify-between overflow-hidden rounded-card border border-border bg-surface p-4 transition-colors duration-150 hover:border-fg sm:h-36 sm:p-5"
-                  >
-                    <ArrowUpRight
-                      className="relative ml-auto h-5 w-5 text-fg-subtle transition-colors group-hover:text-fg"
-                      aria-hidden
-                    />
-                    <span className="relative">
-                      <span className="block font-display text-lg font-semibold leading-tight sm:text-xl">{c.name}</span>
-                      {c.description && (
-                        <span className="mt-0.5 line-clamp-1 block text-xs text-fg-subtle sm:text-sm">{c.description}</span>
-                      )}
-                    </span>
+                  <Link href={`/products?category=${c.id}`} className="group block rounded-card focus-visible:outline-offset-4">
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-card border border-border">
+                      <CategoryArt category={c} />
+                    </div>
+                    <div className="mt-3 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-display text-base font-semibold leading-tight group-hover:underline group-hover:underline-offset-4 sm:text-lg">
+                          {c.name}
+                        </p>
+                        {c.productCount != null && (
+                          <p className="mt-0.5 text-xs text-fg-subtle">{c.productCount} สินค้า</p>
+                        )}
+                      </div>
+                      <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-fg-subtle transition-colors group-hover:text-fg" aria-hidden />
+                    </div>
                   </Link>
                 </li>
               ))}

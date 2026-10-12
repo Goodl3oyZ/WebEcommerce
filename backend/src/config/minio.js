@@ -15,6 +15,7 @@ export const BUCKETS = {
   STORES: "stores",
   REVIEWS: "reviews",
   BRANDS: "brands",
+  CATEGORIES: "categories",
 };
 
 // Ensure all required buckets exist

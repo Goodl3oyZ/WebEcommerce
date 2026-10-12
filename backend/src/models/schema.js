@@ -92,6 +92,8 @@ export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  // Storage key in the "categories" bucket (cover image for the storefront).
+  imageUrl: varchar("image_url", { length: 500 }),
 });
 
 export const categoriesRelations = relations(categories, ({ many }) => ({

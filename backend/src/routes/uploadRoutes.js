@@ -38,6 +38,12 @@ const adminRoutes = [
     delete: "deleteBrandLogo",
   },
   {
+    path: "category",
+    upload: "uploadCategoryImage",
+    update: "updateCategoryImage",
+    delete: "deleteCategoryImage",
+  },
+  {
     path: "store",
     upload: "uploadStoreImage",
     update: "updateStoreImage",

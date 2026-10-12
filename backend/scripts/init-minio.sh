@@ -32,13 +32,12 @@ create_bucket() {
   done
 }
 
-create_bucket products
-create_bucket profiles
-create_bucket stores
-create_bucket reviews
+# Keep in sync with BUCKETS in src/config/minio.js.
+BUCKETS="products profiles stores reviews brands categories"
 
-for BUCKET in products profiles stores reviews; do
-  mc anonymous set download myminio/$BUCKET || echo "Failed to set policy for $BUCKET"
+for BUCKET in $BUCKETS; do
+  create_bucket "$BUCKET"
+  mc anonymous set download "myminio/$BUCKET" || echo "Failed to set policy for $BUCKET"
 done
 
 echo "MinIO buckets and policies initialized."

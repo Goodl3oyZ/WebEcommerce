@@ -69,6 +69,7 @@ describe("review images (customer-owned)", () => {
 describe.each([
   ["product", "products", "productId"],
   ["brand", "brands", "brandId"],
+  ["category", "categories", "categoryId"],
   ["store", "stores", "storeId"],
 ])("%s images (admin)", (path, bucket, idField) => {
   test("admins upload under the entity id, replace and delete", async () => {
