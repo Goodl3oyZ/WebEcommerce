@@ -149,21 +149,29 @@ export default function ProductDetailPage() {
   }, [product]);
 
   // Add to cart
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
-    addToCart({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      imageUrl: imageUrls[0] || "/images/placeholder.svg",
-      quantity: quantity,
-      variantId: selectedVariant?.id,
-      variant: selectedVariant,
-      variantName: selectedVariant
-        ? `${selectedVariant.color} - ${selectedVariant.size}`
-        : null,
-    });
-    toast.success("Added to cart!");
+    if (product.variants?.length > 0 && !selectedVariant) {
+      toast.error("กรุณาเลือกตัวเลือกสินค้าก่อน");
+      return;
+    }
+    try {
+      await addToCart({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        imageUrl: imageUrls[0] || "/images/placeholder.svg",
+        quantity: quantity,
+        variantId: selectedVariant?.id,
+        variant: selectedVariant,
+        variantName: selectedVariant
+          ? `${selectedVariant.color} - ${selectedVariant.size}`
+          : null,
+      });
+      toast.success("เพิ่มลงตะกร้าแล้ว");
+    } catch (err) {
+      toast.error(err.message || "เพิ่มลงตะกร้าไม่สำเร็จ");
+    }
   };
 
   // Nothing below can render until the product has loaded (all hooks are above).
@@ -192,9 +200,11 @@ export default function ProductDetailPage() {
     ? selectedVariant.stock <= 0
     : product.stock <= 0 || product.stock == null;
   const isUnpriced = !product.price || Number(product.price) <= 0;
-  const isButtonDisabled = isOutOfStock || isUnpriced;
+  const needsVariant = product.variants?.length > 0 && !selectedVariant;
+  const isButtonDisabled = isOutOfStock || isUnpriced || needsVariant;
 
   const getButtonText = () => {
+    if (needsVariant) return "กรุณาเลือกตัวเลือกสินค้า";
     if (isOutOfStock) return "สินค้าหมด (Out of Stock)";
     if (isUnpriced) return "ยังไม่เปิดขาย / ไม่ระบุราคา";
     return "เพิ่มลงตะกร้า";

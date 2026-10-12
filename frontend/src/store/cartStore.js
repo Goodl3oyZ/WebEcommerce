@@ -57,8 +57,10 @@ const useCartStore = create(
             }
           }
         } catch (error) {
-          console.error("Error adding item:", error);
+          console.error("Error adding item:", error.message);
           set({ error: error.message });
+          // Let the caller show the reason (and not a "success" toast).
+          throw error;
         } finally {
           set({ isLoading: false });
         }
