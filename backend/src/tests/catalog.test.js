@@ -23,6 +23,17 @@ describe("categories", () => {
     expect((await agent.get("/api/categories/x")).status).toBe(404);
   });
 
+  test("categories without an image offer the newest product photo as coverImage", async () => {
+    const category = await createCategory();
+    const bare = await createCategory();
+    await createProduct({ categoryId: category.id, imageUrl: ["products-x/old.png"] });
+    await createProduct({ categoryId: category.id, imageUrl: ["products-x/new.png"] });
+    await createProduct({ categoryId: category.id, imageUrl: [], isActive: true });
+    const list = (await (await newAgent()).get("/api/categories")).body.categories;
+    expect(list.find((c) => c.id === category.id).coverImage).toMatch(/\/products\/products-x\/new\.png$/);
+    expect(list.find((c) => c.id === bare.id).coverImage).toBeNull();
+  });
+
   test("category cover image: stored as a key, returned as a public URL", async () => {
     const { agent } = await loginAs("admin");
     const created = await agent

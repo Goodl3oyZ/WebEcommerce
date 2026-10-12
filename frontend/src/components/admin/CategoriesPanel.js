@@ -136,13 +136,21 @@ export function CategoriesPanel() {
           <p className="text-sm font-medium text-fg">รูปหน้าปก</p>
           <div className="mt-2 grid grid-cols-[8rem_1fr] items-start gap-4">
             <div className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-border">
-              <CategoryArt category={{ name: form.name, description: form.description, imageUrl: form.imageUrl }} sizes="128px" />
+              <CategoryArt
+                compact
+                sizes="128px"
+                category={{
+                  name: form.name,
+                  imageUrl: form.imageUrl,
+                  coverImage: categories.find((c) => c.id === editingId)?.coverImage ?? null,
+                }}
+              />
             </div>
             <div className="space-y-2 text-xs text-fg-muted">
               <p>
                 {form.imageUrl
                   ? "รูปนี้จะแสดงในหน้าแรก (Shop by category)"
-                  : "ยังไม่มีรูป: หน้าร้านจะใช้ไอคอนที่เลือกจากชื่อหมวดแทน (ตามตัวอย่าง)"}
+                  : "ยังไม่มีรูปหน้าปก: หน้าร้านจะใช้รูปสินค้าล่าสุดในหมวดนี้ หรือถ้ายังไม่มีสินค้าที่มีรูป จะแสดงชื่อหมวดแบบตัวอักษรใหญ่ (ตามตัวอย่าง)"}
               </p>
               <div className="flex flex-wrap gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-2 font-medium text-fg hover:bg-surface-muted">
@@ -209,7 +217,7 @@ export function CategoriesPanel() {
             {categories.map((c) => (
               <li key={c.id} className={`flex items-center gap-4 py-3 ${editingId === c.id ? "bg-surface-muted/60" : ""}`}>
                 <div className="group relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border">
-                  <CategoryArt category={c} sizes="80px" className="[&_svg]:h-7 [&_svg]:w-7" />
+                  <CategoryArt category={c} sizes="80px" compact />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-fg">{c.name}</p>

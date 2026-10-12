@@ -3,7 +3,7 @@ import { categories, products } from "../models/schema.js";
 import { eq, and, ne, asc, sql } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { BUCKETS, getFileUrl, toStoredKey } from "../config/minio.js";
-import { listProducts } from "./productService.js";
+import { listProducts, resolveImages } from "./productService.js";
 
 async function assertNameAvailable(name, exceptId) {
   const existing = await db.query.categories.findFirst({
@@ -25,13 +25,23 @@ export const categoryService = {
         name: categories.name,
         description: categories.description,
         imageUrl: categories.imageUrl,
+        // Newest active product photo: a real cover when no image was uploaded.
+        coverImages: sql`(select p.image_url from products p
+          where p.category_id = ${categories.id} and p.is_active = true
+            and jsonb_typeof(p.image_url) = 'array' and jsonb_array_length(p.image_url) > 0
+          order by p.created_at desc limit 1)`,
         productCount: sql`(count(${products.id}) filter (where ${products.isActive} = true))::int`,
       })
       .from(categories)
       .leftJoin(products, eq(products.categoryId, categories.id))
       .groupBy(categories.id)
       .orderBy(asc(categories.name));
-    return { categories: rows.map(present) };
+    return {
+      categories: rows.map(({ coverImages, ...row }) => ({
+        ...present(row),
+        coverImage: resolveImages(coverImages)?.find(Boolean) ?? null,
+      })),
+    };
   },
 
   async getCategoryById(id) {
