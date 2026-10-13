@@ -1,6 +1,7 @@
 import { ENV } from "./src/config/loadENV.js";
 import { app, httpServer, io, redisClient } from "./src/app.js";
 import { startPaymentWorker } from "./src/workers/paymentWorker.js";
+import { startNotificationListener } from "./src/services/notificationDelivery.js";
 
 const PORT = ENV.SERVER.PORT;
 if (process.env.NODE_ENV !== "test") {
@@ -9,6 +10,8 @@ if (process.env.NODE_ENV !== "test") {
   });
   // Expires unpaid orders, confirms unknown charges, refunds unapplied payments.
   const stopPaymentWorker = startPaymentWorker();
+  // Pushes committed notifications to sockets and sends order emails.
+  const stopNotificationListener = startNotificationListener();
 
   // Graceful shutdown so in-flight requests finish during deploys/restarts.
   let shuttingDown = false;
@@ -24,6 +27,7 @@ if (process.env.NODE_ENV !== "test") {
     forceExit.unref();
 
     stopPaymentWorker();
+    stopNotificationListener();
     // Closes socket connections and the underlying HTTP server.
     io.close(async () => {
       try {

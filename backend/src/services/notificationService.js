@@ -3,6 +3,7 @@ import { notifications, users } from "../models/schema.js";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { paginationMeta } from "../utils/pagination.js";
+import { publishNotification } from "./orderNotifications.js";
 
 /** Priority has no column; it lives in metadata. */
 const withPriority = (n) => n && { ...n, priority: n.metadata?.priority ?? "medium" };
@@ -99,6 +100,13 @@ export const notificationService = {
     const created = recipientIds.length
       ? await db.insert(notifications).values(recipientIds.map((id) => ({ ...payload, userId: id }))).returning()
       : [];
+    // Tell open tabs to refresh (payloads are capped at 8 KB, so ids go in chunks).
+    if (broadcast) await publishNotification(db, { all: true });
+    else {
+      for (let i = 0; i < recipientIds.length; i += 100) {
+        await publishNotification(db, { userIds: recipientIds.slice(i, i + 100) });
+      }
+    }
     return { sent: created.length, notifications: created.map(withPriority) };
   },
 

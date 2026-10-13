@@ -7,6 +7,9 @@ const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
 const { ENV } = await import("../config/loadENV.js");
 const { and, eq, gte, ne, sql } = await import("drizzle-orm");
+const { deliverNotification, renderNotificationEmail, startNotificationListener } = await import(
+  "../services/notificationDelivery.js"
+);
 
 const newStore = async (name = `Branch ${randomUUID().slice(0, 6)}`) =>
   (await db.insert(schema.stores).values({ name }).returning())[0];
@@ -74,6 +77,97 @@ describe("notifications", () => {
     ]) {
       expect((await agent[method](path).send({})).status).toBe(403);
     }
+  });
+});
+
+describe("order status notifications", () => {
+  const forOrder = async (orderId) =>
+    (await db.select().from(schema.notifications).where(sql`${schema.notifications.metadata}->>'orderId' = ${orderId}`)).sort(
+      (a, b) => a.createdAt - b.createdAt
+    );
+
+  test("admin status changes notify the customer; their own cancel does not", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const { agent, user } = await loginAs("user");
+    const order = await createOrder(user.id);
+
+    for (const status of ["confirmed", "processing", "shipped"]) {
+      expect((await admin.put(`/api/orders/admin/${order.id}/status`).send({ status })).status).toBe(200);
+    }
+    const sent = await forOrder(order.id);
+    // "processing" is skipped: shipping follows it straight away.
+    expect(sent.map((n) => n.metadata.status)).toEqual(["confirmed", "shipped"]);
+    expect(sent[1]).toMatchObject({ userId: user.id, type: "shipping", isRead: false });
+    expect(sent[1].message).toContain(order.orderNumber);
+    expect(sent[1].metadata).toMatchObject({ link: `/orders/${order.id}`, priority: "high" });
+    expect((await agent.get("/api/notifications")).body.unreadCount).toBe(2);
+
+    const own = await createOrder(user.id);
+    expect((await agent.post(`/api/orders/${own.id}/cancel`).send({ reason: "x" })).status).toBe(200);
+    expect(await forOrder(own.id)).toHaveLength(0);
+
+    const byAdmin = await createOrder(user.id);
+    await admin.put(`/api/orders/admin/${byAdmin.id}/status`).send({ status: "cancelled", notes: "Out of stock" });
+    expect((await forOrder(byAdmin.id))[0]).toMatchObject({ title: "คำสั่งซื้อถูกยกเลิก" });
+  });
+
+  test("important updates are emailed once, unless the customer turned order emails off", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const { agent, user } = await loginAs("user");
+    const order = await createOrder(user.id);
+    await admin.put(`/api/orders/admin/${order.id}/status`).send({ status: "cancelled", notes: "Out of stock" });
+    const [n] = await forOrder(order.id);
+
+    const mine = () => (globalThis.sentEmails ?? []).filter((m) => m.to === user.email);
+    await deliverNotification({ id: n.id, userId: user.id, email: true });
+    await deliverNotification({ id: n.id, userId: user.id, email: true }); // redelivered
+    expect(mine()).toHaveLength(1);
+    expect(mine()[0].subject).toContain("คำสั่งซื้อถูกยกเลิก");
+    expect(mine()[0].html).toContain(`/orders/${order.id}`);
+
+    await agent.put("/api/users/preferences").send({ notifications: { orderEmails: false } });
+    const second = await createOrder(user.id);
+    await admin.put(`/api/orders/admin/${second.id}/status`).send({ status: "cancelled" });
+    const [m] = await forOrder(second.id);
+    await deliverNotification({ id: m.id, userId: user.id, email: true });
+    expect(mine()).toHaveLength(1);
+  });
+
+  test("the listener delivers after commit, and never for a rolled-back change", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const { user } = await loginAs("user");
+    const { notifyOrderStatus } = await import("../services/orderNotifications.js");
+    const mine = () => (globalThis.sentEmails ?? []).filter((m) => m.to === user.email);
+    const waitFor = async (check) => {
+      for (let i = 0; i < 50 && !check(); i++) await new Promise((r) => setTimeout(r, 100));
+    };
+    const stop = startNotificationListener();
+    try {
+      await new Promise((r) => setTimeout(r, 500)); // LISTEN registered
+
+      const rolledBack = await createOrder(user.id);
+      await db
+        .transaction(async (tx) => {
+          await notifyOrderStatus(tx, "pending", { ...rolledBack, status: "cancelled" }, null);
+          throw new Error("rollback");
+        })
+        .catch(() => {});
+
+      const order = await createOrder(user.id);
+      await admin.put(`/api/orders/admin/${order.id}/status`).send({ status: "cancelled" });
+      await waitFor(() => mine().length > 0);
+      await new Promise((r) => setTimeout(r, 300));
+      expect(mine()).toHaveLength(1);
+      expect(mine()[0].html).toContain(`/orders/${order.id}`);
+    } finally {
+      stop();
+    }
+  });
+
+  test("email content is escaped", () => {
+    const { html } = renderNotificationEmail({ siteName: "<b>", title: "a<script>", message: "m", url: "https://x.test/" });
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;b&gt;");
   });
 });
 

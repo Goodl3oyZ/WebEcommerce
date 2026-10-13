@@ -4,11 +4,9 @@ import { Pool } from "pg";
 import { ENV } from "./loadENV.js";
 import * as schema from "../models/schema.js";
 
-const pool = new Pool({
+/** Where and how to connect; also used by connections outside the pool (LISTEN). */
+export const connectionOptions = {
   connectionString: ENV.DB.URL,
-  max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,
   ssl:
     ENV.SERVER.NODE_ENV === "production" && process.env.DB_SSL !== "false"
       ? {
@@ -16,6 +14,13 @@ const pool = new Pool({
             process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
         }
       : false,
+};
+
+const pool = new Pool({
+  ...connectionOptions,
+  max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
 export const db = drizzle(pool, {

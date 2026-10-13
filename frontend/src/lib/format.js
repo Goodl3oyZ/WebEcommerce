@@ -18,3 +18,20 @@ export function formatTHB(value) {
 /** Same rounding as the backend: integer satang. */
 export const toSatang = (value) => Math.round(Number(value || 0) * 100);
 export const fromSatang = (satang) => satang / 100;
+
+const rtf = typeof Intl !== "undefined" && Intl.RelativeTimeFormat ? new Intl.RelativeTimeFormat("th", { numeric: "auto" }) : null;
+
+/** "5 นาทีที่แล้ว", "เมื่อวาน"; dates older than a week as a short date. */
+export function timeAgo(value, now = Date.now()) {
+  const t = new Date(value).getTime();
+  if (!Number.isFinite(t)) return "";
+  const seconds = Math.round((t - now) / 1000);
+  const abs = Math.abs(seconds);
+  if (abs < 60) return "เมื่อสักครู่";
+  if (!rtf || abs >= 7 * 86400) {
+    return new Date(t).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
+  }
+  if (abs < 3600) return rtf.format(Math.round(seconds / 60), "minute");
+  if (abs < 86400) return rtf.format(Math.round(seconds / 3600), "hour");
+  return rtf.format(Math.round(seconds / 86400), "day");
+}

@@ -13,6 +13,7 @@ import {
 } from "../models/schema.js";
 import { assertOrderTransition } from "../utils/orderStatus.js";
 import { ApiError } from "../utils/ApiError.js";
+import { notifyOrderStatus } from "./orderNotifications.js";
 
 /** Audit trail for stock changes made by orders. */
 export async function recordMovements(tx, rows) {
@@ -59,6 +60,7 @@ export async function setOrderStatus(tx, order, status, { comment, actorId, extr
       comment: comment || `Status updated to ${status}`,
       createdBy: actorId ?? null,
     });
+    await notifyOrderStatus(tx, order.status, updated, actorId);
   }
   return updated;
 }

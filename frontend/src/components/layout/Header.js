@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import {
+  Bell,
   ChevronDown,
   ClipboardList,
   LogOut,
@@ -25,6 +26,7 @@ import Container from "@/components/shop/Container";
 import BrandMark from "@/components/brand/BrandMark";
 import CartDrawer from "@/components/shop/CartDrawer";
 import SearchOverlay from "@/components/shop/SearchOverlay";
+import NotificationBell from "@/components/shop/NotificationBell";
 
 // Shown first in the menu when the shop has them (by category name).
 const PREFERRED_CATEGORIES = ["อุปกรณ์สวมใส่อัจฉริยะ", "รองเท้า", "ฟื้นฟูร่างกาย", "อุปกรณ์ฟิตเนส"];
@@ -105,6 +107,9 @@ function AccountMenu({ user, logout }) {
           </Link>
           <Link href="/orders" role="menuitem" className={item} onClick={() => setOpen(false)}>
             <ClipboardList className="h-4 w-4" aria-hidden /> คำสั่งซื้อของฉัน
+          </Link>
+          <Link href="/notifications" role="menuitem" className={item} onClick={() => setOpen(false)}>
+            <Bell className="h-4 w-4" aria-hidden /> การแจ้งเตือน
           </Link>
           {isAdmin(user) && (
             <Link href="/admin" role="menuitem" className={item} onClick={() => setOpen(false)}>
@@ -242,6 +247,8 @@ export default function Header() {
             <Search className="h-5 w-5" aria-hidden />
           </button>
 
+          {mounted && user && <NotificationBell userId={user.id} />}
+
           {mounted && user ? (
             <div className="hidden md:block">
               <AccountMenu user={user} logout={logout} />
@@ -312,6 +319,9 @@ export default function Header() {
                 </Link>
                 <Link href="/orders" className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fg/5">
                   <ClipboardList className="h-5 w-5" aria-hidden /> คำสั่งซื้อของฉัน
+                </Link>
+                <Link href="/notifications" className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fg/5">
+                  <Bell className="h-5 w-5" aria-hidden /> การแจ้งเตือน
                 </Link>
                 {isAdmin(user) && (
                   <Link href="/admin" className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fg/5">

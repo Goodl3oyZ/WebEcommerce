@@ -14,7 +14,7 @@ export { brandsAPI } from "./brands";
 // export { wishlistAPI } from "./wishlist";
 export { uploadAPI } from "./upload";
 export { paymentsAPI } from "./payment";
-// export { notificationsAPI } from "./notifications";
+export { notificationsAPI } from "./notifications";
 // export { settingsAPI } from "./settings";
 export { couponsAPI } from "./coupons";
 export { usersAPI } from "./users";

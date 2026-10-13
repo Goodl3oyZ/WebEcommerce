@@ -100,6 +100,8 @@ if (configuredProviders.has("facebook")) {
         clientSecret: ENV.FBAuth.clientSecret,
         callbackURL: ENV.CALLBACK_URL.facebook,
         profileFields: ["id", "emails", "name", "picture"],
+        // The library default (v3.2) is long retired.
+        graphAPIVersion: "v21.0",
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
