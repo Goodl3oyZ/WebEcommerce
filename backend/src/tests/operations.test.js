@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { newAgent } from "./helpers/app.js";
 import { createUser, loginAs } from "./helpers/factories.js";
-import { checkoutSetup, createOrder, createProduct } from "./helpers/fixtures.js";
+import { PNG, checkoutSetup, createOrder, createProduct } from "./helpers/fixtures.js";
 
 const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
@@ -370,6 +370,21 @@ describe("settings", () => {
     expect(rows.find((r) => r.key === "siteName").value).toBe(name);
 
     expect((await admin.put("/api/settings").send({ unknown: 1 })).status).toBe(400);
+
+    // Store logo: upload, save as a setting, public URL; replacing deletes the old file.
+    const first = await admin.post("/api/uploads/site").attach("image", PNG, { filename: "logo.png", contentType: "image/png" });
+    expect(first.status).toBe(201);
+    const set = await admin.put("/api/settings").send({ logo: first.body.url });
+    expect(set.body.data.logo).toBe(first.body.fileName);
+    const publicLogo = (await anon.get("/api/settings/public")).body.data.logoUrl;
+    expect(publicLogo).toMatch(/\/site\/site-unassigned\/.+logo\.png$/);
+    expect((await fetch(publicLogo)).status).toBe(200);
+    const second = await admin.put("/api/uploads/site").attach("image", PNG, { filename: "logo2.png", contentType: "image/png" });
+    await admin.put("/api/settings").send({ logo: second.body.fileName });
+    expect((await fetch(publicLogo)).status).not.toBe(200);
+    expect((await admin.put("/api/settings").send({ logo: "https://evil.example/x.png" })).body.code).toBe("INVALID_LOGO");
+    expect((await admin.put("/api/settings").send({ logo: null })).body.data.logoUrl).toBeNull();
+    expect((await admin.delete("/api/uploads/site").send({ fileName: second.body.fileName })).status).toBe(200);
     expect((await (await loginAs("user")).agent.get("/api/settings")).status).toBe(403);
   });
 });

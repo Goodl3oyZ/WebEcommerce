@@ -156,6 +156,7 @@ const uploadDocs = [
   ["brand", "Brand logo", "admin", "brandId", "Optional brandId groups the file; use the returned url in the brand's logo."],
   ["category", "Category image", "admin", "categoryId", "Optional categoryId groups the file; use the returned url in the category's imageUrl."],
   ["store", "Store image", "admin", "storeId", "Optional storeId groups the file."],
+  ["site", "Store logo", "admin", null, "Then save the returned fileName as `logo` with PUT /api/settings (used in the header and as the browser-tab icon). Square PNG/WebP works best."],
 ];
 
 documentRoutes(

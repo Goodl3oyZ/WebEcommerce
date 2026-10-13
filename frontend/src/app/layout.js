@@ -39,12 +39,15 @@ async function getPublicSettings() {
 }
 
 export async function generateMetadata() {
-  const name = (await getPublicSettings())?.siteName || "CHALLENGE";
+  const settings = await getPublicSettings();
+  const name = settings?.siteName || "CHALLENGE";
+  // Uploaded logo, else a generated monogram (see app/brand-icon).
+  const icon = settings?.logoUrl || `/brand-icon?name=${encodeURIComponent(name)}`;
   return {
     title: { default: `${name} — อุปกรณ์วิ่ง ฟิตเนส และเทรนนิ่ง`, template: `%s | ${name}` },
     description:
       "ร้านอุปกรณ์กีฬาสำหรับนักวิ่งและสายเทรนนิ่ง: รองเท้า เสื้อผ้า และอุปกรณ์เสริมสำหรับทุกการซ้อม",
-    icons: { icon: "/favicon.png" },
+    icons: { icon: icon, apple: icon },
   };
 }
 

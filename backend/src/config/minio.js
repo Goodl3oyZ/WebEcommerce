@@ -16,6 +16,7 @@ export const BUCKETS = {
   REVIEWS: "reviews",
   BRANDS: "brands",
   CATEGORIES: "categories",
+  SITE: "site", // store logo / favicon
 };
 
 // Ensure all required buckets exist

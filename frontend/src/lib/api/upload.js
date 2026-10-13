@@ -41,6 +41,16 @@ export const uploadAPI = {
     return res.data;
   },
 
+  /** { url, fileName } — then save fileName as the `logo` setting. */
+  uploadSiteLogo: async (file) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await axiosInstance.post("/uploads/site", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
+
   uploadStoreImage: async (file) => {
     const formData = new FormData();
     formData.append("image", file);

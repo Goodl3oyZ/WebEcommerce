@@ -22,6 +22,7 @@ import useCartStore from "@/store/cartStore";
 import useUiStore from "@/store/uiStore";
 import { categoriesAPI } from "@/lib/api/categories";
 import Container from "@/components/shop/Container";
+import BrandMark from "@/components/brand/BrandMark";
 import CartDrawer from "@/components/shop/CartDrawer";
 import SearchOverlay from "@/components/shop/SearchOverlay";
 
@@ -218,7 +219,7 @@ export default function Header() {
         </button>
 
         <Link href="/" className="flex min-w-0 shrink-0 items-center gap-2" aria-label="หน้าแรก">
-          <Image src="/favicon.png" alt="" width={32} height={32} className="h-8 w-8" priority />
+          <BrandMark size={32} />
           <Wordmark />
         </Link>
 
@@ -281,7 +282,10 @@ export default function Header() {
           className="fixed inset-y-0 left-0 flex w-[85%] max-w-sm flex-col bg-surface shadow-xl transition-transform duration-200 ease-out data-[closed]:-translate-x-full"
         >
           <div className="flex h-16 items-center justify-between border-b border-border px-4">
-            <Wordmark />
+            <span className="flex min-w-0 items-center gap-2">
+              <BrandMark size={28} />
+              <Wordmark />
+            </span>
             <button
               type="button"
               onClick={() => setMenuOpen(false)}

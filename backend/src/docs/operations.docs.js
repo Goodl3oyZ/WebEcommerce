@@ -164,7 +164,7 @@ documentRoutes("Reports", [
 ]);
 
 documentRoutes("Settings", [
-  { method: "get", path: "/api/settings/public", summary: "Public site settings", auth: "public", responses: { 200: "{ siteName, maintenance, theme, currency }" } },
+  { method: "get", path: "/api/settings/public", summary: "Public site settings", auth: "public", responses: { 200: "{ siteName, maintenance, theme, currency, logoUrl }" } },
   { method: "get", path: "/api/settings", summary: "All site settings", auth: "admin", responses: { 200: "Settings" } },
   ...["put", "patch"].map((method) => ({
     method,

@@ -79,6 +79,7 @@ const product = adminImage("products", "productId");
 const brand = adminImage("brands", "brandId");
 const category = adminImage("categories", "categoryId");
 const store = adminImage("stores", "storeId");
+const site = adminImage("site", "siteId");
 
 export const uploadController = {
   // Avatar: same behaviour as PUT /api/users/profile with only an avatar.
@@ -108,6 +109,10 @@ export const uploadController = {
   uploadCategoryImage: category.upload,
   updateCategoryImage: category.update,
   deleteCategoryImage: category.remove,
+
+  uploadSiteImage: site.upload,
+  updateSiteImage: site.update,
+  deleteSiteImage: site.remove,
 
   uploadStoreImage: store.upload,
   updateStoreImage: store.update,

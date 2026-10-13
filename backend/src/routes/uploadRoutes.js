@@ -44,6 +44,12 @@ const adminRoutes = [
     delete: "deleteCategoryImage",
   },
   {
+    path: "site",
+    upload: "uploadSiteImage",
+    update: "updateSiteImage",
+    delete: "deleteSiteImage",
+  },
+  {
     path: "store",
     upload: "uploadStoreImage",
     update: "updateStoreImage",
