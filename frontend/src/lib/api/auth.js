@@ -45,36 +45,35 @@ export const authAPI = {
         user: response.data.data?.user, // แยก user object ออกมาเพื่อความสะดวก
       };
     } catch (error) {
-      console.log("Register error details:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
+      // The axios interceptor already turned it into an APIError (status, data).
+      const status = error.response?.status ?? error.status;
+      const body = error.response?.data ?? error.data;
+      console.log("Register error details:", { status, data: body, message: error.message });
 
       // Handle specific error cases
-      if (error.response?.status === 409) {
+      if (status === 409) {
         throw new APIError(
-          "Email already exists. Please use a different email address.",
-          error.response.status
+          "อีเมลนี้มีบัญชีอยู่แล้ว ลองเข้าสู่ระบบหรือใช้อีเมลอื่น",
+          status
         );
       }
 
       // Handle validation errors
-      if (error.response?.status === 400) {
-        const validationErrors = error.response.data?.errors;
+      if (status === 400) {
+        const validationErrors = body?.errors;
         if (validationErrors) {
           const formattedErrors = formatValidationErrors(validationErrors);
           throw new APIError(
             formattedErrors || "Please check your input and try again",
-            error.response.status,
+            status,
             validationErrors
           );
         }
       }
 
       throw new APIError(
-        error.response?.data?.message || "Registration failed",
-        error.response?.status || 500
+        body?.message || "Registration failed",
+        status || 500
       );
     }
   },
@@ -104,15 +103,18 @@ export const authAPI = {
         tokens: response.data.tokens,
       };
     } catch (error) {
-      console.error("Login error details:", {
+      // The axios interceptor already turned it into an APIError (status, data).
+      const status = error.response?.status ?? error.status;
+      const body = error.response?.data ?? error.data;
+      console.warn("Login error details:", {
         status: error.response?.status,
         data: error.response?.data,
         message: error.message,
       });
 
       // กรณี validation error (400)
-      if (error.response?.status === 400) {
-        const serverMessage = error.response.data?.message ?? "";
+      if (status === 400) {
+        const serverMessage = body?.message ?? "";
         if (serverMessage.includes("password")) {
           throw new APIError("รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร", 400);
         }
@@ -122,12 +124,19 @@ export const authAPI = {
         throw new APIError("ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง", 400);
       }
 
-      // กรณีอื่นๆ
+      // กรณีอื่นๆ (data.code tells the page what happened, e.g. EMAIL_NOT_VERIFIED)
       throw new APIError(
-        error.response?.data?.message || "ล็อกอินไม่สำเร็จ กรุณาลองใหม่",
-        error.response?.status || 500
+        body?.message || "ล็อกอินไม่สำเร็จ กรุณาลองใหม่",
+        status || 500,
+        body ?? null
       );
     }
+  },
+
+  /** Always succeeds from the user's view; the server does not say whether the email exists. */
+  resendVerification: async (email) => {
+    const response = await api.post("/auth/resend-verification", { email: email.trim() });
+    return response.data;
   },
 
   forgotPassword: async (email) => {

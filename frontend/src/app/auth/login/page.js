@@ -9,11 +9,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FaGithub, FaGoogle, FaFacebook } from "react-icons/fa";
 import { config } from "@/lib/config";
+import VerifyEmailNotice from "@/components/auth/VerifyEmailNotice";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const [retryAfter, setRetryAfter] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState(null);
   const router = useRouter();
 
   const {
@@ -48,6 +50,8 @@ export default function LoginPage() {
         // Return to where the user came from (same-site paths only).
         const next = new URLSearchParams(window.location.search).get("redirect");
         router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+      } else if (result.code === "EMAIL_NOT_VERIFIED") {
+        setUnverifiedEmail(data.email.trim());
       } else {
         toast.error(result.error || "ล็อกอินไม่สำเร็จ", {
           duration: 5000,
@@ -71,6 +75,21 @@ export default function LoginPage() {
   const handleOAuthLogin = (provider) => {
     window.location.href = config.oauth.startUrl(provider);
   };
+
+  if (unverifiedEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-muted py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full">
+          <VerifyEmailNotice
+            email={unverifiedEmail}
+            title="ยืนยันอีเมลก่อนเข้าสู่ระบบ"
+            sentAlready={false}
+            onBack={() => setUnverifiedEmail(null)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-muted py-12 px-4 sm:px-6 lg:px-8">

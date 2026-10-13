@@ -9,10 +9,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FaGithub, FaGoogle, FaFacebook } from "react-icons/fa";
 import { config } from "@/lib/config";
+import VerifyEmailNotice from "@/components/auth/VerifyEmailNotice";
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState(null);
   const router = useRouter();
   const {
     register,
@@ -30,10 +32,8 @@ export default function RegisterPage() {
 
       // ✅ ตรวจสอบกรณีสำเร็จ
       if (result?.success && result?.user) {
-        toast.success(
-          result.message || "ลงทะเบียนสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี"
-        );
-        router.push("/"); // เปลี่ยนหน้าไปยังหน้าหลัก
+        // Signing in waits until the emailed link is clicked.
+        setRegisteredEmail(result.user.email);
         return;
       }
 
@@ -65,6 +65,16 @@ export default function RegisterPage() {
   const handleOAuthRegister = (provider) => {
     window.location.href = config.oauth.startUrl(provider);
   };
+
+  if (registeredEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-muted py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full">
+          <VerifyEmailNotice email={registeredEmail} title="สมัครสมาชิกสำเร็จ ยืนยันอีเมลของคุณ" onBack={() => router.push("/auth/login")} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-muted py-12 px-4 sm:px-6 lg:px-8">

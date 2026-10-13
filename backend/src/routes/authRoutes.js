@@ -49,6 +49,12 @@ router.post(
 );
 
 router.get("/verify-email", verifyEmailRateLimiter, authController.verifyEmail);
+router.post(
+  "/resend-verification",
+  passwordResetRateLimiter,
+  validationMiddleware(authDto.forgotPassword),
+  authController.resendVerification
+);
 
 // Work without a valid access token: refresh exists for when it has expired,
 // and logout must always be able to clear the session.

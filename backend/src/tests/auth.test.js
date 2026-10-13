@@ -91,11 +91,12 @@ describe("GET /api/auth/verify-email", () => {
   });
 
   test("rejects an access token used as a verification token", async () => {
-    const { agent, user } = await loginAs("user", { isVerified: false });
+    const { agent, user } = await loginAs("user");
     const accessToken = cookieValue(
       await agent.post("/api/auth/login").send({ email: user.email, password: DEFAULT_PASSWORD }),
       "accessToken"
     );
+    await db.update(users).set({ isVerified: false }).where(eq(users.id, user.id));
     const res = await agent
       .get("/api/auth/verify-email")
       .query({ token: accessToken })
@@ -103,6 +104,33 @@ describe("GET /api/auth/verify-email", () => {
     expect(res.status).toBe(400);
     const fresh = await db.query.users.findFirst({ where: eq(users.id, user.id) });
     expect(fresh.isVerified).toBe(false);
+  });
+
+  test("login waits for verification; the link unlocks it", async () => {
+    const { agent, email, token } = await registerAndGetToken();
+    const blocked = await login(agent, email);
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.code).toBe("EMAIL_NOT_VERIFIED");
+    expect(cookieValue(blocked, "accessToken")).toBeUndefined();
+    expect((await login(agent, email, "Wrong-pass1!")).status).toBe(401); // no hint without the password
+
+    await agent.get("/api/auth/verify-email").query({ token }).set("Accept", "application/json");
+    expect((await login(agent, email)).status).toBe(200);
+  });
+
+  test("resend: a new link for unverified accounts, at most once a minute, same answer for everyone", async () => {
+    const { agent, email } = await registerAndGetToken();
+    const verified = await createUser();
+    for (const target of [email, email, verified.email, freshEmail()]) {
+      const res = await agent.post("/api/auth/resend-verification").send({ email: target });
+      expect(res.status).toBe(200);
+    }
+    expect(emailsTo(email)).toHaveLength(2); // registration + one resend
+    expect(emailsTo(verified.email)).toHaveLength(0);
+
+    const token = tokenFromEmail(emailsTo(email)[1]);
+    await agent.get("/api/auth/verify-email").query({ token }).set("Accept", "application/json");
+    expect((await login(agent, email)).status).toBe(200);
   });
 
   test("requires a token", async () => {

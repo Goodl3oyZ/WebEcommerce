@@ -1,12 +1,32 @@
 import { authService } from "../services/authService.js";
 import { sendEmail } from "../utils/email.js";
 import { ENV } from "../config/loadENV.js";
+import { renderEmail } from "../utils/emailLayout.js";
+import { settingsService } from "../services/settingsService.js";
 import {
   setAuthCookies,
   clearAuthCookies,
   destroySession,
   saveSession,
 } from "../utils/authCookies.js";
+
+const siteName = async () => (await settingsService.getPublicSettings()).siteName;
+
+async function sendVerificationEmail(user) {
+  const token = authService.createEmailVerificationToken(user);
+  const url = `${ENV.SERVER.API_URL}/auth/verify-email?token=${encodeURIComponent(token)}`;
+  await sendEmail({
+    to: user.email,
+    ...renderEmail({
+      siteName: await siteName(),
+      title: "ยืนยันอีเมลของคุณ",
+      message: `สวัสดี ${user.name || ""} กดปุ่มด้านล่างเพื่อยืนยันอีเมลนี้ แล้วเข้าสู่ระบบได้เลย ลิงก์ใช้ได้ 24 ชั่วโมง`,
+      url,
+      cta: "ยืนยันอีเมล",
+      footer: "ถ้าคุณไม่ได้สมัครสมาชิก ไม่ต้องทำอะไร บัญชีจะไม่ถูกใช้งาน",
+    }),
+  });
+}
 
 const clientInfo = (req) => ({
   ipAddress: req.ip,
@@ -20,19 +40,8 @@ const authController = {
     const { email, password, name } = req.body;
     const user = await authService.register({ email, password, name });
 
-    const token = authService.createEmailVerificationToken(user);
-    const link = `${ENV.SERVER.API_URL}/auth/verify-email?token=${encodeURIComponent(token)}`;
     try {
-      await sendEmail({
-        to: user.email,
-        subject: "Verify your email",
-        html: `
-          <h1>Welcome!</h1>
-          <p>Please verify your email by clicking the link below:</p>
-          <a href="${link}">Verify Email</a>
-          <p>This link will expire in 24 hours.</p>
-        `,
-      });
+      await sendVerificationEmail(user);
     } catch (error) {
       // The account exists either way; failing here would make a retry hit 409.
       console.error("Verification email could not be sent:", error.message);
@@ -120,6 +129,22 @@ const authController = {
     });
   },
 
+  /** Same response whether or not the email has an unverified account. */
+  async resendVerification(req, res) {
+    const user = await authService.resendVerification(req.body.email);
+    if (user) {
+      try {
+        await sendVerificationEmail(user);
+      } catch (error) {
+        console.error("Verification email could not be sent:", error.message);
+      }
+    }
+    res.json({
+      status: "success",
+      message: "If this email has an account waiting for verification, a new link has been sent.",
+    });
+  },
+
   /** Same response whether or not the email has an account. */
   async forgotPassword(req, res) {
     const { email } = req.body;
@@ -129,8 +154,14 @@ const authController = {
       try {
         await sendEmail({
           to: email,
-          subject: "Reset your password",
-          text: `Reset your password using this link (valid for 30 minutes): ${link}`,
+          ...renderEmail({
+            siteName: await siteName(),
+            title: "ตั้งรหัสผ่านใหม่",
+            message: "มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีนี้ กดปุ่มด้านล่างภายใน 30 นาที ลิงก์ใช้ได้ครั้งเดียว",
+            url: link,
+            cta: "ตั้งรหัสผ่านใหม่",
+            footer: "ถ้าคุณไม่ได้ขอ ไม่ต้องทำอะไร รหัสผ่านเดิมยังใช้ได้ตามปกติ",
+          }),
         });
       } catch (error) {
         console.error("Password reset email could not be sent:", error.message);

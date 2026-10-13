@@ -70,7 +70,8 @@ export const userService = {
         email: userData.email,
         password: await hashPassword(userData.password),
         isActive: true,
-        isVerified: false,
+        // Created by staff, who vouch for the address; they can sign in at once.
+        isVerified: true,
         lastPasswordChange: new Date(),
         failedLoginAttempts: 0,
       })

@@ -25,7 +25,7 @@ documentRoutes("Auth", [
     responses: {
       200: "Logged in",
       401: "Invalid email or password",
-      403: "Account is deactivated",
+      403: "Account is deactivated, or email not verified yet (code EMAIL_NOT_VERIFIED)",
       429: "Too many attempts / account temporarily locked",
     },
   },
@@ -35,6 +35,16 @@ documentRoutes("Auth", [
     summary: "Request a password reset email",
     description:
       "Always returns 200 (does not reveal whether the email exists). The emailed link is valid for 30 minutes and works once.",
+    auth: "public",
+    body: authDto.forgotPassword,
+    responses: { 200: "Request accepted" },
+  },
+  {
+    method: "post",
+    path: "/api/auth/resend-verification",
+    summary: "Send the email verification link again",
+    description:
+      "Always returns 200 (does not reveal whether the email exists or is verified). At most one email per account per minute.",
     auth: "public",
     body: authDto.forgotPassword,
     responses: { 200: "Request accepted" },

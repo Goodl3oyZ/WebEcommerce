@@ -92,16 +92,22 @@ export const AuthProvider = ({ children }) => {
       setUser(result.user);
       return { success: true };
     } catch (error) {
-      console.error("Login failed:", error);
+      console.warn("Login failed:", error.message);
 
       // แสดง error ที่เป็นประโยชน์ต่อผู้ใช้
       let userMessage = "ล็อกอินไม่สำเร็จ";
       if (error.message.includes("รหัสผ่าน")) userMessage = error.message;
       if (error.message.includes("อีเมล")) userMessage = error.message;
+      const code = error.data?.code;
+      if (code === "EMAIL_NOT_VERIFIED") userMessage = "กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ";
+      if (code === "INVALID_CREDENTIALS") userMessage = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+      if (code === "ACCOUNT_LOCKED") userMessage = "ลองผิดหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่";
+      if (code === "ACCOUNT_DEACTIVATED") userMessage = "บัญชีนี้ถูกปิดการใช้งาน";
 
       return {
         success: false,
         error: userMessage,
+        code,
         validationErrors: error.validationErrors,
       };
     } finally {
@@ -120,21 +126,11 @@ export const AuthProvider = ({ children }) => {
         throw new Error(response?.message || "Invalid response from server");
       }
 
-      // ใช้ user จาก response.data แทน response.user
-      const newUserData = {
-        ...response.data.user,
-        // เพิ่มข้อมูลอื่นๆ หากจำเป็น
-        verificationMessage: response.message,
-      };
-
-      localStorage.setItem("user", JSON.stringify(newUserData));
-      setUser(newUserData);
-
-      // ส่งกลับ message จาก API ด้วย
+      // Not signed in yet: the account must verify its email first.
       return {
         success: true,
         message: response.message || "Registration successful",
-        user: newUserData,
+        user: response.data.user,
       };
     } catch (error) {
       console.error("Registration error:", error);

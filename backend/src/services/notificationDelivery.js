@@ -15,11 +15,9 @@ import { ENV } from "../config/loadENV.js";
 import { notifications, userPreferences, users } from "../models/schema.js";
 import { emitTo } from "../realtime/index.js";
 import { sendEmail } from "../utils/email.js";
+import { renderEmail } from "../utils/emailLayout.js";
 import { settingsService } from "./settingsService.js";
 import { NOTIFICATION_CHANNEL } from "./orderNotifications.js";
-
-const escapeHtml = (s) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 /** Has the user turned order emails off? (Profile > notifications) */
 async function wantsOrderEmails(userId) {
@@ -30,29 +28,15 @@ async function wantsOrderEmails(userId) {
   return prefs?.notifications?.orderEmails !== false;
 }
 
-export function renderNotificationEmail({ siteName, title, message, url }) {
-  const name = escapeHtml(siteName);
-  return {
-    subject: `${title} · ${siteName}`,
-    text: `${title}\n\n${message}\n\nดูรายละเอียด: ${url}\n\n${siteName}`,
-    html: `<!doctype html>
-<html lang="th"><body style="margin:0;background:#f4f4f2;font-family:Helvetica,Arial,sans-serif;color:#111">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:16px;padding:32px">
-        <tr><td style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#555">${name}</td></tr>
-        <tr><td style="padding-top:20px;font-size:22px;font-weight:700">${escapeHtml(title)}</td></tr>
-        <tr><td style="padding-top:12px;font-size:15px;line-height:1.6;color:#333">${escapeHtml(message)}</td></tr>
-        <tr><td style="padding-top:28px">
-          <a href="${escapeHtml(url)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 22px;border-radius:999px">ดูคำสั่งซื้อ</a>
-        </td></tr>
-        <tr><td style="padding-top:28px;font-size:12px;color:#888">ปิดอีเมลแจ้งเตือนคำสั่งซื้อได้ที่หน้าการแจ้งเตือนในบัญชีของคุณ</td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`,
-  };
-}
+export const renderNotificationEmail = ({ siteName, title, message, url }) =>
+  renderEmail({
+    siteName,
+    title,
+    message,
+    url,
+    cta: "ดูคำสั่งซื้อ",
+    footer: "ปิดอีเมลแจ้งเตือนคำสั่งซื้อได้ที่หน้าการแจ้งเตือนในบัญชีของคุณ",
+  });
 
 async function emailOnce(notificationId, userId) {
   // First instance to claim the key sends it; kept a day to cover redelivery.

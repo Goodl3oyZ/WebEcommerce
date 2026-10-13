@@ -152,6 +152,9 @@ export const authService = {
       throw authError(403, "Account is deactivated", "ACCOUNT_DEACTIVATED");
     }
     await redis.del(failKey);
+    if (!user.isVerified) {
+      throw authError(403, "Please verify your email before logging in", "EMAIL_NOT_VERIFIED");
+    }
 
     await db.delete(userSessions).where(lt(userSessions.expiresAt, new Date()));
 
@@ -265,6 +268,17 @@ export const authService = {
    * Returns a reset token, or null when no active account has this email.
    * Callers must respond identically in both cases.
    */
+  /**
+   * The account to re-send a verification link to, or null (unknown,
+   * already verified, deactivated, or asked within the last minute).
+   */
+  async resendVerification(email) {
+    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!user || user.isVerified || !user.isActive) return null;
+    const fresh = await redis.set(`verify-resend:${user.id}`, "1", { NX: true, EX: 60 });
+    return fresh === "OK" ? user : null;
+  },
+
   async forgotPassword(email) {
     const user = await db.query.users.findFirst({ where: eq(users.email, email) });
     if (!user || !user.isActive) return null;
@@ -293,6 +307,8 @@ export const authService = {
       .set({
         password: await hashPassword(newPassword),
         lastPasswordChange: new Date(),
+        // The reset link reached this inbox, which proves the address.
+        isVerified: true,
         updatedAt: new Date(),
       })
       .where(eq(users.id, user.id));
