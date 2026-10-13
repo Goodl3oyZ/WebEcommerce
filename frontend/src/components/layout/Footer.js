@@ -89,7 +89,17 @@ export default function Footer() {
           ))}
         </div>
         <div className="mt-12 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/50 sm:flex-row sm:justify-between">
-          <p>© {new Date().getFullYear()} {siteName}. สงวนลิขสิทธิ์</p>
+          <p>
+            © {new Date().getFullYear()} {siteName}. สงวนลิขสิทธิ์
+            <span aria-hidden> · </span>
+            <Link href="/privacy" className="hover:text-white hover:underline underline-offset-4">
+              นโยบายความเป็นส่วนตัว
+            </Link>
+            <span aria-hidden> · </span>
+            <Link href="/data-deletion" className="hover:text-white hover:underline underline-offset-4">
+              การลบข้อมูล
+            </Link>
+          </p>
           <p>ราคาสินค้ายังไม่รวม VAT 7% ซึ่งคำนวณในขั้นตอนชำระเงิน</p>
         </div>
       </Container>

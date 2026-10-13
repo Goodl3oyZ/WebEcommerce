@@ -66,6 +66,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: /api
         NEXT_PUBLIC_OMISE_PUBLIC_KEY: ${OMISE_PUBLIC_KEY:?}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${CONTACT_EMAIL:-}
     <<: [*restart, *logging]
     environment:
       # Used by src/middleware.js to verify the accessToken cookie

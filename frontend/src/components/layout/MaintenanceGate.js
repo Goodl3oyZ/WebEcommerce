@@ -13,7 +13,9 @@ export default function MaintenanceGate({ children }) {
   const { maintenance, siteName } = useSiteSettings();
   const { user } = useAuth();
   const pathname = usePathname() || "";
-  const exempt = pathname.startsWith("/admin") || pathname.startsWith("/auth") || STAFF.includes(user?.role);
+  // Policy pages stay readable: login providers (e.g. Facebook) check them.
+  const exempt =
+    ["/admin", "/auth", "/privacy", "/data-deletion"].some((p) => pathname.startsWith(p)) || STAFF.includes(user?.role);
 
   if (!maintenance || exempt) {
     return (
