@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ALL_PROVINCES } from "../utils/provinceZones.js";
 
 const SHIPMENT_STATUSES = ["pending", "processing", "shipped", "in_transit", "out_for_delivery", "delivered", "failed", "returned"];
 const atLeastOne = { message: "At least one field must be provided for update" };
@@ -14,9 +15,14 @@ const methodFields = {
 };
 
 const zoneFields = {
-  name: z.string().trim().min(1).max(100).describe("Must match the zone names used for provinces (e.g. Central)"),
+  name: z.string().trim().min(1).max(100),
   description: z.string().max(500).optional().nullable(),
   baseCost: z.coerce.number().min(0),
+  provinces: z
+    .array(z.enum(ALL_PROVINCES))
+    .max(ALL_PROVINCES.length)
+    .optional()
+    .describe("Thai province names served by this zone; a province is moved here from any other zone"),
   isActive: z.boolean().optional(),
 };
 

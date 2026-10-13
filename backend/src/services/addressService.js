@@ -1,6 +1,6 @@
 import { db } from "../config/db.js";
-import { addresses, users } from "../models/schema.js";
-import { eq, and, ne, desc, asc, sql, ilike, or } from "drizzle-orm";
+import { addresses, orders, users } from "../models/schema.js";
+import { eq, and, ne, desc, asc, sql, ilike, or, isNull } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { resolveShippingZoneId } from "../utils/provinceZones.js";
 import { paginationMeta } from "../utils/pagination.js";
@@ -21,22 +21,38 @@ const ADDRESS_FIELDS = [
 const pick = (data) =>
   Object.fromEntries(ADDRESS_FIELDS.filter((k) => data[k] !== undefined).map((k) => [k, data[k]]));
 
+/** The customer's own addresses (archived ones belong to order history only). */
+const ownActive = (userId) => and(eq(addresses.userId, userId), isNull(addresses.archivedAt));
+
+/** Whether any order points at this address (its contents are then history). */
+async function usedByOrders(tx, addressId) {
+  const [row] = await tx
+    .select({ id: orders.id })
+    .from(orders)
+    .where(or(eq(orders.shippingAddressId, addressId), eq(orders.billingAddressId, addressId)))
+    .limit(1);
+  return Boolean(row);
+}
+
+const archive = (tx, addressId) =>
+  tx.update(addresses).set({ archivedAt: new Date(), isDefault: false, updatedAt: new Date() }).where(eq(addresses.id, addressId));
+
 async function findOwn(txOrDb, addressId, userId) {
   const address = await txOrDb.query.addresses.findFirst({
-    where: and(eq(addresses.id, addressId), eq(addresses.userId, userId)),
+    where: and(eq(addresses.id, addressId), ownActive(userId)),
   });
   if (!address) throw ApiError.notFound("Address not found");
   return address;
 }
 
 const clearDefault = (tx, userId) =>
-  tx.update(addresses).set({ isDefault: false }).where(and(eq(addresses.userId, userId), eq(addresses.isDefault, true)));
+  tx.update(addresses).set({ isDefault: false }).where(and(ownActive(userId), eq(addresses.isDefault, true)));
 
 const byDefaultThenPosition = [desc(addresses.isDefault), asc(addresses.position), asc(addresses.createdAt)];
 
 export const addressService = {
   async getUserAddresses(userId) {
-    return { addresses: await db.query.addresses.findMany({ where: eq(addresses.userId, userId), orderBy: byDefaultThenPosition }) };
+    return { addresses: await db.query.addresses.findMany({ where: ownActive(userId), orderBy: byDefaultThenPosition }) };
   },
 
   async getAddressById(addressId, userId) {
@@ -49,7 +65,7 @@ export const addressService = {
       const [{ count }] = await tx
         .select({ count: sql`count(*)::int` })
         .from(addresses)
-        .where(eq(addresses.userId, userId));
+        .where(ownActive(userId));
       const isDefault = count === 0 || Boolean(data.isDefault);
       if (isDefault) await clearDefault(tx, userId);
 
@@ -67,10 +83,17 @@ export const addressService = {
     });
   },
 
+  /**
+   * Addresses that orders refer to are copied on write: the old row is
+   * archived (orders keep showing where they were sent) and the edited copy
+   * replaces it, so the returned address may have a new id.
+   */
   async updateAddress(addressId, userId, data) {
     return db.transaction(async (tx) => {
       const address = await findOwn(tx, addressId, userId);
-      const changes = { ...pick(data), updatedAt: new Date() };
+      const fields = pick(data);
+      const contentChanged = Object.keys(fields).some((k) => (fields[k] ?? null) !== (address[k] ?? null));
+      const changes = { ...fields, updatedAt: new Date() };
       if (data.province !== undefined && data.province !== address.province) {
         changes.shippingZoneId = await resolveShippingZoneId(data.province, tx);
       }
@@ -79,6 +102,15 @@ export const addressService = {
         changes.isDefault = true;
       } else if (data.isDefault === false && address.isDefault) {
         throw ApiError.badRequest("Choose another address as default instead of unsetting this one");
+      }
+      if (contentChanged && (await usedByOrders(tx, addressId))) {
+        await archive(tx, addressId);
+        const { id, createdAt, archivedAt, ...rest } = address;
+        const [copy] = await tx
+          .insert(addresses)
+          .values({ ...rest, ...changes, isDefault: changes.isDefault ?? address.isDefault })
+          .returning();
+        return copy;
       }
       const [updated] = await tx.update(addresses).set(changes).where(eq(addresses.id, addressId)).returning();
       return updated;
@@ -102,15 +134,16 @@ export const addressService = {
 
   /**
    * Deleting the default promotes the next address. Addresses used by orders
-   * are kept for the order history (the FK refuses, mapped to 400).
+   * are archived instead (hidden from the customer, kept for order history).
    */
   async deleteAddress(addressId, userId) {
     return db.transaction(async (tx) => {
       const address = await findOwn(tx, addressId, userId);
-      await tx.delete(addresses).where(eq(addresses.id, addressId));
+      if (await usedByOrders(tx, addressId)) await archive(tx, addressId);
+      else await tx.delete(addresses).where(eq(addresses.id, addressId));
       if (address.isDefault) {
         const next = await tx.query.addresses.findFirst({
-          where: and(eq(addresses.userId, userId), ne(addresses.id, addressId)),
+          where: and(ownActive(userId), ne(addresses.id, addressId)),
           orderBy: [asc(addresses.position), asc(addresses.createdAt)],
         });
         if (next) await tx.update(addresses).set({ isDefault: true }).where(eq(addresses.id, next.id));
@@ -120,14 +153,17 @@ export const addressService = {
 
   // --- Admin ---------------------------------------------------------------
   async getAllAddresses({ search }, pagination) {
-    const where = search
-      ? or(
-          ilike(addresses.fullName, `%${search}%`),
-          ilike(addresses.phoneNumber, `%${search}%`),
-          ilike(addresses.postalCode, `%${search}%`),
-          ilike(users.email, `%${search}%`)
-        )
-      : undefined;
+    const where = and(
+      isNull(addresses.archivedAt),
+      search
+        ? or(
+            ilike(addresses.fullName, `%${search}%`),
+            ilike(addresses.phoneNumber, `%${search}%`),
+            ilike(addresses.postalCode, `%${search}%`),
+            ilike(users.email, `%${search}%`)
+          )
+        : undefined
+    );
     const [rows, total] = await Promise.all([
       db
         .select({ address: addresses, user: { id: users.id, name: users.name, email: users.email } })

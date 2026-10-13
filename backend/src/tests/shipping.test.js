@@ -6,6 +6,19 @@ import { checkoutSetup, createAddress, createOrder, createShipping } from "./hel
 const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
 const { eq } = await import("drizzle-orm");
+const { shippingService } = await import("../services/shippingService.js");
+const { resolveShippingZoneId, PROVINCE_ZONES } = await import("../utils/provinceZones.js");
+
+/** Run `fn` in a transaction that is always rolled back (zones are shared by parallel tests). */
+async function inRollback(fn) {
+  const rollback = new Error("rollback");
+  await expect(
+    db.transaction(async (tx) => {
+      await fn(tx);
+      throw rollback;
+    })
+  ).rejects.toBe(rollback);
+}
 
 /** A customer with a placed (paid) order and its shipment. */
 async function shippedOrder() {
@@ -166,6 +179,44 @@ describe("admin shipments", () => {
     expect((await admin.delete(`/api/shipping/methods/${method.body.id}`)).body.isActive).toBe(false);
     expect((await admin.delete(`/api/shipping/zones/${zone.body.id}`)).body.isActive).toBe(false);
     expect((await admin.delete(`/api/shipping/zones/${randomUUID()}`)).status).toBe(404);
+  });
+
+  test("zones carry their provinces; unknown provinces are refused", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const zones = (await admin.get("/api/shipping/zones")).body;
+    const central = zones.find((z) => z.name === "Central");
+    if (central) expect(central.provinces).toContain("กรุงเทพมหานคร");
+
+    const zone = await admin.post("/api/shipping/zones").send({ name: `Zone ${randomUUID().slice(0, 6)}`, baseCost: 10 });
+    expect(zone.body.provinces).toEqual([]);
+    const bad = await admin.put(`/api/shipping/zones/${zone.body.id}`).send({ provinces: ["Atlantis"] });
+    expect(bad.status).toBe(400);
+  });
+
+  test("assigning a province moves it (and its addresses) to the zone; renaming keeps provinces", async () => {
+    const province = "ตราด";
+    const legacyName = PROVINCE_ZONES[province];
+    await inRollback(async (tx) => {
+      let legacy = await tx.query.shippingZones.findFirst({ where: eq(schema.shippingZones.name, legacyName) });
+      if (!legacy) [legacy] = await tx.insert(schema.shippingZones).values({ name: legacyName, baseCost: "40.00" }).returning();
+      const [target] = await tx.insert(schema.shippingZones).values({ name: `Zone ${randomUUID().slice(0, 6)}`, baseCost: "10.00", provinces: [] }).returning();
+      const { user } = await loginAs("user");
+      const [address] = await tx
+        .insert(schema.addresses)
+        .values({ userId: user.id, shippingZoneId: legacy.id, addressLine1: "1 Rd", country: "TH", province, postalCode: "23000" })
+        .returning();
+
+      await shippingService.assignProvinces(tx, target.id, [province]);
+      expect(await resolveShippingZoneId(province, tx)).toBe(target.id);
+      const after = await tx.query.shippingZones.findFirst({ where: eq(schema.shippingZones.id, legacy.id) });
+      expect(after.provinces).not.toContain(province);
+      expect(after.provinces.length).toBeGreaterThan(0); // the rest of its provinces stay
+      expect((await tx.query.addresses.findFirst({ where: eq(schema.addresses.id, address.id) })).shippingZoneId).toBe(target.id);
+
+      // A renamed zone keeps serving its provinces (no longer tied to the name).
+      await tx.update(schema.shippingZones).set({ name: `Renamed ${randomUUID().slice(0, 6)}` }).where(eq(schema.shippingZones.id, target.id));
+      expect(await resolveShippingZoneId(province, tx)).toBe(target.id);
+    });
   });
 
   test("admin endpoints are forbidden for customers", async () => {

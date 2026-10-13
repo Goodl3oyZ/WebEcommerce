@@ -1,11 +1,13 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../config/db.js";
 import { shippingZones } from "../models/schema.js";
 
 /**
- * Province (Thai name, as in the address data) -> shipping zone name from the
- * seed. Must cover all 77 provinces: an unmapped province has no shipping
- * options, so its customers cannot check out (a test enforces this).
+ * Default province (Thai name, as in the address data) -> shipping zone name
+ * from the seed. Zones store their own province list (editable by admins);
+ * this map seeds those lists and serves zones that have none yet. Must cover
+ * all 77 provinces: an unmapped province has no shipping options, so its
+ * customers cannot check out (a test enforces this).
  */
 export const PROVINCE_ZONES = {
   // Central
@@ -93,10 +95,25 @@ export const PROVINCE_ZONES = {
   นราธิวาส: "South",
 };
 
+export const ALL_PROVINCES = Object.keys(PROVINCE_ZONES);
+
+/** Default provinces of a zone, by its seed name. */
+export const defaultProvincesFor = (zoneName) => ALL_PROVINCES.filter((p) => PROVINCE_ZONES[p] === zoneName);
+
+/** The provinces a zone serves: its own list, or the default for its name. */
+export const zoneProvinces = (zone) => (Array.isArray(zone.provinces) ? zone.provinces : defaultProvincesFor(zone.name));
+
 /** Shipping zone id for a province, or null when it has no (active) zone. */
 export async function resolveShippingZoneId(province, txOrDb = db) {
-  const zoneName = province ? PROVINCE_ZONES[province.trim()] : null;
-  if (!zoneName) return null;
-  const zone = await txOrDb.query.shippingZones.findFirst({ where: eq(shippingZones.name, zoneName) });
+  const name = province?.trim();
+  if (!name) return null;
+  let zone = await txOrDb.query.shippingZones.findFirst({
+    where: sql`${shippingZones.provinces} @> ${JSON.stringify([name])}::jsonb`,
+  });
+  if (!zone && PROVINCE_ZONES[name]) {
+    const legacy = await txOrDb.query.shippingZones.findFirst({ where: eq(shippingZones.name, PROVINCE_ZONES[name]) });
+    // A zone with its own list only serves the provinces on it.
+    if (legacy && !Array.isArray(legacy.provinces)) zone = legacy;
+  }
   return zone?.isActive === false ? null : zone?.id ?? null;
 }

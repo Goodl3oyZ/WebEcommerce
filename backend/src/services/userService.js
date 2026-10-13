@@ -9,7 +9,7 @@ import {
   pointsHistory,
   addresses,
 } from "../models/schema.js";
-import { eq, and, ilike, or, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, ilike, or, desc, sql, inArray, isNull } from "drizzle-orm";
 import { hashPassword } from "../utils/hashPassword.js";
 import { ApiError } from "../utils/ApiError.js";
 import { getHighestRole, ROLE_HIERARCHY } from "../utils/roles.js";
@@ -171,7 +171,7 @@ export const userService = {
       db
         .select({ count: sql`count(*)::int` })
         .from(addresses)
-        .where(eq(addresses.userId, userId)),
+        .where(and(eq(addresses.userId, userId), isNull(addresses.archivedAt))),
       db.query.userRoles.findMany({ where: eq(userRoles.userId, userId) }),
     ]);
 

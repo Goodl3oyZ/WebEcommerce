@@ -15,7 +15,7 @@ import {
   shipments,
   paymentTransactions,
 } from "../models/schema.js";
-import { eq, and, desc, sql, gte, lte, ilike, or, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, ilike, or, inArray, isNull } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { ORDER_STATUSES } from "../utils/orderStatus.js";
 import { writeAuditLog } from "./auditService.js";
@@ -180,10 +180,10 @@ export const orderService = {
       created = await withRetry(() => db.transaction(async (tx) => {
       const [shippingAddress, billingAddress] = await Promise.all([
         tx.query.addresses.findFirst({
-          where: and(eq(addresses.id, shippingAddressId), eq(addresses.userId, userId)),
+          where: and(eq(addresses.id, shippingAddressId), eq(addresses.userId, userId), isNull(addresses.archivedAt)),
         }),
         tx.query.addresses.findFirst({
-          where: and(eq(addresses.id, billingAddressId), eq(addresses.userId, userId)),
+          where: and(eq(addresses.id, billingAddressId), eq(addresses.userId, userId), isNull(addresses.archivedAt)),
         }),
       ]);
       if (!shippingAddress || !billingAddress) {

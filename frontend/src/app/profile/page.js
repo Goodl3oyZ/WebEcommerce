@@ -293,7 +293,7 @@ export default function Profile() {
       setSuccessMsg("ลบที่อยู่เรียบร้อยแล้ว");
     } catch (err) {
       console.error("Error deleting address:", err);
-      setErrorMsg("ลบไม่สำเร็จ: " + err.message);
+      setErrorMsg("ลบไม่สำเร็จ: " + (err.response?.data?.message || err.message));
     }
   };
 

@@ -4,6 +4,7 @@ import {
   productVariants,
   productAttributes,
   productReviews,
+  inventoryMovements,
 } from "../models/schema.js";
 import { eq, ilike, and, or, desc, asc, sql, gte, lte, inArray, exists } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
@@ -37,6 +38,8 @@ function toStoredImages(value) {
   }
   return value ?? null;
 }
+
+const actorNote = (actorId) => (actorId ? `by user ${actorId}` : null);
 
 /** Response shape: image URLs, total stock and rating summary. */
 export function presentProduct(product, ratings) {
@@ -271,35 +274,46 @@ export const productService = {
     });
   },
 
-  async createVariant(productId, data) {
+  async createVariant(productId, data, { actorId } = {}) {
     await getVisibleProduct(productId, { includeInactive: true });
-    const [variant] = await db
-      .insert(productVariants)
-      .values({
-        productId,
-        color: data.color.trim(),
-        size: data.size.trim(),
-        sku: data.sku.trim(),
-        stock: data.stock,
-        price: String(data.price),
-      })
-      .returning();
-    return variant;
+    return db.transaction(async (tx) => {
+      const [variant] = await tx
+        .insert(productVariants)
+        .values({
+          productId,
+          color: data.color.trim(),
+          size: data.size.trim(),
+          sku: data.sku.trim(),
+          stock: data.stock,
+          price: String(data.price),
+        })
+        .returning();
+      if (variant.stock) {
+        await tx.insert(inventoryMovements).values({ variantId: variant.id, change: variant.stock, reason: "admin_initial", note: actorNote(actorId) });
+      }
+      return variant;
+    });
   },
 
-  async updateVariant(productId, variantId, updates) {
+  /** Stock set by an admin is logged as the difference from what it was. */
+  async updateVariant(productId, variantId, updates, { actorId } = {}) {
     const changes = {};
     for (const key of ["color", "size", "sku", "stock"]) {
       if (updates[key] !== undefined) changes[key] = typeof updates[key] === "string" ? updates[key].trim() : updates[key];
     }
     if (updates.price !== undefined) changes.price = String(updates.price);
-    const [variant] = await db
-      .update(productVariants)
-      .set(changes)
-      .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
-      .returning();
-    if (!variant) throw ApiError.notFound("Variant not found");
-    return variant;
+    return db.transaction(async (tx) => {
+      const where = and(eq(productVariants.id, variantId), eq(productVariants.productId, productId));
+      // Lock the row so a checkout cannot reserve between reading and writing the stock.
+      const [before] = await tx.select({ stock: productVariants.stock }).from(productVariants).where(where).for("update");
+      if (!before) throw ApiError.notFound("Variant not found");
+      const [variant] = await tx.update(productVariants).set(changes).where(where).returning();
+      const change = variant.stock - before.stock;
+      if (change) {
+        await tx.insert(inventoryMovements).values({ variantId, change, reason: "admin_adjust", note: actorNote(actorId) });
+      }
+      return variant;
+    });
   },
 
   /** Variants that were ever ordered cannot be deleted (set stock to 0 instead). */

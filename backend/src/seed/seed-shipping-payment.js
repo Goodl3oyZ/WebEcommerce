@@ -5,6 +5,7 @@ import {
   shippingZones,
 } from "../models/schema.js";
 import { PAYMENT_METHODS, SHIPPING_ZONES } from "./data.js";
+import { defaultProvincesFor } from "../utils/provinceZones.js";
 
 async function seedShippingAndPayment() {
   try {
@@ -16,7 +17,10 @@ async function seedShippingAndPayment() {
 
     console.log("Seeding shipping zones...");
     for (const { methods, ...zone } of SHIPPING_ZONES) {
-      const [row] = await db.insert(shippingZones).values({ ...zone, isActive: true }).returning();
+      const [row] = await db
+        .insert(shippingZones)
+        .values({ ...zone, provinces: defaultProvincesFor(zone.name), isActive: true })
+        .returning();
       await db.insert(shippingMethods).values(methods.map((m) => ({ ...m, isActive: true, shippingZoneId: row.id })));
     }
     console.log("Shipping zones and methods seeded!");

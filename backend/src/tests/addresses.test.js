@@ -93,13 +93,42 @@ describe("own addresses", () => {
     expect((await agent.get("/api/addresses")).body.addresses).toHaveLength(0);
   });
 
-  test("an address used by an order cannot be deleted", async () => {
+  test("deleting an address used by an order hides it but keeps it for the order", async () => {
     const { agent, user } = await loginAs("user");
     const address = (await agent.post("/api/addresses").send(body())).body;
-    await createOrder(user.id, { shippingAddressId: address.id, billingAddressId: address.id });
-    const res = await agent.delete(`/api/addresses/${address.id}`);
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe("FOREIGN_KEY_VIOLATION");
+    const other = (await agent.post("/api/addresses").send(body({ addressLine1: "2nd" }))).body;
+    const order = await createOrder(user.id, { shippingAddressId: address.id, billingAddressId: address.id });
+
+    expect((await agent.delete(`/api/addresses/${address.id}`)).status).toBe(204);
+    const list = (await agent.get("/api/addresses")).body.addresses;
+    expect(list.map((a) => a.id)).toEqual([other.id]);
+    expect(list[0].isDefault).toBe(true);
+    expect((await agent.put(`/api/addresses/${address.id}`).send({ fullName: "x" })).status).toBe(404);
+
+    const kept = await db.query.orders.findFirst({ where: eq(schema.orders.id, order.id), with: { shippingAddress: true } });
+    expect(kept.shippingAddress).toMatchObject({ id: address.id, addressLine1: "99 Sukhumvit Rd" });
+    expect(kept.shippingAddress.archivedAt).not.toBeNull();
+  });
+
+  test("editing an address used by an order leaves the order's copy unchanged", async () => {
+    const { agent, user } = await loginAs("user");
+    const address = (await agent.post("/api/addresses").send(body())).body;
+    const order = await createOrder(user.id, { shippingAddressId: address.id, billingAddressId: address.id });
+
+    const edited = await agent.put(`/api/addresses/${address.id}`).send({ addressLine1: "1 New Road" });
+    expect(edited.status).toBe(200);
+    expect(edited.body.id).not.toBe(address.id);
+    expect(edited.body).toMatchObject({ addressLine1: "1 New Road", isDefault: true, fullName: address.fullName });
+    expect((await agent.get("/api/addresses")).body.addresses.map((a) => a.id)).toEqual([edited.body.id]);
+
+    const kept = await db.query.orders.findFirst({ where: eq(schema.orders.id, order.id), with: { shippingAddress: true } });
+    expect(kept.shippingAddress.addressLine1).toBe("99 Sukhumvit Rd");
+
+    // Unused addresses and no-op edits are updated in place.
+    expect((await agent.put(`/api/addresses/${edited.body.id}`).send({ addressLine1: "2 New Road" })).body.id).toBe(edited.body.id);
+    const sameId = (await agent.post("/api/addresses").send(body())).body.id;
+    await createOrder(user.id, { shippingAddressId: sameId });
+    expect((await agent.put(`/api/addresses/${sameId}`).send({ isDefault: true })).body.id).toBe(sameId);
   });
 
   test("other users' addresses are invisible", async () => {

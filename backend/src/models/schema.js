@@ -195,7 +195,7 @@ export const inventoryMovements = pgTable(
       .references(() => productVariants.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
     change: integer("change").notNull(),
-    // order_reserve | order_release
+    // order_reserve | order_release | admin_initial | admin_adjust
     reason: varchar("reason", { length: 30 }).notNull(),
     note: text("note"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -426,6 +426,9 @@ export const addresses = pgTable("addresses", {
   postalCode: varchar("postal_code", { length: 20 }).notNull(),
   isDefault: boolean("is_default").default(false),
   position: integer("position").default(0),
+  // Set when the customer deletes or edits an address that orders refer to:
+  // the row stays for the order history but is hidden from the customer.
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1193,6 +1196,9 @@ export const shippingZones = pgTable("shipping_zones", {
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   baseCost: decimal("base_cost", { precision: 10, scale: 2 }).notNull(),
+  // Thai province names served by this zone. Null on zones created before
+  // this column: those fall back to the built-in map by zone name.
+  provinces: jsonb("provinces"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

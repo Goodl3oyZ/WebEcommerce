@@ -11,7 +11,7 @@ import {
 } from "../models/schema.js";
 import { eq, and, ne, desc, asc, sql, ilike, or, inArray } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
-import { resolveShippingZoneId } from "../utils/provinceZones.js";
+import { resolveShippingZoneId, zoneProvinces } from "../utils/provinceZones.js";
 import { paginationMeta } from "../utils/pagination.js";
 import { setOrderStatus } from "./orderLifecycle.js";
 
@@ -93,10 +93,36 @@ export const shippingService = {
   },
 
   async getShippingZones({ includeInactive }) {
-    return db.query.shippingZones.findMany({
+    const zones = await db.query.shippingZones.findMany({
       where: includeInactive ? undefined : eq(shippingZones.isActive, true),
       orderBy: [asc(shippingZones.name)],
     });
+    return zones.map((zone) => ({ ...zone, provinces: zoneProvinces(zone) }));
+  },
+
+  /**
+   * Give `zone` exactly `provinces`, taking them away from every other zone,
+   * and move existing addresses in those provinces to it. Other zones' lists
+   * are written out explicitly so nothing depends on zone names any more.
+   */
+  async assignProvinces(tx, zoneId, provinces) {
+    const wanted = new Set(provinces);
+    const zones = await tx.query.shippingZones.findMany();
+    for (const other of zones) {
+      if (other.id === zoneId) continue;
+      const current = zoneProvinces(other);
+      const kept = current.filter((p) => !wanted.has(p));
+      if (kept.length !== current.length || !Array.isArray(other.provinces)) {
+        await tx.update(shippingZones).set({ provinces: kept, updatedAt: new Date() }).where(eq(shippingZones.id, other.id));
+      }
+    }
+    await tx.update(shippingZones).set({ provinces: [...wanted], updatedAt: new Date() }).where(eq(shippingZones.id, zoneId));
+    if (wanted.size) {
+      await tx
+        .update(addresses)
+        .set({ shippingZoneId: zoneId })
+        .where(and(inArray(addresses.province, [...wanted]), sql`${addresses.shippingZoneId} is distinct from ${zoneId}`));
+    }
   },
 
   /** Called by checkout inside its transaction. */
@@ -376,16 +402,21 @@ export const shippingService = {
 
   async createShippingZone(data) {
     await this.assertZoneNameAvailable(data.name);
-    const [zone] = await db
-      .insert(shippingZones)
-      .values({
-        name: data.name.trim(),
-        description: data.description || null,
-        baseCost: String(data.baseCost),
-        isActive: data.isActive ?? true,
-      })
-      .returning();
-    return zone;
+    return db.transaction(async (tx) => {
+      const [zone] = await tx
+        .insert(shippingZones)
+        .values({
+          name: data.name.trim(),
+          description: data.description || null,
+          baseCost: String(data.baseCost),
+          provinces: [],
+          isActive: data.isActive ?? true,
+        })
+        .returning();
+      if (data.provinces?.length) await this.assignProvinces(tx, zone.id, data.provinces);
+      const fresh = await tx.query.shippingZones.findFirst({ where: eq(shippingZones.id, zone.id) });
+      return { ...fresh, provinces: zoneProvinces(fresh) };
+    });
   },
 
   async updateShippingZone(id, data) {
@@ -399,8 +430,14 @@ export const shippingService = {
     if (data.description !== undefined) changes.description = data.description;
     if (data.baseCost !== undefined) changes.baseCost = String(data.baseCost);
     if (data.isActive !== undefined) changes.isActive = data.isActive;
-    const [zone] = await db.update(shippingZones).set(changes).where(eq(shippingZones.id, id)).returning();
-    return zone;
+    // A zone still on the name-based default keeps its provinces when renamed.
+    if (!Array.isArray(existing.provinces)) changes.provinces = zoneProvinces(existing);
+    return db.transaction(async (tx) => {
+      await tx.update(shippingZones).set(changes).where(eq(shippingZones.id, id));
+      if (data.provinces !== undefined) await this.assignProvinces(tx, id, data.provinces);
+      const zone = await tx.query.shippingZones.findFirst({ where: eq(shippingZones.id, id) });
+      return { ...zone, provinces: zoneProvinces(zone) };
+    });
   },
 
   /** Zones are disabled, not deleted (addresses reference them). */

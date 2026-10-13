@@ -65,11 +65,11 @@ export const productController = {
   },
 
   async createVariant(req, res) {
-    res.status(201).json(await productService.createVariant(req.params.id, req.body));
+    res.status(201).json(await productService.createVariant(req.params.id, req.body, { actorId: req.user?.id }));
   },
 
   async updateVariant(req, res) {
-    res.json(await productService.updateVariant(req.params.id, req.params.variantId, req.body));
+    res.json(await productService.updateVariant(req.params.id, req.params.variantId, req.body, { actorId: req.user?.id }));
   },
 
   async deleteVariant(req, res) {

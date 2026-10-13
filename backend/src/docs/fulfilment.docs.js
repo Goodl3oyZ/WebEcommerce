@@ -109,7 +109,7 @@ documentRoutes("Shipping", [
     method: "post",
     path: "/api/shipping/zones",
     summary: "Create a shipping zone",
-    description: "Provinces map to zones by name (Central, North, Northeast, East, West, South).",
+    description: "provinces lists the Thai provinces served; listing a province moves it from its current zone (and its customers' addresses).",
     auth: "admin",
     body: shippingDto.createShippingZone,
     responses: { 201: "Zone", 409: "Name already exists" },

@@ -5,6 +5,7 @@ import { createBrand, createCategory, createOrder, createProduct } from "./helpe
 
 const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
+const { eq } = await import("drizzle-orm");
 
 const tag = () => `T${randomUUID().slice(0, 8)}`;
 
@@ -234,6 +235,10 @@ describe("admin product management", () => {
 
     const put = await agent.put(`/api/products/${product.id}/variants/${created.body.id}`).send({ stock: 9 });
     expect(put.body.stock).toBe(9);
+    // Stock edits are audited as movements: +5 initial, +4 adjustment.
+    const moves = await db.query.inventoryMovements.findMany({ where: eq(schema.inventoryMovements.variantId, created.body.id) });
+    expect(moves.map((m) => [m.reason, m.change]).sort()).toEqual([["admin_adjust", 4], ["admin_initial", 5]]);
+    expect(moves.every((m) => m.note?.startsWith("by user "))).toBe(true);
     const patch = await agent.patch(`/api/products/${product.id}/variants/${created.body.id}`).send({ price: 150 });
     expect(patch.body.price).toBe("150.00");
     expect((await agent.patch(`/api/products/${product.id}/variants/${randomUUID()}`).send({ stock: 1 })).status).toBe(404);
