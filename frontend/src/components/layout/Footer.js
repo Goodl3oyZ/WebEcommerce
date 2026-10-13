@@ -46,7 +46,7 @@ export default function Footer() {
   if (pathname?.startsWith("/admin")) return null;
 
   return (
-    <footer className="mt-20 bg-[#0f0f0f] text-white">
+    <footer className={`${pathname === "/" ? "border-t border-white/10" : "mt-20"} bg-[#0f0f0f] text-white`}>
       <Container className="py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
