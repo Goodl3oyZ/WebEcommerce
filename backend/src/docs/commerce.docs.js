@@ -48,10 +48,11 @@ documentRoutes("Cart", [
     method: "post",
     path: "/api/cart/merge",
     summary: "Merge a guest cart after login",
-    description: "Client prices are ignored; unavailable items are skipped and quantities are capped at stock.",
+    description:
+      "Client prices are ignored. A product already in the cart keeps the larger quantity (so merging twice never doubles it); unavailable items are skipped and quantities are capped at stock.",
     auth: "user",
     body: cartDto.mergeGuestCart,
-    responses: { 200: "Merged cart with `skipped` items" },
+    responses: { 200: "Merged cart with `skipped` and `limited` (reduced to stock) lines" },
   },
 ]);
 

@@ -9,7 +9,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setUserData } = useAuth();
+  const { completeSignIn } = useAuth();
   const hasProcessed = useRef(false);
 
   const handleCallback = useCallback(async () => {
@@ -32,8 +32,8 @@ export default function AuthCallbackPage() {
       const { data } = response.data;
 
       if (data?.user) {
-        setUserData(data.user);
-        toast.success(`Welcome back, ${data.user.name || data.user.email}!`);
+        await completeSignIn(data.user);
+        toast.success(`ยินดีต้อนรับ ${data.user.name || data.user.email}`);
         router.push("/");
       } else {
         throw new Error("Invalid user data");
@@ -47,7 +47,7 @@ export default function AuthCallbackPage() {
       toast.error("Something went wrong. Please try logging in again.");
       router.push("/auth/login");
     }
-  }, [router, searchParams, setUserData]);
+  }, [router, searchParams, completeSignIn]);
 
   useEffect(() => {
     if (!hasProcessed.current) {

@@ -29,10 +29,32 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const clearCartStore = useCartStore((state) => state.clearCart);
+  const resetLocalCart = useCartStore((state) => state.resetLocal);
   const clearAuthData = useCallback(() => {
     setUser(null);
     localStorage.removeItem("user");
+    // A copy of the account's cart must not stay behind as a "guest" cart.
+    if (useCartStore.getState().owner) useCartStore.getState().resetLocal();
+  }, []);
+
+  /**
+   * Finish any sign-in (password or social): save the user, fold the guest
+   * cart into the account's cart, then show the signed-in UI.
+   */
+  const completeSignIn = useCallback(async (signedInUser) => {
+    localStorage.setItem("user", JSON.stringify(signedInUser));
+    try {
+      const { added, skipped, limited } = await useCartStore.getState().mergeGuestCart();
+      if (added > 0) {
+        const note = skipped || limited ? "\nบางรายการหมดหรือมีไม่พอ จึงปรับจำนวนให้แล้ว" : "";
+        toast.success(`เพิ่มสินค้า ${added} รายการจากตะกร้าก่อนเข้าสู่ระบบแล้ว${note}`, { duration: 5000 });
+      } else if (skipped) {
+        toast("สินค้าในตะกร้าก่อนเข้าสู่ระบบหมดแล้ว จึงไม่ได้เพิ่มเข้าบัญชี", { duration: 5000 });
+      }
+    } catch {
+      // The guest cart stays on this device; the account cart loads as usual.
+    }
+    setUser(signedInUser);
   }, []);
 
   const setUserData = useCallback(
@@ -86,10 +108,7 @@ export const AuthProvider = ({ children }) => {
       if (!result.success || !result.user) {
         throw new Error(result.error || "Invalid login response");
       }
-      // บันทึกข้อมูลผู้ใช้และ token
-      localStorage.setItem("user", JSON.stringify(result.user));
-
-      setUser(result.user);
+      await completeSignIn(result.user);
       return { success: true };
     } catch (error) {
       console.warn("Login failed:", error.message);
@@ -152,15 +171,15 @@ export const AuthProvider = ({ children }) => {
     try {
       // End the server session (httpOnly cookies can only be cleared by the API).
       await authAPI.logout().catch(() => {});
-      // Clear cart and auth data
-      clearCartStore();
+      // Forget this device's copy; the account keeps its cart for next time.
+      resetLocalCart();
       clearAuthData();
       // Redirect to login page
       router.push("/auth/login");
     } catch (error) {
       console.error("Logout error:", error);
       // Even if there's an error, still clear data and redirect
-      clearCartStore();
+      resetLocalCart();
       clearAuthData();
       router.push("/auth/login");
     }
@@ -172,6 +191,7 @@ export const AuthProvider = ({ children }) => {
     error,
     login,
     register,
+    completeSignIn,
     logout,
     clearAuthData,
     setUserData,

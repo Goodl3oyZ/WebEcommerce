@@ -102,6 +102,24 @@ describe("cart", () => {
     expect(res.body.items).toHaveLength(1);
     expect(res.body.items[0]).toMatchObject({ quantity: 2, price: "300.00" });
     expect(res.body.skipped).toHaveLength(2);
+    expect(res.body.limited).toEqual([
+      { productId: item.product.id, variantId: item.variant.id, requested: 5, quantity: 2 },
+    ]);
+  });
+
+  test("POST /merge keeps the larger quantity of a product already in the cart, so it never doubles", async () => {
+    const { agent } = await loginAs("user");
+    const shoe = await createProduct({ stock: 10 });
+    const sock = await createProduct({ stock: 10 });
+    await add(agent, shoe, 2);
+    const line = (p, quantity) => ({ productId: p.product.id, variantId: p.variant.id, quantity });
+
+    const once = await agent.post("/api/cart/merge").send({ items: [line(shoe, 1), line(sock, 3)] });
+    const quantities = (body) => Object.fromEntries(body.items.map((i) => [i.variantId, i.quantity]));
+    expect(quantities(once.body)).toEqual({ [shoe.variant.id]: 2, [sock.variant.id]: 3 });
+
+    const again = await agent.post("/api/cart/merge").send({ items: [line(shoe, 1), line(sock, 3)] });
+    expect(quantities(again.body)).toEqual(quantities(once.body));
   });
 
   test("POST /checkout places an order for the whole cart", async () => {

@@ -175,9 +175,17 @@ export const cartService = {
    * Merge a guest (browser) cart after login. Prices from the client are
    * ignored; invalid items are skipped and quantities are capped at stock.
    */
+  /**
+   * Fold a cart built before signing in into the account's cart. A product
+   * already in the account keeps the larger of the two quantities (merging
+   * twice, or a cart left over from this account, never doubles it); others
+   * are added. Quantities are capped at stock. `skipped` lists lines that
+   * could not be added and `limited` the ones that were reduced.
+   */
   async mergeGuestCart(userId, items) {
     const cart = await getOrCreateCart(userId);
     const skipped = [];
+    const limited = [];
     for (const { productId, variantId, quantity } of items) {
       let variant;
       try {
@@ -189,12 +197,13 @@ export const cartService = {
       const existing = await db.query.cartItems.findFirst({
         where: and(eq(cartItems.cartId, cart.id), eq(cartItems.variantId, variantId)),
       });
-      const wanted = (existing?.quantity ?? 0) + quantity;
+      const wanted = Math.max(existing?.quantity ?? 0, quantity);
       const allowed = Math.min(wanted, variant.stock, MAX_QUANTITY_PER_ITEM);
       if (allowed <= 0) {
         skipped.push({ productId, variantId, reason: "out of stock" });
         continue;
       }
+      if (allowed < wanted) limited.push({ productId, variantId, requested: wanted, quantity: allowed });
       if (existing) {
         await db
           .update(cartItems)
@@ -206,6 +215,6 @@ export const cartService = {
           .values({ cartId: cart.id, productId, variantId, quantity: allowed, price: variant.price });
       }
     }
-    return { ...(await this.getCart(userId)), skipped };
+    return { ...(await this.getCart(userId)), skipped, limited };
   },
 };

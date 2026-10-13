@@ -2,10 +2,35 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { cartAPI } from "@/lib/api/cart";
 
+/** Signed-in user's id from the saved session, or null for a guest. */
+const signedInUserId = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "null")?.id ?? null;
+  } catch {
+    return null;
+  }
+};
+
+/** Server cart lines -> the shape the storefront uses. */
+const fromServer = (cart) =>
+  cart?.items?.map((item) => ({
+    id: item.productId,
+    productId: item.productId,
+    variantId: item.variantId,
+    quantity: item.quantity,
+    price: parseFloat(item.price),
+    name: item.product?.name,
+    image: item.product?.image,
+    variantName: item.variant ? `${item.variant.color} - ${item.variant.size}` : null,
+  })) || [];
+
 const useCartStore = create(
   persist(
     (set, get) => ({
       items: [],
+      // Whose items these are: a user id (a copy of their server cart) or
+      // null (a guest cart, to be merged into the account on sign-in).
+      owner: null,
       isLoading: false,
       error: null,
       setItems: (items) => set({ items }),
@@ -24,7 +49,10 @@ const useCartStore = create(
             await cartAPI.addItem(cartItemData);
             await get().fetchCartFromBackend();
           } else {
-            const currentItems = get().items;
+            // A copy of someone's server cart left after their session ended
+            // is not this guest's cart: start a fresh one.
+            const currentItems = get().owner ? [] : get().items;
+            if (get().owner) set({ items: [], owner: null });
             const existingItem = currentItems.find(
               (i) => i.id === item.id && i.variantId === item.variantId
             );
@@ -125,27 +153,36 @@ const useCartStore = create(
           // No isLoading guard: add/update/remove call this while their own
           // isLoading flag is still set, and the badge must refresh.
           const backendCart = await cartAPI.getCart();
-
-          const backendItems =
-            backendCart.items?.map((item) => ({
-              id: item.productId,
-              productId: item.productId,
-              variantId: item.variantId,
-              quantity: item.quantity,
-              price: parseFloat(item.price),
-              name: item.product?.name,
-              image: item.product?.image,
-              variantName: item.variant
-                ? `${item.variant.color} - ${item.variant.size}`
-                : null,
-            })) || [];
-
-          set({ items: backendItems });
+          set({ items: fromServer(backendCart), owner: signedInUserId() });
         } catch (error) {
           console.error("Error fetching cart from backend:", error.message);
           set({ error: error.message });
         }
       },
+
+      /**
+       * Right after sign-in: add the guest cart to the account's cart, then
+       * show the account's cart. Returns what happened, for a message.
+       */
+      mergeGuestCart: async () => {
+        const { items, owner } = get();
+        const lines = owner
+          ? []
+          : items
+              .filter((i) => i.variantId && i.quantity > 0)
+              .map((i) => ({ productId: i.productId ?? i.id, variantId: i.variantId, quantity: i.quantity }));
+        if (lines.length === 0) {
+          await get().fetchCartFromBackend();
+          return { added: 0, skipped: 0, limited: 0 };
+        }
+        const merged = await cartAPI.mergeGuestCart({ items: lines });
+        set({ items: fromServer(merged), owner: signedInUserId() });
+        const skipped = merged.skipped?.length ?? 0;
+        return { added: lines.length - skipped, skipped, limited: merged.limited?.length ?? 0 };
+      },
+
+      /** Forget the local copy only (sign-out); the account keeps its cart. */
+      resetLocal: () => set({ items: [], owner: null, isLoading: false, error: null }),
 
       clearCart: async () => {
         try {
