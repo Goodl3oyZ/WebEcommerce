@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 
 export default function Orders() {
   const { user } = useAuth();
@@ -22,7 +23,6 @@ export default function Orders() {
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [toast, setToast] = useState({ show: false, type: "", message: "" });
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -41,24 +41,13 @@ export default function Orders() {
         setTotalPages(response.data?.totalPages || response.totalPages || 1);
       } catch (err) {
         setError(err.message || "ไม่สามารถดึงข้อมูลคำสั่งซื้อได้");
-        setToast({
-          show: true,
-          type: "error",
-          message: err.message || "เกิดข้อผิดพลาด",
-        });
+        toast.error(err.message || "เกิดข้อผิดพลาด");
       } finally {
         setLoading(false);
       }
     };
     if (user) fetchOrders();
   }, [user, currentPage]);
-
-  useEffect(() => {
-    if (toast.show) {
-      const timer = setTimeout(() => setToast({ ...toast, show: false }), 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
 
   const getStatusBadge = (status) => {
     const map = {
@@ -87,17 +76,13 @@ export default function Orders() {
     if (!confirm("ยืนยันการยกเลิกออเดอร์นี้?")) return;
     try {
       await orderAPI.cancelOrder(orderId, "user_cancel");
-      setToast({ show: true, type: "success", message: "ยกเลิกออเดอร์สำเร็จ" });
+      toast.success("ยกเลิกออเดอร์สำเร็จ");
       // รีเฟรชรายการ
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" } : o))
       );
     } catch (err) {
-      setToast({
-        show: true,
-        type: "error",
-        message: err.message || "ยกเลิกไม่สำเร็จ",
-      });
+      toast.error(err.message || "ยกเลิกไม่สำเร็จ");
     }
   };
 
@@ -127,16 +112,6 @@ export default function Orders() {
 
   return (
     <div className="max-w-4xl mx-auto p-8 animate-fade-in">
-      {/* Toast notification */}
-      {toast.show && (
-        <div
-          className={`fixed top-6 right-6 z-50 px-6 py-3 rounded-lg shadow-lg text-white text-base font-medium transition-all animate-fade-in-down ${
-            toast.type === "error" ? "bg-red-500" : "bg-green-500"
-          }`}
-        >
-          {toast.message}
-        </div>
-      )}
       <div className="flex items-center gap-3 mb-8 animate-fade-in-down">
         <Package className="w-8 h-8 text-fg-muted animate-bounce" />
         <div>

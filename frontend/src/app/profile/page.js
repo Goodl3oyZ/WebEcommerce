@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usersAPI } from "@/lib/api/users";
 import { addressAPI } from "@/lib/api/address";
 import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 import Image from "next/image";
 import ProductImage from "@/components/ui/ProductImage";
 import { CouponWallet } from "@/components/shop/CouponList";
@@ -90,7 +91,6 @@ export default function Profile() {
   });
 
   // Add state for toast notifications
-  const [toast, setToast] = useState({ show: false, type: "", message: "" });
 
   // New states for provinces, districts, subdistricts, and shippingZoneId
   const [provinces, setProvinces] = useState([]);
@@ -146,13 +146,6 @@ export default function Profile() {
     fetchData();
   }, [user, loading, router]);
 
-  // Show toast for 2.5s
-  useEffect(() => {
-    if (toast.show) {
-      const timer = setTimeout(() => setToast({ ...toast, show: false }), 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
 
   useEffect(() => {
     // โหลด provinces ตอน mount
@@ -389,7 +382,7 @@ export default function Profile() {
         }));
         if (updated.avatar) setImagePreview(updated.avatar);
       }
-      setToast({ show: true, type: "success", message: "บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว" });
+      toast.success("บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว");
       setEditMode(false);
     } catch (err) {
       console.error("Error updating profile:", err);
@@ -534,17 +527,6 @@ export default function Profile() {
           บัญชีผู้ใช้
         </h1>
 
-        {/* Toast notification */}
-        {toast.show && (
-          <div
-            className={classNames(
-              "fixed top-6 right-6 z-50 px-6 py-3 rounded-lg shadow-lg text-white text-base font-medium transition-all",
-              toast.type === "success" ? "bg-green-500" : "bg-red-500"
-            )}
-          >
-            {toast.message}
-          </div>
-        )}
 
         {/* Personal Info Tab */}
         {activeTab === "personal" && (

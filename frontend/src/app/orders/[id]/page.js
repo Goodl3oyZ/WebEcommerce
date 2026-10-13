@@ -422,8 +422,6 @@ export default function OrderDetailsPage() {
   const [order, setOrder] = useState(null);
   const [tracking, setTracking] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMsg, setToastMsg] = useState("");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("credit_card");
   const [isPaying, setIsPaying] = useState(false);
@@ -446,8 +444,7 @@ export default function OrderDetailsPage() {
       setOrder(orderResponse.data);
       setTracking(trackingResponse.data);
     } catch (error) {
-      setToastMsg("ไม่สามารถโหลดข้อมูลคำสั่งซื้อได้");
-      setShowToast(true);
+      toast.error("ไม่สามารถโหลดข้อมูลคำสั่งซื้อได้");
     } finally {
       setLoading(false);
     }
@@ -479,12 +476,6 @@ export default function OrderDetailsPage() {
       }
     })();
   }, [id, loadOrderDetails]);
-  useEffect(() => {
-    if (showToast) {
-      const timer = setTimeout(() => setShowToast(false), 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [showToast]);
 
   const handlePay = async () => {
     const card = { name: cardInfo.name, number: cardInfo.number, expiry: cardInfo.exp, cvc: cardInfo.cvc };
@@ -587,12 +578,6 @@ export default function OrderDetailsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-2 py-10 animate-fade-in space-y-8">
-      {/* Toast notification */}
-      {showToast && (
-        <div className="fixed top-8 right-8 z-50 px-8 py-4 rounded-xl shadow-lg text-white text-base font-semibold bg-red-500 transition-all animate-fade-in-down">
-          {toastMsg}
-        </div>
-      )}
       {/* Header */}
       <div className="bg-surface rounded-xl shadow p-6 border flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
