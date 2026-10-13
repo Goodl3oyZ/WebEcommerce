@@ -6,7 +6,7 @@ import { checkoutSetup, createOrder, createProduct } from "./helpers/fixtures.js
 const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
 const { ENV } = await import("../config/loadENV.js");
-const { and, gte, ne, sql } = await import("drizzle-orm");
+const { and, eq, gte, ne, sql } = await import("drizzle-orm");
 
 const newStore = async (name = `Branch ${randomUUID().slice(0, 6)}`) =>
   (await db.insert(schema.stores).values({ name }).returning())[0];
@@ -241,6 +241,66 @@ describe("admin dashboard and seeding", () => {
     } finally {
       ENV.SERVER.NODE_ENV = previous;
     }
+  });
+});
+
+describe("demo data", () => {
+  test("install adds the photo catalogue once; remove takes out demo and old seed rows, hiding ordered ones", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const { agent: superAdmin, user } = await loginAs("super_admin");
+    expect((await admin.get("/api/admin/demo-data")).status).toBe(403);
+    expect((await admin.post("/api/admin/demo-data")).status).toBe(403);
+
+    // Rows the old main seed would have made: one sold (kept hidden), one not.
+    const legacyCategory = (await db.insert(schema.categories).values({ name: "Clothing", description: "All types of clothing items" }).returning())[0];
+    const sold = await createProduct({ name: "Designer Watch" });
+    await db.update(schema.productVariants).set({ sku: "WT-SLV-001" }).where(eq(schema.productVariants.id, sold.variant.id));
+    const unsold = await createProduct({ name: "Classic T-Shirt", categoryId: legacyCategory.id });
+    await db.update(schema.productVariants).set({ sku: "TS-BLK-M-001" }).where(eq(schema.productVariants.id, unsold.variant.id));
+    const order = await createOrder(user.id);
+    await db.insert(schema.orderItems).values({ orderId: order.id, productId: sold.product.id, variantId: sold.variant.id, quantity: 1, price: "1.00", subtotal: "1.00" });
+    // Your own product in a seed-named category keeps that category.
+    const mine = await createProduct({ name: `Mine ${randomUUID().slice(0, 6)}` });
+
+    const status = await superAdmin.get("/api/admin/demo-data");
+    expect(status.status).toBe(200);
+    expect(status.body.catalog.products).toHaveLength(11);
+    expect(status.body.catalog.images).toBe(20);
+
+    const installed = await superAdmin.post("/api/admin/demo-data");
+    expect(installed.status).toBe(201);
+    expect(installed.body.created.products + installed.body.created.skipped).toBe(11);
+    const again = await superAdmin.post("/api/admin/demo-data");
+    expect(again.body.created).toMatchObject({ products: 0, skipped: 11 });
+
+    // Visible in the shop with a working photo.
+    const tee = await db.query.productVariants.findFirst({ where: eq(schema.productVariants.sku, "DEMO-TEE-BLACK-M") });
+    const page = await (await newAgent()).get(`/api/products/${tee.productId}`);
+    const image = (page.body.data ?? page.body).imageUrl[0];
+    expect(image).toMatch(/\/products\/demo\/tee-black-1\.jpg$/);
+    expect((await fetch(image)).status).toBe(200);
+
+    const plan = (await superAdmin.get("/api/admin/demo-data")).body.removal.groups;
+    const products = plan.find((g) => g.key === "products").items;
+    expect(products.find((p) => p.id === sold.product.id).action).toBe("hide");
+    expect(products.find((p) => p.id === unsold.product.id).action).toBe("delete");
+    expect(products.some((p) => p.id === mine.product.id)).toBe(false);
+
+    expect((await superAdmin.post("/api/admin/demo-data/remove").send({})).status).toBe(400);
+    const removed = await superAdmin.post("/api/admin/demo-data/remove").send({ confirm: "REMOVE DEMO DATA" });
+    expect(removed.status).toBe(200);
+    expect(removed.body.removed.products.deleted).toBeGreaterThanOrEqual(12);
+    expect(removed.body.removed.products.hidden).toBeGreaterThanOrEqual(1);
+    expect(removed.body.removed.images.deleted).toBe(20);
+
+    const demoLeft = await db.select().from(schema.productVariants).where(sql`${schema.productVariants.sku} like 'DEMO-%'`);
+    expect(demoLeft).toHaveLength(0);
+    expect((await db.query.products.findFirst({ where: eq(schema.products.id, sold.product.id) })).isActive).toBe(false);
+    expect(await db.query.products.findFirst({ where: eq(schema.products.id, unsold.product.id) })).toBeUndefined();
+    expect(await db.query.categories.findFirst({ where: eq(schema.categories.id, legacyCategory.id) })).toBeUndefined();
+    expect(await db.query.products.findFirst({ where: eq(schema.products.id, mine.product.id) })).toBeDefined();
+    expect((await fetch(image)).status).not.toBe(200);
+    expect((await superAdmin.get("/api/admin/demo-data")).body.removal.total).toBe(0);
   });
 });
 

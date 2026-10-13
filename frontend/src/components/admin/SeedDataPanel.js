@@ -13,6 +13,7 @@ import {
   FaTerminal,
 } from "react-icons/fa";
 import { adminAPI } from "@/lib/api/admin";
+import { DemoDataSection } from "./DemoDataSection";
 
 const CONFIRM_PHRASE = "DELETE EXISTING DATA";
 const SEEDS = [
@@ -145,11 +146,15 @@ export function SeedDataPanel() {
   const [error, setError] = useState(null);
   const [running, setRunning] = useState(null);
   const [output, setOutput] = useState("");
+  const [demo, setDemo] = useState(null);
+  const [demoBusy, setDemoBusy] = useState(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setPreview(await adminAPI.getSeedPreview());
+      const [seedPreview, demoData] = await Promise.all([adminAPI.getSeedPreview(), adminAPI.getDemoData()]);
+      setPreview(seedPreview);
+      setDemo(demoData);
     } catch (e) {
       // The API client throws APIError (status on the error itself).
       const status = e?.status ?? e?.response?.status;
@@ -179,6 +184,35 @@ export function SeedDataPanel() {
     }
   };
 
+  const installDemo = async () => {
+    setDemoBusy("install");
+    try {
+      const { created } = await adminAPI.installDemoData();
+      toast.success(`เพิ่มสินค้าตัวอย่าง ${created.products} รายการแล้ว`);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || e.message || "เพิ่มไม่สำเร็จ");
+    } finally {
+      setDemoBusy(null);
+    }
+  };
+
+  const removeDemo = async (confirm, reset) => {
+    setDemoBusy("remove");
+    try {
+      const { removed } = await adminAPI.removeDemoData(confirm);
+      const sum = (field) => Object.values(removed).reduce((n, g) => n + (g[field] ?? 0), 0);
+      const hidden = sum("hidden");
+      toast.success(`ลบแล้ว ${sum("deleted")} รายการ${hidden ? ` ซ่อน ${hidden} รายการที่มีออเดอร์` : ""}`);
+      reset();
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || e.message || "ลบไม่สำเร็จ");
+    } finally {
+      setDemoBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -186,7 +220,7 @@ export function SeedDataPanel() {
           <FaDatabase aria-hidden /> ข้อมูลเริ่มต้น (Seed)
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
-          ดูก่อนว่าแต่ละชุดจะลบและสร้างอะไร ตัวเลข “จะลบ” นับจากฐานข้อมูลตอนนี้ ใช้สำหรับเครื่องพัฒนาหรือระบบทดสอบ
+          เพิ่มสินค้าตัวอย่างไว้โชว์ลูกค้า แล้วลบออกได้ด้วยปุ่มเดียวเมื่อพร้อมขายจริง
         </p>
       </div>
 
@@ -203,18 +237,28 @@ export function SeedDataPanel() {
       ) : error ? (
         <p className="rounded-xl bg-danger-soft p-4 text-sm text-danger">{error}</p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {SEEDS.map((seed) => (
-            <SeedCard
-              key={seed.id}
-              seed={seed}
-              preview={preview?.[seed.id]}
-              running={running === seed.id}
-              disabled={running !== null}
-              onRun={run}
-            />
-          ))}
-        </div>
+        <>
+          <DemoDataSection data={demo} busy={demoBusy} onInstall={installDemo} onRemove={removeDemo} />
+          <div className="border-t border-border pt-6">
+            <h3 className="font-semibold text-fg">รีเซ็ตฐานข้อมูล</h3>
+            <p className="mt-1 text-sm text-fg-muted">
+              ลบข้อมูลทั้งตารางแล้วสร้างใหม่ ใช้กับเครื่องพัฒนาหรือระบบทดสอบเท่านั้น ตัวเลข “จะลบ”
+              นับจากฐานข้อมูลตอนนี้
+            </p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {SEEDS.map((seed) => (
+              <SeedCard
+                key={seed.id}
+                seed={seed}
+                preview={preview?.[seed.id]}
+                running={running === seed.id}
+                disabled={running !== null}
+                onRun={run}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {output && (

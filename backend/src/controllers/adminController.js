@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { adminService } from "../services/adminService.js";
+import { demoDataService } from "../services/demoDataService.js";
+import { writeAuditLog } from "../services/auditService.js";
 import { ENV } from "../config/loadENV.js";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -21,6 +23,22 @@ export const SEED_CONFIRMATION = "DELETE EXISTING DATA";
 export const adminController = {
   async getSeedPreview(req, res) {
     res.json(await adminService.getSeedPreview());
+  },
+
+  async getDemoData(req, res) {
+    res.json(await demoDataService.status({ actorId: req.user.id }));
+  },
+
+  async installDemoData(req, res) {
+    const created = await demoDataService.install();
+    await writeAuditLog({ actorId: req.user.id, entity: "demo_data", action: "install", after: created });
+    res.status(201).json({ success: true, created });
+  },
+
+  async removeDemoData(req, res) {
+    const removed = await demoDataService.remove({ actorId: req.user.id });
+    await writeAuditLog({ actorId: req.user.id, entity: "demo_data", action: "remove", after: removed });
+    res.json({ success: true, removed });
   },
 
   async getDashboard(req, res) {

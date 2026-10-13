@@ -13,6 +13,11 @@ export const seedDto = z
   })
   .strict();
 
+export const DEMO_REMOVE_CONFIRMATION = "REMOVE DEMO DATA";
+export const demoRemoveDto = z
+  .object({ confirm: z.literal(DEMO_REMOVE_CONFIRMATION).describe(`Must be "${DEMO_REMOVE_CONFIRMATION}"`) })
+  .strict();
+
 const router = express.Router();
 
 router.use(apiRateLimiter);
@@ -23,5 +28,9 @@ router.get("/dashboard", adminController.getDashboard);
 // Can wipe data: super admins only (and disabled in production by default).
 router.get("/seed/preview", requireRole(ROLES.SUPER_ADMIN), adminController.getSeedPreview);
 router.post("/seed", requireRole(ROLES.SUPER_ADMIN), validationMiddleware(seedDto), adminController.runSeed);
+// Demo catalogue: only adds/removes its own rows, so it also works in production.
+router.get("/demo-data", requireRole(ROLES.SUPER_ADMIN), adminController.getDemoData);
+router.post("/demo-data", requireRole(ROLES.SUPER_ADMIN), adminController.installDemoData);
+router.post("/demo-data/remove", requireRole(ROLES.SUPER_ADMIN), validationMiddleware(demoRemoveDto), adminController.removeDemoData);
 
 export default router;

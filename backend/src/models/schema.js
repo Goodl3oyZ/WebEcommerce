@@ -185,6 +185,20 @@ export const productVariants = pgTable("product_variants", {
   stockNotNegative: check("product_variants_stock_not_negative", sql`${table.stock} >= 0`),
 }));
 
+// Rows created by the demo catalogue (admin "install demo data"), so removing
+// the demo takes out exactly those rows and nothing an admin made.
+export const seedRecords = pgTable(
+  "seed_records",
+  {
+    tableName: varchar("table_name", { length: 50 }).notNull(),
+    recordId: uuid("record_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.tableName, table.recordId] }),
+  })
+);
+
 // Every stock change made by orders (reserve / release), for auditing.
 export const inventoryMovements = pgTable(
   "inventory_movements",

@@ -25,6 +25,17 @@ const ATTRS = [
   { key: "color", label: "สี" },
   { key: "size", label: "ขนาด" },
 ];
+const APPAREL_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL"];
+/** Sizes in a natural order: XS < S < M < L, 2.5 kg < 10 kg; anything else keeps its order. */
+function bySize(a, b) {
+  const ra = APPAREL_SIZES.indexOf(String(a).toUpperCase());
+  const rb = APPAREL_SIZES.indexOf(String(b).toUpperCase());
+  if (ra !== -1 && rb !== -1) return ra - rb;
+  const na = parseFloat(a);
+  const nb = parseFloat(b);
+  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+  return 0;
+}
 const REVIEWS_PER_PAGE = 5;
 const RECENT_KEY = "recentlyViewedProducts";
 
@@ -139,7 +150,10 @@ function useVariantPicker(variants) {
     () =>
       ATTRS.map((a) => ({
         ...a,
-        values: [...new Set(variants.map((v) => v[a.key]).filter(Boolean))],
+        values: (() => {
+          const values = [...new Set(variants.map((v) => v[a.key]).filter(Boolean))];
+          return a.key === "size" ? values.sort(bySize) : values;
+        })(),
       }))
         .filter((g) => g.values.length > 0)
         .concat(

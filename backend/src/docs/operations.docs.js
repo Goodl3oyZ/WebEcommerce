@@ -6,7 +6,7 @@ import { inventoryDto } from "../dtos/inventory.dto.js";
 import { supplierDto } from "../dtos/supplier.dto.js";
 import { reportDto } from "../dtos/report.dto.js";
 import { settingsDto } from "../dtos/settings.dto.js";
-import { seedDto } from "../routes/adminRoutes.js";
+import { seedDto, demoRemoveDto } from "../routes/adminRoutes.js";
 
 documentRoutes("Wishlist", [
   { method: "get", path: "/api/wishlist", summary: "Your wishlist (products include stock)", auth: "user", responses: { 200: "Items" } },
@@ -117,6 +117,32 @@ documentRoutes("Admin", [
     auth: "super_admin",
     body: seedDto,
     responses: { 200: "Seeded", 400: "Unknown seed or missing confirmation" },
+  },
+  {
+    method: "get",
+    path: "/api/admin/demo-data",
+    summary: "Demo catalogue status and what removal would take out",
+    description: "catalog: the demo products (installed or not). removal.groups: demo and old seed rows with action delete | hide (kept for order history) | keep.",
+    auth: "super_admin",
+    responses: { 200: "{ catalog, removal }" },
+  },
+  {
+    method: "post",
+    path: "/api/admin/demo-data",
+    summary: "Install the demo catalogue (with photos)",
+    description: "Adds categories, brands and products with photos without deleting anything. Products already installed are skipped. Works in production.",
+    auth: "super_admin",
+    responses: { 201: "{ created: { categories, brands, products, skipped } }" },
+  },
+  {
+    method: "post",
+    path: "/api/admin/demo-data/remove",
+    summary: "Remove demo and seed data",
+    description:
+      "Deletes the demo catalogue and the rows the main seed created (fixed SKUs, coupon codes, demo admin). Rows referenced by orders are hidden/deactivated instead; categories and brands your products use are kept.",
+    auth: "super_admin",
+    body: demoRemoveDto,
+    responses: { 200: "{ removed: per group deleted/hidden/kept }", 400: "Missing confirmation" },
   },
 ]);
 
