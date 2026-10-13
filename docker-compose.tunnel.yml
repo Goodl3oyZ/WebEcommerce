@@ -1,0 +1,21 @@
+# Override for running behind Cloudflare Tunnel instead of serving HTTPS here.
+#   docker compose --env-file .env.production \
+#     -f docker-compose.prod.yml -f docker-compose.tunnel.yml up -d --build
+#
+# Caddy listens on the host's loopback only (TUNNEL_PORT, default 8095), so
+# nothing is reachable except through cloudflared, which points the public
+# hostname at http://localhost:${TUNNEL_PORT}. No ports 80/443 are used.
+
+services:
+  caddy:
+    ports: !override
+      - "127.0.0.1:${TUNNEL_PORT:-8095}:80"
+    volumes:
+      - ./production/caddy/Caddyfile.tunnel:/etc/caddy/Caddyfile:ro
+
+  backend:
+    environment:
+      # Visitor -> Cloudflare -> cloudflared -> Caddy -> API: trust the two
+      # proxies in front of the API so req.ip is the visitor's address
+      # (rate limits and login lockouts are per visitor, not per tunnel).
+      TRUST_PROXY: "2"

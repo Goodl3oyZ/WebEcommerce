@@ -43,6 +43,27 @@ docker compose --env-file .env.production -f docker-compose.prod.yml \
   run --rm backend npm run seed:all
 ```
 
+## Behind Cloudflare Tunnel (no open ports)
+
+When the server is reached through `cloudflared` instead of ports 80/443, add
+`docker-compose.tunnel.yml`. Caddy then serves plain HTTP on
+`127.0.0.1:${TUNNEL_PORT:-8095}` only, Cloudflare provides HTTPS, and the API
+trusts the two proxies in front of it (`TRUST_PROXY=2`) so rate limits see each
+visitor's IP. `ACME_EMAIL` is unused but still required by the base file.
+
+```bash
+docker compose --env-file .env.production   -f docker-compose.prod.yml -f docker-compose.tunnel.yml up -d --build
+```
+
+In the cloudflared config, before the final `http_status:404` rule:
+
+```yaml
+  - hostname: shop.example.com
+    service: http://localhost:8095
+```
+
+then `cloudflared tunnel route dns <tunnel> shop.example.com` and restart cloudflared.
+
 ## OAuth and payment provider settings
 
 - OAuth callback URLs: `https://<DOMAIN>/oauth/{github,google,facebook}/callback`

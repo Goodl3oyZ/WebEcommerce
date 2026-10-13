@@ -6,33 +6,5 @@
 }
 
 {$DOMAIN} {
-	encode zstd gzip
-
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		-Server
-	}
-
-	# Product/profile images from SeaweedFS (anonymous read-only S3 access)
-	handle_path /media/* {
-		@notGet not method GET HEAD
-		respond @notGet 405
-		reverse_proxy seaweedfs:8333 {
-			header_up Host {upstream_hostport}
-		}
-	}
-
-	@backend path /api/* /oauth/* /socket.io/* /api-docs /api-docs/*
-	handle @backend {
-		request_body {
-			max_size 10MB
-		}
-		reverse_proxy backend:5000
-	}
-
-	handle {
-		reverse_proxy frontend:3000
-	}
+	import /etc/caddy/routes.caddy
 }

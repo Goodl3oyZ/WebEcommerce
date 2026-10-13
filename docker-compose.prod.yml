@@ -50,6 +50,7 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:?}
     volumes:
       - ./production/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./production/caddy/routes.caddy:/etc/caddy/routes.caddy:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

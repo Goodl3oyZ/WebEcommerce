@@ -1,0 +1,14 @@
+# Behind Cloudflare Tunnel (docker-compose.tunnel.yml): Cloudflare serves HTTPS
+# and cloudflared forwards plain HTTP to this port on the host's loopback.
+{
+	auto_https off
+	servers {
+		# Keep X-Forwarded-For/-Proto from cloudflared (it connects from the
+		# Docker gateway), so the API sees the visitor's IP and https.
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	import /etc/caddy/routes.caddy
+}
