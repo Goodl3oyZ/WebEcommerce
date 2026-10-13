@@ -1,0 +1,107 @@
+# CI on every push and pull request; CD for pushes to main.
+#
+# deploy runs only after both test jobs pass. It calls the server's deploy
+# webhook (deploy/webhook/server.mjs) with a request signed by
+# DEPLOY_WEBHOOK_SECRET, then waits until the server reports the result.
+# Repository secrets (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_WEBHOOK_URL     e.g. https://deploy.example.com/hooks/deploy
+#   DEPLOY_WEBHOOK_SECRET  same value as DEPLOY_SECRET on the server
+# Without them the deploy job is skipped with a notice.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # Starts Postgres, Redis and SeaweedFS with docker-compose.test.yml.
+      - run: npm test
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  deploy:
+    name: Deploy to production
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+    steps:
+      - name: Trigger the server
+        id: trigger
+        env:
+          URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$SECRET" ]; then
+            echo "::notice::DEPLOY_WEBHOOK_URL / DEPLOY_WEBHOOK_SECRET not set, skipping deploy"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          body=$(printf '{"ref":"%s","sha":"%s","ts":%s}' "$GITHUB_REF" "$GITHUB_SHA" "$(date +%s)")
+          sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
+          curl -fsS --retry 3 --retry-all-errors -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Deploy-Signature: sha256=$sig" \
+            --data "$body"
+
+      - name: Wait for the result
+        if: steps.trigger.outputs.skip != '1'
+        env:
+          URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          for i in $(seq 1 100); do
+            sleep 15
+            s=$(curl -fsS "$URL/status" || echo '{}')
+            sha=$(echo "$s" | jq -r '.sha // empty')
+            state=$(echo "$s" | jq -r '.state // empty')
+            echo "[$i] $(echo "$s" | jq -c .)"
+            if [ "$sha" = "$GITHUB_SHA" ] && [ "$state" = "success" ]; then
+              echo "Deployed $GITHUB_SHA"; exit 0
+            fi
+            if [ "$sha" = "$GITHUB_SHA" ] && [ "$state" = "failed" ]; then
+              echo "::error::Deploy failed: $(echo "$s" | jq -r .message)"; exit 1
+            fi
+          done
+          echo "::error::Timed out waiting for the server"; exit 1
