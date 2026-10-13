@@ -28,7 +28,9 @@ try {
   } else {
     const userId = rows[0].id;
     const { rowCount } = await pool.query(
-      "insert into user_roles (user_id, role) select $1, $2 where not exists (select 1 from user_roles where user_id = $1 and role = $2)",
+      // Explicit casts: $2 is used both as a value and in a comparison, and
+      // Postgres refuses to infer two different types for it.
+      "insert into user_roles (user_id, role) select $1::uuid, $2::varchar where not exists (select 1 from user_roles where user_id = $1::uuid and role = $2::varchar)",
       [userId, role]
     );
     console.log(rowCount ? `${email} is now ${role}. Sign in again to use it.` : `${email} already has ${role}.`);
