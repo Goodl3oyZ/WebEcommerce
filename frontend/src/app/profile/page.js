@@ -135,7 +135,7 @@ export default function Profile() {
           setAddresses(addressRes.addresses);
         }
 
-        setPoints(pointsRes?.data?.points || 0);
+        setPoints(pointsRes?.points ?? pointsRes?.data?.points ?? profileRes?.data?.user?.points ?? 0);
       } catch (err) {
         setError(err.message);
       } finally {

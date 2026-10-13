@@ -1,5 +1,6 @@
 "use client";
 import { createCardToken } from "@/lib/omise";
+import { cardErrorMessage, formatCardNumber, formatCvc, formatExpiry, validateCard } from "@/lib/cardInput";
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -271,6 +272,27 @@ function PaymentInfo({ order }) {
   );
 }
 
+const cardInputClass = (error) =>
+  `h-11 w-full rounded-lg border bg-surface px-3 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-fg/10 ${
+    error ? "border-danger focus:border-danger" : "border-border focus:border-fg"
+  }`;
+
+function CardField({ id, label, error, children }) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-fg">
+        {label}
+      </label>
+      {children}
+      {error && (
+        <p id={`${id}-error`} className="mt-1 text-xs font-medium text-danger">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function PaymentModal({
   show,
   onClose,
@@ -278,70 +300,95 @@ function PaymentModal({
   setPaymentMethod,
   cardInfo,
   setCardInfo,
+  cardErrors,
   isPaying,
   onPay,
 }) {
   if (!show) return null;
+  const field = (key, error) => ({
+    "aria-invalid": error ? true : undefined,
+    "aria-describedby": error ? `pay-${key}-error` : undefined,
+    className: cardInputClass(error),
+  });
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-surface p-8 rounded-2xl shadow-2xl w-full max-w-md relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="pay-title" className="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl sm:p-8">
         <button
-          className="absolute top-3 right-3 text-fg-subtle hover:text-fg text-xl font-bold"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full text-xl text-fg-subtle hover:bg-fg/5 hover:text-fg"
           onClick={onClose}
           aria-label="ปิด"
         >
           ×
         </button>
-        <h2 className="text-xl font-bold mb-6 text-center text-fg">
+        <h2 id="pay-title" className="mb-6 text-center text-xl font-bold text-fg">
           เลือกวิธีชำระเงิน
         </h2>
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
-          className="mb-6 w-full border rounded-lg p-3 focus:ring-2 focus:ring-fg"
+          aria-label="วิธีชำระเงิน"
+          className={`${cardInputClass()} mb-5`}
         >
           <option value="credit_card">บัตรเครดิต/เดบิต</option>
           <option value="promptpay">PromptPay</option>
         </select>
         {paymentMethod === "credit_card" && (
-          <div className="space-y-3 mb-6">
-            <input
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-fg"
-              placeholder="ชื่อบนบัตร"
-              value={cardInfo.name}
-              onChange={(e) =>
-                setCardInfo({ ...cardInfo, name: e.target.value })
-              }
-            />
-            <input
-              className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-fg"
-              placeholder="หมายเลขบัตร"
-              value={cardInfo.number}
-              onChange={(e) =>
-                setCardInfo({ ...cardInfo, number: e.target.value })
-              }
-              maxLength={16}
-            />
-            <div className="flex gap-2">
-              <input
-                className="w-1/2 border rounded-lg p-3 focus:ring-2 focus:ring-fg"
-                placeholder="MM/YY"
-                value={cardInfo.exp}
-                onChange={(e) =>
-                  setCardInfo({ ...cardInfo, exp: e.target.value })
-                }
-                maxLength={5}
-              />
-              <input
-                className="w-1/2 border rounded-lg p-3 focus:ring-2 focus:ring-fg"
-                placeholder="CVC"
-                value={cardInfo.cvc}
-                onChange={(e) =>
-                  setCardInfo({ ...cardInfo, cvc: e.target.value })
-                }
-                maxLength={4}
-              />
+          <div className="mb-6 grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <CardField id="pay-number" label="หมายเลขบัตร" error={cardErrors.number}>
+                <input
+                  id="pay-number"
+                  inputMode="numeric"
+                  autoComplete="cc-number"
+                  placeholder="0000 0000 0000 0000"
+                  value={cardInfo.number}
+                  onChange={(e) => setCardInfo((c) => ({ ...c, number: formatCardNumber(e.target.value) }))}
+                  {...field("number", cardErrors.number)}
+                />
+              </CardField>
             </div>
+            <div className="col-span-2">
+              <CardField id="pay-name" label="ชื่อบนบัตร" error={cardErrors.name}>
+                <input
+                  id="pay-name"
+                  autoComplete="cc-name"
+                  placeholder="ชื่อ-นามสกุล (ภาษาอังกฤษ)"
+                  value={cardInfo.name}
+                  onChange={(e) => setCardInfo((c) => ({ ...c, name: e.target.value }))}
+                  {...field("name", cardErrors.name)}
+                />
+              </CardField>
+            </div>
+            <CardField id="pay-expiry" label="วันหมดอายุ" error={cardErrors.expiry}>
+              <input
+                id="pay-expiry"
+                inputMode="numeric"
+                autoComplete="cc-exp"
+                placeholder="ดด/ปป"
+                value={cardInfo.exp}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setCardInfo((c) => ({ ...c, exp: formatExpiry(value, c.exp) }));
+                }}
+                {...field("expiry", cardErrors.expiry)}
+              />
+            </CardField>
+            <CardField id="pay-cvc" label="CVC" error={cardErrors.cvc}>
+              <input
+                id="pay-cvc"
+                inputMode="numeric"
+                autoComplete="cc-csc"
+                placeholder="123"
+                value={cardInfo.cvc}
+                onChange={(e) => setCardInfo((c) => ({ ...c, cvc: formatCvc(e.target.value) }))}
+                {...field("cvc", cardErrors.cvc)}
+              />
+            </CardField>
+            {cardErrors.form && (
+              <p role="alert" className="col-span-2 rounded-lg bg-danger/10 px-3 py-2 text-sm font-medium text-danger">
+                {cardErrors.form}
+              </p>
+            )}
           </div>
         )}
         {paymentMethod === "promptpay" && (
@@ -349,16 +396,16 @@ function PaymentModal({
             <p>เมื่อกดยืนยัน จะสร้าง QR PromptPay สำหรับชำระเงิน</p>
           </div>
         )}
-        <div className="flex gap-3 mt-4">
+        <div className="mt-4 flex gap-3">
           <button
-            className="flex-1 bg-fg hover:bg-fg/85 text-canvas px-4 py-3 rounded-lg font-bold shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 rounded-full bg-fg px-4 py-3 font-semibold text-canvas transition-colors hover:bg-fg/85 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={onPay}
             disabled={isPaying}
           >
             {isPaying ? "กำลังชำระเงิน..." : "ยืนยันชำระเงิน"}
           </button>
           <button
-            className="flex-1 bg-border hover:bg-border text-fg px-4 py-3 rounded-lg font-semibold shadow transition-all"
+            className="flex-1 rounded-full border border-border px-4 py-3 font-semibold text-fg transition-colors hover:bg-fg/5"
             onClick={onClose}
           >
             ยกเลิก
@@ -382,6 +429,7 @@ export default function OrderDetailsPage() {
   const [isPaying, setIsPaying] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const addToCart = useCartStore((state) => state.addItem);
+  const [cardErrors, setCardErrors] = useState({});
   const [cardInfo, setCardInfo] = useState({
     name: "",
     number: "",
@@ -439,17 +487,23 @@ export default function OrderDetailsPage() {
   }, [showToast]);
 
   const handlePay = async () => {
+    const card = { name: cardInfo.name, number: cardInfo.number, expiry: cardInfo.exp, cvc: cardInfo.cvc };
+    if (paymentMethod === "credit_card") {
+      const errors = validateCard(card);
+      setCardErrors(errors);
+      if (Object.keys(errors).length) return;
+    }
     setIsPaying(true);
     try {
       const body = { orderId: order.id, method: paymentMethod };
       if (paymentMethod === "credit_card") {
         // Tokenized in the browser: the card number never reaches our server.
-        body.cardToken = await createCardToken({
-          name: cardInfo.name,
-          number: cardInfo.number,
-          expiry: cardInfo.exp,
-          cvc: cardInfo.cvc,
-        });
+        try {
+          body.cardToken = await createCardToken(card);
+        } catch (e) {
+          setCardErrors({ form: cardErrorMessage(e.message) });
+          return;
+        }
       }
       const result = await paymentsAPI.createPayment(body);
       const { payment, charge } = result?.data || {};
@@ -633,6 +687,7 @@ export default function OrderDetailsPage() {
         setPaymentMethod={setPaymentMethod}
         cardInfo={cardInfo}
         setCardInfo={setCardInfo}
+        cardErrors={cardErrors}
         isPaying={isPaying}
         onPay={handlePay}
       />
