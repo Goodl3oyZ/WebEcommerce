@@ -113,7 +113,7 @@ documentRoutes("Admin", [
     path: "/api/admin/seed",
     summary: "Load seed data",
     description:
-      'Super admins only. Disabled in production unless ALLOW_ADMIN_SEED=true. "main", "shipping" and "all" DELETE existing data and need confirm: "DELETE EXISTING DATA".',
+      'Super admins only. In production only "address" and "shipping" (reference data) run; "main" and "all" need ALLOW_ADMIN_SEED=true. "main", "shipping" and "all" DELETE existing data and need confirm: "DELETE EXISTING DATA".',
     auth: "super_admin",
     body: seedDto,
     responses: { 200: "Seeded", 400: "Unknown seed or missing confirmation" },

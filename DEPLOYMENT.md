@@ -104,10 +104,12 @@ case, review the change and apply it by hand
   (503 if any is down).
 - **Logs:** `docker compose -f docker-compose.prod.yml logs -f backend`
   (json-file driver, rotated at 5 × 10 MB per container).
-- **Admin seeding:** `POST /api/admin/seed` (the "Seed" admin tab) can delete every
-  user and product. It is disabled in production unless `ALLOW_ADMIN_SEED=true`, is
-  restricted to super admins, and needs a typed confirmation. Seed a fresh database
-  from the command line instead (see First deploy).
+- **Admin seeding:** `POST /api/admin/seed` (the "Seed" admin tab), super admins only.
+  In production the reference-data seeds work: Thai addresses, and shipping
+  zones/methods + payment methods (replaces them, typed confirmation, refused once
+  orders exist). The "main" and "all" seeds delete every user and product and stay
+  disabled unless `ALLOW_ADMIN_SEED=true`. From the command line:
+  `docker compose ... exec backend npm run seed:address` / `seed:shipping`.
 - **Orders, stock and payments:** stock is reserved atomically at checkout (a CHECK
   constraint keeps it at zero or above; every reserve/release is in
   `inventory_movements`). A payment worker runs every minute inside the API:

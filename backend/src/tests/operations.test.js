@@ -316,7 +316,7 @@ describe("admin dashboard and seeding", () => {
     expect(address.blocked).toBeNull();
   });
 
-  test("seeding is super-admin only, needs confirmation and is off in production", async () => {
+  test("seeding is super-admin only, needs confirmation; production allows only reference data", async () => {
     const { agent: admin } = await loginAs("admin");
     const { agent: superAdmin } = await loginAs("super_admin");
 
@@ -332,6 +332,10 @@ describe("admin dashboard and seeding", () => {
       const blocked = await superAdmin.post("/api/admin/seed").send({ seedType: "main", confirm: "DELETE EXISTING DATA" });
       expect(blocked.status).toBe(403);
       expect(blocked.body.code).toBe("SEED_DISABLED");
+      expect((await superAdmin.post("/api/admin/seed").send({ seedType: "all", confirm: "DELETE EXISTING DATA" })).status).toBe(403);
+      // Reference data is allowed: it reaches the usual confirmation check.
+      const shipping = await superAdmin.post("/api/admin/seed").send({ seedType: "shipping" });
+      expect(shipping.body.code).toBe("CONFIRMATION_REQUIRED");
     } finally {
       ENV.SERVER.NODE_ENV = previous;
     }

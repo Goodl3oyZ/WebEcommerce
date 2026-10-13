@@ -9,9 +9,12 @@ import { ApiError } from "../utils/ApiError.js";
 const run = promisify(execFile);
 
 /** Seed scripts, in order. "main" and "shipping" DELETE existing data first. */
+// `production`: reference data a live shop needs (Thai addresses; shipping
+// zones/methods and payment methods). Allowed in production; "main" and "all",
+// which delete users and products, are not (unless ALLOW_ADMIN_SEED=true).
 const SEEDS = {
-  address: { scripts: ["src/seed/seed-address-thai.js"], destructive: false },
-  shipping: { scripts: ["src/seed/seed-shipping-payment.js"], destructive: true },
+  address: { scripts: ["src/seed/seed-address-thai.js"], destructive: false, production: true },
+  shipping: { scripts: ["src/seed/seed-shipping-payment.js"], destructive: true, production: true },
   main: { scripts: ["src/seed/seed.js"], destructive: true },
   all: {
     scripts: ["src/seed/seed.js", "src/seed/seed-shipping-payment.js", "src/seed/seed-address-thai.js"],
@@ -47,15 +50,21 @@ export const adminController = {
 
   /**
    * Re-seed reference/demo data. The "main" seed deletes every user, product,
-   * coupon and store, so: disabled in production unless ALLOW_ADMIN_SEED=true,
-   * super_admin only (route), and destructive seeds need an explicit phrase.
+   * coupon and store, so in production only the reference-data seeds run
+   * (unless ALLOW_ADMIN_SEED=true); super_admin only (route), and destructive
+   * seeds need an explicit phrase.
    */
   async runSeed(req, res) {
-    if (ENV.SERVER.NODE_ENV === "production" && process.env.ALLOW_ADMIN_SEED !== "true") {
-      throw new ApiError(403, "Seeding is disabled in production", null, "SEED_DISABLED");
-    }
     const { seedType, confirm } = req.body;
     const seed = SEEDS[seedType];
+    if (ENV.SERVER.NODE_ENV === "production" && !seed.production && process.env.ALLOW_ADMIN_SEED !== "true") {
+      throw new ApiError(
+        403,
+        `The "${seedType}" seed deletes users and products, so it is disabled in production`,
+        null,
+        "SEED_DISABLED"
+      );
+    }
     if (seed.destructive && confirm !== SEED_CONFIRMATION) {
       throw new ApiError(
         400,
