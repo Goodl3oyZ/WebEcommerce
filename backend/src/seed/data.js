@@ -96,15 +96,15 @@ export const SHIPPING_ZONES = [
     description: "กรุงเทพฯ ปริมณฑล ภาคกลาง",
     baseCost: 50.0,
     methods: [
-      { name: "Standard Delivery (Central)", code: "STANDARD_CENTRAL", description: "Delivers in 3-5 business days", price: 50.0 },
-      { name: "Express Delivery (Central)", code: "EXPRESS_CENTRAL", description: "Next-day delivery", price: 100.0 },
+      { name: "ส่งธรรมดา (ภาคกลาง)", code: "STANDARD_CENTRAL", description: "ถึงภายใน 3–5 วันทำการหลังจัดส่ง", price: 50.0 },
+      { name: "ส่งด่วน (ภาคกลาง)", code: "EXPRESS_CENTRAL", description: "ถึงวันทำการถัดไปหลังจัดส่ง", price: 100.0 },
     ],
   },
-  { name: "North", description: "ภาคเหนือ", baseCost: 70.0, methods: [{ name: "Standard Delivery (North)", code: "STANDARD_NORTH", description: "Delivers in 3-7 business days", price: 70.0 }] },
-  { name: "Northeast", description: "ภาคตะวันออกเฉียงเหนือ", baseCost: 75.0, methods: [{ name: "Standard Delivery (Northeast)", code: "STANDARD_NORTHEAST", description: "Delivers in 3-7 business days", price: 75.0 }] },
-  { name: "East", description: "ภาคตะวันออก", baseCost: 65.0, methods: [{ name: "Standard Delivery (East)", code: "STANDARD_EAST", description: "Delivers in 3-7 business days", price: 65.0 }] },
-  { name: "West", description: "ภาคตะวันตก", baseCost: 60.0, methods: [{ name: "Standard Delivery (West)", code: "STANDARD_WEST", description: "Delivers in 3-7 business days", price: 60.0 }] },
-  { name: "South", description: "ภาคใต้", baseCost: 80.0, methods: [{ name: "Standard Delivery (South)", code: "STANDARD_SOUTH", description: "Delivers in 3-7 business days", price: 80.0 }] },
+  { name: "North", description: "ภาคเหนือ", baseCost: 70.0, methods: [{ name: "ส่งธรรมดา (ภาคเหนือ)", code: "STANDARD_NORTH", description: "ถึงภายใน 3–7 วันทำการหลังจัดส่ง", price: 70.0 }] },
+  { name: "Northeast", description: "ภาคตะวันออกเฉียงเหนือ", baseCost: 75.0, methods: [{ name: "ส่งธรรมดา (ภาคอีสาน)", code: "STANDARD_NORTHEAST", description: "ถึงภายใน 3–7 วันทำการหลังจัดส่ง", price: 75.0 }] },
+  { name: "East", description: "ภาคตะวันออก", baseCost: 65.0, methods: [{ name: "ส่งธรรมดา (ภาคตะวันออก)", code: "STANDARD_EAST", description: "ถึงภายใน 3–7 วันทำการหลังจัดส่ง", price: 65.0 }] },
+  { name: "West", description: "ภาคตะวันตก", baseCost: 60.0, methods: [{ name: "ส่งธรรมดา (ภาคตะวันตก)", code: "STANDARD_WEST", description: "ถึงภายใน 3–7 วันทำการหลังจัดส่ง", price: 60.0 }] },
+  { name: "South", description: "ภาคใต้", baseCost: 80.0, methods: [{ name: "ส่งธรรมดา (ภาคใต้)", code: "STANDARD_SOUTH", description: "ถึงภายใน 3–7 วันทำการหลังจัดส่ง", price: 80.0 }] },
 ];
 
 export const PAYMENT_METHODS = [

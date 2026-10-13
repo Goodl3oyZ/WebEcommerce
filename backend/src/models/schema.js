@@ -970,8 +970,15 @@ export const pointsHistory = pgTable("points_history", {
   description: text("description"),
   // Set for points earned/reversed by an order, so each order credits once.
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+  // Set for points earned by reviewing a product (type "review"): once per
+  // customer per product, even if the review is deleted and written again.
+  productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  reviewRewardOnce: uniqueIndex("points_history_review_once")
+    .on(table.userId, table.productId)
+    .where(sql`${table.type} = 'review'`),
+}));
 
 export const pointsHistoryRelations = relations(pointsHistory, ({ one }) => ({
   user: one(users, {

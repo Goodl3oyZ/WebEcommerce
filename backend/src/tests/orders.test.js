@@ -6,6 +6,7 @@ import {
   checkoutSetup,
   createAddress,
   createCoupon,
+  createOrder,
   createProduct,
   getVariantStock,
 } from "./helpers/fixtures.js";
@@ -13,7 +14,7 @@ import {
 const { omiseService } = await import("../services/omiseService.js");
 const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
-const { eq } = await import("drizzle-orm");
+const { eq, sql } = await import("drizzle-orm");
 
 const { settingsService } = await import("../services/settingsService.js");
 
@@ -386,5 +387,53 @@ describe("admin order management", () => {
     const shipment = await db.query.shipments.findFirst({ where: eq(schema.shipments.orderId, order.id) });
     expect(shipment).toMatchObject({ trackingNumber: "KERRY-1", status: "shipped" });
     expect((await admin.put(`/api/orders/admin/${randomUUID()}/shipping`).send({ trackingNumber: "X" })).status).toBe(404);
+  });
+});
+
+describe("delivery confirmation", () => {
+  test("shipped orders close automatically after AUTO_DELIVER_DAYS; recent ones stay open", async () => {
+    const { runPaymentMaintenance: run } = await import("../workers/paymentWorker.js");
+    const { user } = await loginAs("user");
+    const shippedOn = async (daysAgo) => {
+      const order = await createOrder(user.id, { status: "shipped", paymentStatus: "completed" });
+      await db.insert(schema.orderStatusHistory).values({
+        orderId: order.id,
+        status: "shipped",
+        comment: "Shipped",
+        createdAt: new Date(Date.now() - daysAgo * 86_400_000),
+      });
+      return order;
+    };
+    const old = await shippedOn(8);
+    const recent = await shippedOn(2);
+
+    await run();
+    const fresh = async (o) => db.query.orders.findFirst({ where: eq(schema.orders.id, o.id) });
+    expect(await fresh(old)).toMatchObject({ status: "delivered", shippingStatus: "delivered" });
+    expect((await fresh(recent)).status).toBe("shipped");
+    const note = await db.query.notifications.findFirst({
+      where: sql`${schema.notifications.metadata}->>'orderId' = ${old.id}`,
+    });
+    expect(note.message).toContain("แต้ม");
+  });
+
+  test("admin 'to_ship' filter lists paid, confirmed and processing orders", async () => {
+    const { agent: admin } = await loginAs("admin");
+    const { user } = await loginAs("user");
+    const make = (status) => createOrder(user.id, { status, paymentStatus: status === "pending" ? "pending" : "completed" });
+    const [paid, processing, shipped, pending] = await Promise.all([make("paid"), make("processing"), make("shipped"), make("pending")]);
+    const res = await admin.get("/api/orders/admin/all").query({ status: "to_ship", limit: 100 });
+    const ids = res.body.orders.map((o) => o.id);
+    expect(ids).toEqual(expect.arrayContaining([paid.id, processing.id]));
+    expect(ids).not.toContain(shipped.id);
+    expect(ids).not.toContain(pending.id);
+  });
+
+  test("customers confirm receipt of their shipped order", async () => {
+    const { agent, user } = await loginAs("user");
+    const order = await createOrder(user.id, { status: "shipped", paymentStatus: "completed" });
+    const res = await agent.patch(`/api/orders/${order.id}/status`).send({ status: "delivered" });
+    expect(res.status).toBe(200);
+    expect(res.body.data?.status ?? res.body.status).toBe("delivered");
   });
 });

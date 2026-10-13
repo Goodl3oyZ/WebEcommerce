@@ -8,6 +8,8 @@
  *    find the charge by its orderId metadata and apply the real result.
  * 3. Successful charges that could not be applied (order already cancelled,
  *    or paid twice): refund them.
+ * 4. Orders shipped AUTO_DELIVER_DAYS ago (default 7) that the customer never
+ *    confirmed: mark them delivered, so they can be reviewed and are closed.
  *
  * Every step is idempotent and claims its work with compare-and-set updates,
  * so a crash mid-run or two API instances running it at once is safe: the
@@ -15,14 +17,15 @@
  */
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "../config/db.js";
-import { orders, orderStatusHistory, paymentTransactions } from "../models/schema.js";
+import { orders, orderStatusHistory, paymentTransactions, shipments } from "../models/schema.js";
 import { omiseService } from "../services/omiseService.js";
 import { paymentService } from "../services/paymentService.js";
-import { cancelOrder } from "../services/orderLifecycle.js";
+import { cancelOrder, setOrderStatus } from "../services/orderLifecycle.js";
 import { PAYMENT_DEADLINE_MINUTES } from "../services/orderService.js";
 import { toSatang } from "../utils/money.js";
 
 const BATCH = 50;
+export const AUTO_DELIVER_DAYS = Number(process.env.AUTO_DELIVER_DAYS) || 7;
 const MAX_REFUND_ATTEMPTS = 5;
 // Unknown outcomes are not expired while Omise cannot be reached, unless
 // they are this far past the deadline (then the refund path covers it).
@@ -186,13 +189,54 @@ async function refundUnapplied(stats) {
   }
 }
 
+/** Close shipped orders nobody confirmed after AUTO_DELIVER_DAYS (database clock). */
+async function autoCompleteDeliveries(stats) {
+  const due = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.status, "shipped"),
+        sql`coalesce(
+          (select max(h.created_at) from order_status_history h where h.order_id = ${orders.id} and h.status = 'shipped'),
+          ${orders.updatedAt}
+        ) <= now() - make_interval(days => ${AUTO_DELIVER_DAYS})`
+      )
+    )
+    .orderBy(asc(orders.updatedAt))
+    .limit(BATCH);
+
+  for (const { id } of due) {
+    try {
+      await db.transaction(async (tx) => {
+        const order = await tx.query.orders.findFirst({ where: eq(orders.id, id) });
+        if (order?.status !== "shipped") return;
+        await setOrderStatus(tx, order, "delivered", {
+          comment: `Delivered automatically ${AUTO_DELIVER_DAYS} days after shipping`,
+          extra: { shippingStatus: "delivered" },
+        });
+        await tx
+          .update(shipments)
+          .set({ status: "delivered", actualDelivery: new Date(), updatedAt: new Date() })
+          .where(eq(shipments.orderId, id));
+      });
+      stats.delivered += 1;
+    } catch (error) {
+      if (error.code === "ORDER_STATE_CHANGED") continue; // the customer confirmed meanwhile
+      stats.errors += 1;
+      log(`auto-delivery of ${id} failed`, error.message);
+    }
+  }
+}
+
 /** One maintenance pass. Safe to call concurrently and repeatedly. */
 export async function runPaymentMaintenance() {
-  const stats = { expired: 0, reconciled: 0, refunded: 0, errors: 0 };
+  const stats = { expired: 0, reconciled: 0, refunded: 0, delivered: 0, errors: 0 };
   await reconcileUnknown(stats);
   await expireOverdue(stats);
   await refundUnapplied(stats);
-  if (stats.expired || stats.reconciled || stats.refunded || stats.errors) log("pass", stats);
+  await autoCompleteDeliveries(stats);
+  if (stats.expired || stats.reconciled || stats.refunded || stats.delivered || stats.errors) log("pass", stats);
   return stats;
 }
 

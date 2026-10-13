@@ -77,6 +77,10 @@ export const productController = {
     res.status(204).send();
   },
 
+  async reviewEligibility(req, res) {
+    res.json(await productService.reviewEligibility(req.params.id, req.user.id));
+  },
+
   async createReview(req, res) {
     res.status(201).json(await productService.createReview(req.params.id, req.user.id, req.body));
   },

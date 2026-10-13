@@ -154,6 +154,12 @@ const productsAPI = {
     }
   },
   // User routes (requires auth)
+  /** { canReview, reason, review, reward: { points, minLength } } */
+  getReviewEligibility: async (productId) => {
+    const response = await axiosInstance.get(`/products/${productId}/review/eligibility`);
+    return response.data;
+  },
+
   createReview: async (productId, reviewData) => {
     try {
       // The API only accepts these fields (the author is the logged-in user).

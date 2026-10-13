@@ -525,7 +525,8 @@ export const orderService = {
 
   async getAllOrders({ status, search }, pagination, txOrDb = db) {
     const conditions = [];
-    if (status) conditions.push(eq(orders.status, status));
+    if (status === "to_ship") conditions.push(inArray(orders.status, ["paid", "confirmed", "processing"]));
+    else if (status) conditions.push(eq(orders.status, status));
     if (search) {
       conditions.push(
         or(ilike(orders.orderNumber, `%${search}%`), sql`${orders.id}::text ILIKE ${`%${search}%`}`)

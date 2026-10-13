@@ -56,7 +56,36 @@ async function adjustBalance(tx, userId, delta) {
   return user.points;
 }
 
+/** Points for a review with a written comment, once per customer per product. */
+export const REVIEW_REWARD_POINTS = 20;
+export const REVIEW_REWARD_MIN_LENGTH = 10;
+export const reviewEarnsPoints = (comment) => (comment ?? "").trim().length >= REVIEW_REWARD_MIN_LENGTH;
+
 export const loyaltyService = {
+  /**
+   * Credit the review reward if the comment qualifies and this customer was
+   * never rewarded for this product. Returns the points added (0 otherwise).
+   */
+  async rewardReview(tx, userId, productId, comment) {
+    if (!reviewEarnsPoints(comment)) return 0;
+    const already = await tx.query.pointsHistory.findFirst({
+      where: and(eq(pointsHistory.userId, userId), eq(pointsHistory.productId, productId), eq(pointsHistory.type, "review")),
+      columns: { id: true },
+    });
+    if (already) return 0;
+    const balance = await adjustBalance(tx, userId, REVIEW_REWARD_POINTS);
+    const programId = await syncTier(tx, userId, balance);
+    await tx.insert(pointsHistory).values({
+      userId,
+      loyaltyProgramId: programId,
+      productId,
+      points: REVIEW_REWARD_POINTS,
+      type: "review",
+      description: "Earned for a product review",
+    });
+    return REVIEW_REWARD_POINTS;
+  },
+
   async getLoyaltyPoints(userId) {
     const user = await db.query.users.findFirst({ where: eq(users.id, userId), columns: { points: true } });
     if (!user) throw ApiError.notFound("User not found");

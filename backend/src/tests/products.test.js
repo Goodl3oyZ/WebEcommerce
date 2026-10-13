@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { newAgent } from "./helpers/app.js";
 import { loginAs } from "./helpers/factories.js";
-import { createBrand, createCategory, createOrder, createProduct } from "./helpers/fixtures.js";
+import { createBrand, createCategory, createOrder, createProduct, orderWithProduct } from "./helpers/fixtures.js";
 
 const { db } = await import("../config/db.js");
 const schema = await import("../models/schema.js");
@@ -130,24 +130,68 @@ describe("public catalogue", () => {
 });
 
 describe("reviews", () => {
-  test("one review per customer, shown with the reviewer's name", async () => {
-    const { product } = await createProduct();
+  const points = async (userId) => (await db.query.users.findFirst({ where: eq(schema.users.id, userId) })).points ?? 0;
+
+  test("only after receiving the product; one review per customer, shown with the reviewer's name", async () => {
+    const item = await createProduct();
+    const { product } = item;
     const { agent, user } = await loginAs("user");
 
+    // Not bought, then bought but still on its way: no review yet.
+    let eligibility = await agent.get(`/api/products/${product.id}/review/eligibility`);
+    expect(eligibility.body).toMatchObject({ canReview: false, reason: "not_received", reward: { points: 20, minLength: 10 } });
+    const early = await agent.post(`/api/products/${product.id}/review`).send({ rating: 5, comment: "Great" });
+    expect(early.status).toBe(403);
+    expect(early.body.code).toBe("REVIEW_NOT_ALLOWED");
+    await orderWithProduct(user.id, item, "shipped");
+    expect((await agent.post(`/api/products/${product.id}/review`).send({ rating: 5 })).status).toBe(403);
+
+    await orderWithProduct(user.id, item, "delivered");
+    expect((await agent.get(`/api/products/${product.id}/review/eligibility`)).body.canReview).toBe(true);
     const created = await agent.post(`/api/products/${product.id}/review`).send({ rating: 5, comment: "Great" });
     expect(created.status).toBe(201);
     const again = await agent.post(`/api/products/${product.id}/review`).send({ rating: 1 });
     expect(again.status).toBe(409);
+    eligibility = await agent.get(`/api/products/${product.id}/review/eligibility`);
+    expect(eligibility.body).toMatchObject({ canReview: false, reason: "already_reviewed", review: { id: created.body.id } });
 
     const list = await (await newAgent()).get(`/api/products/${product.id}/reviews`);
     expect(list.body.averageRating).toBe(5);
     expect(list.body.reviews[0].user).toMatchObject({ id: user.id, name: user.name });
     expect(list.body.reviews[0].user.email).toBeUndefined();
+    expect((await (await newAgent()).get(`/api/products/${product.id}/review/eligibility`)).status).toBe(401);
+  });
+
+  test("a written review earns 20 points once per product, even if deleted and written again", async () => {
+    const item = await createProduct();
+    const { product } = item;
+    const { agent, user } = await loginAs("user");
+    await orderWithProduct(user.id, item, "delivered");
+    const before = await points(user.id);
+
+    // Stars only: no points; adding a comment later earns them.
+    const short = await agent.post(`/api/products/${product.id}/review`).send({ rating: 4, comment: "ok" });
+    expect(short.body.pointsAwarded).toBe(0);
+    const edited = await agent.put(`/api/products/${product.id}/review/${short.body.id}`).send({ comment: "Battery lasts a full week of runs" });
+    expect(edited.body.pointsAwarded).toBe(20);
+    expect(await points(user.id)).toBe(before + 20);
+    const again = await agent.put(`/api/products/${product.id}/review/${short.body.id}`).send({ comment: "Still great after a month" });
+    expect(again.body.pointsAwarded).toBe(0);
+
+    expect((await agent.delete(`/api/products/${product.id}/review/${short.body.id}`)).status).toBe(204);
+    const rewritten = await agent.post(`/api/products/${product.id}/review`).send({ rating: 5, comment: "Writing it again for points" });
+    expect(rewritten.body.pointsAwarded).toBe(0);
+    expect(await points(user.id)).toBe(before + 20);
+
+    const history = await agent.get("/api/users/points/history");
+    expect(history.body.history.filter((h) => h.type === "review")).toHaveLength(1);
   });
 
   test("validation and authentication", async () => {
-    const { product } = await createProduct();
-    const { agent } = await loginAs("user");
+    const item = await createProduct();
+    const { product } = item;
+    const { agent, user } = await loginAs("user");
+    await orderWithProduct(user.id, item, "delivered");
     expect((await agent.post(`/api/products/${product.id}/review`).send({ rating: 6 })).status).toBe(400);
     expect((await agent.post(`/api/products/${product.id}/review`).send({ rating: 3, userId: randomUUID() })).status).toBe(400);
     expect((await (await newAgent()).post(`/api/products/${product.id}/review`).send({ rating: 3 })).status).toBe(401);
@@ -156,10 +200,12 @@ describe("reviews", () => {
   });
 
   test("authors edit their own reviews; moderators may delete any", async () => {
-    const { product } = await createProduct();
-    const { agent: author } = await loginAs("user");
+    const item = await createProduct();
+    const { product } = item;
+    const { agent: author, user } = await loginAs("user");
     const { agent: other } = await loginAs("user");
     const { agent: moderator } = await loginAs("moderator");
+    await orderWithProduct(user.id, item, "delivered");
     const review = (await author.post(`/api/products/${product.id}/review`).send({ rating: 2 })).body;
 
     expect((await other.put(`/api/products/${product.id}/review/${review.id}`).send({ rating: 5 })).status).toBe(403);

@@ -4,9 +4,11 @@ import { adminAPI } from "@/lib/api";
 import { ResponsiveTable } from "@/components/admin/ui/ResponsiveTable";
 import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
 import ErrorState from "@/components/ErrorState";
+import { CARRIERS, ORDER_STATUS_TH, carrierName, trackingUrl } from "@/lib/shipping";
 
 const STATUS_OPTIONS = [
   "all",
+  "to_ship",
   "pending",
   "paid",
   "confirmed",
@@ -24,7 +26,7 @@ const NEXT_STATUS = {
   pending: ["processing", "cancelled"],
   paid: ["processing"],
   confirmed: ["processing", "cancelled"],
-  processing: ["shipped", "cancelled"],
+  processing: ["cancelled"],
   shipped: ["delivered"],
   delivered: [],
   refund_requested: ["delivered"],
@@ -33,6 +35,52 @@ const NEXT_STATUS = {
 };
 
 const REFUNDABLE_ORDER = ["paid", "confirmed", "processing", "delivered", "refund_requested"];
+const CAN_PREPARE = ["paid", "confirmed"];
+const CAN_SHIP = ["paid", "confirmed", "processing"];
+const statusLabel = (s) => (s === "all" ? "ทุกสถานะ" : s === "to_ship" ? "รอจัดส่ง" : ORDER_STATUS_TH[s] ?? s);
+
+/** Carrier + tracking number; shipping moves the order to "shipped" and tells the customer. */
+function ShipDialog({ order, onClose, onShipped }) {
+  const [carrier, setCarrier] = useState(order.carrier && CARRIERS.some((c) => c.id === order.carrier) ? order.carrier : "thailandpost");
+  const [tracking, setTracking] = useState(order.trackingNumber ?? "");
+  const [saving, setSaving] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!tracking.trim()) return toast.error("กรอกเลขพัสดุ");
+    setSaving(true);
+    try {
+      await adminAPI.updateShippingInfo(order.id, { carrier, trackingNumber: tracking.trim(), status: "shipped" });
+      toast.success(`จัดส่งออเดอร์ ${order.orderNumber} แล้ว ลูกค้าได้รับแจ้งเตือน`);
+      onShipped();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err.message || "บันทึกไม่สำเร็จ");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="ship-title" className="w-full max-w-md rounded-2xl bg-surface p-6">
+        <h3 id="ship-title" className="text-lg font-bold">จัดส่งออเดอร์ {order.orderNumber}</h3>
+        <p className="mt-1 text-sm text-fg-muted">ลูกค้าจะได้รับแจ้งเตือนพร้อมลิงก์ติดตามพัสดุ</p>
+        <label htmlFor="ship-carrier" className="mt-5 block text-sm font-medium">ขนส่ง</label>
+        <select id="ship-carrier" value={carrier} onChange={(e) => setCarrier(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
+          {CARRIERS.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <label htmlFor="ship-tracking" className="mt-4 block text-sm font-medium">เลขพัสดุ</label>
+        <input id="ship-tracking" value={tracking} onChange={(e) => setTracking(e.target.value)} maxLength={100} autoFocus className="mt-1.5 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm uppercase tracking-wide" />
+        <div className="mt-6 flex gap-2">
+          <button type="button" className="flex-1 rounded-xl border border-border py-2.5" onClick={onClose}>ยกเลิก</button>
+          <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-fg py-2.5 font-semibold text-canvas disabled:opacity-60">
+            {saving ? "กำลังบันทึก..." : "ยืนยันจัดส่ง"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 export function OrdersPanel() {
   const [orders, setOrders] = useState([]);
@@ -45,6 +93,7 @@ export function OrdersPanel() {
   const [selected, setSelected] = useState(null);
   const [nextStatus, setNextStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [shipping, setShipping] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -73,7 +122,7 @@ export function OrdersPanel() {
 
   const changeStatus = async (order, newStatus) => {
     if (!newStatus) return;
-    if (!confirm(`เปลี่ยนสถานะออเดอร์ ${order.orderNumber} เป็น ${newStatus}?`)) {
+    if (!confirm(`เปลี่ยนสถานะออเดอร์ ${order.orderNumber} เป็น "${statusLabel(newStatus)}"?`)) {
       return;
     }
     setSubmitting(true);
@@ -119,7 +168,21 @@ export function OrdersPanel() {
       render: (o) => o.user?.name || o.userId,
       searchValue: (o) => o.user?.name || o.userId,
     },
-    { key: "status", header: "สถานะ" },
+    {
+      key: "status",
+      header: "สถานะ",
+      render: (o) => (
+        <span>
+          {statusLabel(o.status)}
+          {o.trackingNumber && (
+            <a href={trackingUrl(o.carrier, o.trackingNumber)} target="_blank" rel="noreferrer" className="block text-xs text-fg-subtle underline underline-offset-2">
+              {carrierName(o.carrier)} {o.trackingNumber}
+            </a>
+          )}
+        </span>
+      ),
+      searchValue: (o) => `${statusLabel(o.status)} ${o.trackingNumber ?? ""}`,
+    },
     {
       key: "total",
       header: "ยอดรวม",
@@ -138,6 +201,16 @@ export function OrdersPanel() {
         const options = NEXT_STATUS[order.status] || [];
         return (
           <div className="flex flex-wrap justify-end gap-2 md:justify-start">
+            {CAN_PREPARE.includes(order.status) && (
+              <button type="button" className="font-semibold text-fg hover:underline" disabled={submitting} onClick={() => changeStatus(order, "processing")}>
+                เริ่มเตรียมสินค้า
+              </button>
+            )}
+            {CAN_SHIP.includes(order.status) && (
+              <button type="button" className="font-semibold text-fg hover:underline" onClick={() => setShipping(order)}>
+                จัดส่ง
+              </button>
+            )}
             <button
               type="button"
               className="text-info hover:underline"
@@ -179,7 +252,7 @@ export function OrdersPanel() {
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+              {statusLabel(s)}
             </option>
           ))}
         </select>
@@ -219,12 +292,23 @@ export function OrdersPanel() {
         </button>
       </div>
 
+      {shipping && (
+        <ShipDialog
+          order={shipping}
+          onClose={() => setShipping(null)}
+          onShipped={() => {
+            setShipping(null);
+            load();
+          }}
+        />
+      )}
+
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-surface p-6">
             <h3 className="mb-2 text-lg font-bold">ออเดอร์ {selected.orderNumber}</h3>
             <p className="mb-4 text-sm text-fg-muted">
-              สถานะปัจจุบัน: {selected.status}
+              สถานะปัจจุบัน: {statusLabel(selected.status)}
             </p>
             {(NEXT_STATUS[selected.status] || []).length === 0 ? (
               <p className="text-sm text-fg-muted">ไม่สามารถเปลี่ยนสถานะต่อได้</p>
@@ -236,7 +320,7 @@ export function OrdersPanel() {
               >
                 {(NEXT_STATUS[selected.status] || []).map((s) => (
                   <option key={s} value={s}>
-                    {s}
+                    {statusLabel(s)}
                   </option>
                 ))}
               </select>

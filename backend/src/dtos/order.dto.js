@@ -43,7 +43,10 @@ export const orderDto = {
   }),
 
   adminListQuery: z.object({
-    status: z.enum(ORDER_STATUSES).optional(),
+    status: z
+      .enum([...ORDER_STATUSES, "to_ship"])
+      .optional()
+      .describe('"to_ship" = paid, confirmed or processing (waiting to be shipped)'),
     search: z.string().optional().describe("Order number or id"),
     page: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),

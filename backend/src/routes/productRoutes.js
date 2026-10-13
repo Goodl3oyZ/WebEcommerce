@@ -41,6 +41,7 @@ router.get("/:id", optionalAuth, productController.getProductById);
 router.use(authMiddleware);
 
 // Reviews (customers)
+router.get("/:id/review/eligibility", productController.reviewEligibility);
 router.post("/:id/review", validationMiddleware(productDto.createReview), productController.createReview);
 router.put(
   "/:id/review/:reviewId",

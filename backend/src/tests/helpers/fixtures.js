@@ -25,6 +25,21 @@ export async function createOrder(userId, overrides = {}) {
   return order;
 }
 
+/** An order by `userId` containing `product` (one unit), in `status`. */
+export async function orderWithProduct(userId, { product, variant }, status = "delivered") {
+  const { db, schema } = await load();
+  const order = await createOrder(userId, { status, paymentStatus: "completed", total: product.price ?? "100.00" });
+  await db.insert(schema.orderItems).values({
+    orderId: order.id,
+    productId: product.id,
+    variantId: variant?.id ?? null,
+    quantity: 1,
+    price: "100.00",
+    subtotal: "100.00",
+  });
+  return order;
+}
+
 /** A product with one variant. */
 export async function createProduct({ price = "100.00", stock = 10, isActive = true, ...extra } = {}) {
   const { db, schema } = await load();

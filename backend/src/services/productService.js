@@ -5,11 +5,33 @@ import {
   productAttributes,
   productReviews,
   inventoryMovements,
+  orders,
+  orderItems,
 } from "../models/schema.js";
 import { eq, ilike, and, or, desc, asc, sql, gte, lte, inArray, exists } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
 import { getFileUrl, toStoredKey, BUCKETS } from "../config/minio.js";
 import { paginationMeta } from "../utils/pagination.js";
+import {
+  loyaltyService,
+  REVIEW_REWARD_POINTS,
+  REVIEW_REWARD_MIN_LENGTH,
+  reviewEarnsPoints,
+} from "./loyaltyService.js";
+
+// Orders whose goods reached the customer: only these can be reviewed.
+const RECEIVED = ["delivered", "refund_requested", "refunded"];
+
+/** Did this customer receive this product in some order? */
+async function hasReceived(userId, productId) {
+  const [row] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .where(and(eq(orders.userId, userId), eq(orderItems.productId, productId), inArray(orders.status, RECEIVED)))
+    .limit(1);
+  return Boolean(row);
+}
 
 const reviewer = { columns: { id: true, name: true, avatar: true } };
 
@@ -347,7 +369,28 @@ export const productService = {
     };
   },
 
-  /** One review per customer per product. */
+  /**
+   * Can this customer review the product? Only after receiving it in an
+   * order, once per product. Also returns their review and the reward rule.
+   */
+  async reviewEligibility(productId, userId) {
+    await getVisibleProduct(productId);
+    const [review, received] = await Promise.all([
+      db.query.productReviews.findFirst({
+        where: and(eq(productReviews.productId, productId), eq(productReviews.userId, userId)),
+      }),
+      hasReceived(userId, productId),
+    ]);
+    const reason = review ? "already_reviewed" : received ? null : "not_received";
+    return {
+      canReview: !reason,
+      reason,
+      review: review ?? null,
+      reward: { points: REVIEW_REWARD_POINTS, minLength: REVIEW_REWARD_MIN_LENGTH },
+    };
+  },
+
+  /** One review per customer per product, after receiving it; a written review earns points once. */
   async createReview(productId, userId, { rating, comment }) {
     await getVisibleProduct(productId);
     const existing = await db.query.productReviews.findFirst({
@@ -356,11 +399,22 @@ export const productService = {
     if (existing) {
       throw new ApiError("You have already reviewed this product. Edit your review instead.", 409, null, "REVIEW_EXISTS");
     }
-    const [review] = await db
-      .insert(productReviews)
-      .values({ productId, userId, rating, comment: comment?.trim() || null })
-      .returning();
-    return review;
+    if (!(await hasReceived(userId, productId))) {
+      throw new ApiError(
+        "You can review a product after you have received it.",
+        403,
+        null,
+        "REVIEW_NOT_ALLOWED"
+      );
+    }
+    return db.transaction(async (tx) => {
+      const [review] = await tx
+        .insert(productReviews)
+        .values({ productId, userId, rating, comment: comment?.trim() || null })
+        .returning();
+      const pointsAwarded = await loyaltyService.rewardReview(tx, userId, productId, review.comment);
+      return { ...review, pointsAwarded };
+    });
   },
 
   async updateReview(productId, reviewId, userId, updates) {
@@ -373,12 +427,18 @@ export const productService = {
     const changes = {};
     if (updates.rating !== undefined) changes.rating = updates.rating;
     if (updates.comment !== undefined) changes.comment = updates.comment?.trim() || null;
-    const [updated] = await db
-      .update(productReviews)
-      .set(changes)
-      .where(eq(productReviews.id, reviewId))
-      .returning();
-    return updated;
+    return db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(productReviews)
+        .set(changes)
+        .where(eq(productReviews.id, reviewId))
+        .returning();
+      // Adding a comment later still earns the reward (once).
+      const pointsAwarded = reviewEarnsPoints(updated.comment)
+        ? await loyaltyService.rewardReview(tx, userId, productId, updated.comment)
+        : 0;
+      return { ...updated, pointsAwarded };
+    });
   },
 
   /** Authors delete their own review; moderators and admins can remove any. */

@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, Expand, Loader2, ShieldCheck, ShoppingBag, S
 import { productsAPI } from "@/lib/api/products";
 import useCartStore from "@/store/cartStore";
 import ProductImage from "@/components/ui/ProductImage";
+import ReviewComposer from "@/components/shop/ReviewComposer";
 import Dialog from "@/components/ui/Dialog";
 import ProductCard, { ProductGrid } from "@/components/ProductCard";
 import Pagination from "@/components/Pagination";
@@ -226,6 +227,16 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (id) load();
   }, [id, load]);
+
+  // After a review is saved: refresh reviews without the page skeleton.
+  const refreshReviews = useCallback(async () => {
+    try {
+      const data = await productsAPI.getProductById(id);
+      if (data) setProduct(data);
+    } catch {
+      /* keep what is shown */
+    }
+  }, [id]);
 
   const variants = useMemo(() => product?.variants ?? [], [product]);
   const { groups, picked, setPicked, selected, available, missing } = useVariantPicker(variants);
@@ -542,6 +553,7 @@ export default function ProductDetailPage() {
             ) : (
               <p className="mt-3 text-sm text-fg-muted">ยังไม่มีรีวิวสำหรับสินค้านี้</p>
             )}
+            <ReviewComposer productId={product.id} onSaved={refreshReviews} />
           </div>
           {reviews.length > 0 && (
             <div>

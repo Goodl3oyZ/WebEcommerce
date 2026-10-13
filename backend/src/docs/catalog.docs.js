@@ -31,10 +31,20 @@ documentRoutes("Products", [
   { method: "get", path: "/api/products/:id/variants", summary: "A product's variants", description: hiddenNote, auth: "public", responses: { 200: "Variants", 404: "Product not found" } },
   { method: "get", path: "/api/products/:id/reviews", summary: "A product's reviews and average rating", auth: "public", query: productDto.pageQuery, responses: { 200: "Reviews and pagination", 404: "Product not found" } },
   {
+    method: "get",
+    path: "/api/products/:id/review/eligibility",
+    summary: "Can I review this product?",
+    description:
+      "Reviews open once the customer has received the product (order delivered). Returns `canReview`, `reason` (not_received | already_reviewed), the customer's own `review`, and `reward` ({ points, minLength }: a comment of minLength+ characters earns points once per product).",
+    auth: "user",
+    responses: { 200: "Eligibility", 404: "Product not found" },
+  },
+  {
     method: "post",
     path: "/api/products/:id/review",
     summary: "Review a product",
-    description: "One review per customer per product.",
+    description:
+      "Only after receiving it (403 REVIEW_NOT_ALLOWED before). One review per customer per product. A comment of 10+ characters earns 20 points once per product; the response includes `pointsAwarded`.",
     auth: "user",
     body: productDto.createReview,
     responses: { 201: "Review", 404: "Product not found", 409: "Already reviewed" },

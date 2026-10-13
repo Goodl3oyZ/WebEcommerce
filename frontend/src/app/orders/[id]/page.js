@@ -21,6 +21,8 @@ import { paymentsAPI } from "@/lib/api/payment";
 import useCartStore from "@/store/cartStore";
 import Image from "next/image";
 import ProductImage from "@/components/ui/ProductImage";
+import ShipmentProgress, { ReviewItemLink } from "@/components/shop/ShipmentProgress";
+import { carrierName, trackingUrl } from "@/lib/shipping";
 
 const ORDER_STATUS = {
   PENDING: "รอการชำระเงิน",
@@ -139,7 +141,7 @@ function OrderStatusBadge({ status, tracking }) {
   );
 }
 
-function OrderItem({ item }) {
+function OrderItem({ item, canReview }) {
   return (
     <div className="flex items-center gap-4 py-4 border-b last:border-b-0">
       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
@@ -154,6 +156,7 @@ function OrderItem({ item }) {
         <div className="text-sm text-fg">
           จำนวน: <span className="font-semibold">{item.quantity}</span>
         </div>
+        {canReview && <ReviewItemLink productId={item.productId ?? item.product?.id} />}
       </div>
       <div className="text-right min-w-[80px]">
         <div className="text-fg font-bold text-base">
@@ -217,7 +220,16 @@ function ShippingInfo({ order, tracking }) {
       <div className="text-sm text-fg">
         เบอร์โทร: {order.shippingAddress?.phoneNumber || "-"}
       </div>
-      {tracking && (
+      {order.trackingNumber && (
+        <div className="text-sm text-fg">
+          เลขพัสดุ:{" "}
+          <a href={trackingUrl(order.carrier, order.trackingNumber)} target="_blank" rel="noreferrer" className="font-mono underline underline-offset-2">
+            {order.trackingNumber}
+          </a>{" "}
+          ({carrierName(order.carrier) || "ขนส่ง"})
+        </div>
+      )}
+      {tracking && !order.trackingNumber && tracking.trackingNumber && (
         <>
           <div className="text-sm text-fg">
             เลขพัสดุ: {tracking.trackingNumber}
@@ -437,12 +449,13 @@ export default function OrderDetailsPage() {
 
   const loadOrderDetails = useCallback(async () => {
     try {
+      // Tracking is optional: there is no shipment before the order ships.
       const [orderResponse, trackingResponse] = await Promise.all([
         orderAPI.getOrder(id),
-        orderAPI.getOrderTracking(id),
+        orderAPI.getOrderTracking(id).catch(() => null),
       ]);
       setOrder(orderResponse.data);
-      setTracking(trackingResponse.data);
+      setTracking(trackingResponse?.data ?? null);
     } catch (error) {
       toast.error("ไม่สามารถโหลดข้อมูลคำสั่งซื้อได้");
     } finally {
@@ -606,6 +619,7 @@ export default function OrderDetailsPage() {
           )}
         </div>
       </div>
+      <ShipmentProgress order={order} onChanged={loadOrderDetails} />
       {/* Pay again / order again */}
       {order.status === "pending" && order.paymentStatus === "processing" && (
         <div className="rounded-xl border border-info/30 bg-info-soft p-4 text-sm text-info" role="status">
@@ -654,7 +668,7 @@ export default function OrderDetailsPage() {
           <Package className="w-5 h-5 text-fg-muted" /> สินค้าในคำสั่งซื้อ
         </div>
         {order.items.map((item) => (
-          <OrderItem key={item.id} item={item} />
+          <OrderItem key={item.id} item={item} canReview={["delivered", "refund_requested"].includes(order.status)} />
         ))}
         {/* Order Summary under items */}
         <OrderSummary order={order} />

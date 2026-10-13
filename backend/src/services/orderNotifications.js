@@ -8,6 +8,7 @@
  */
 import { sql } from "drizzle-orm";
 import { notifications } from "../models/schema.js";
+import { REVIEW_REWARD_POINTS } from "./loyaltyService.js";
 
 export const NOTIFICATION_CHANNEL = "app_notifications";
 
@@ -25,7 +26,11 @@ const MESSAGES = {
   paid: { type: "payment", email: true, title: "ชำระเงินสำเร็จ", text: (n) => `เราได้รับชำระเงินสำหรับคำสั่งซื้อ #${n} แล้ว กำลังเตรียมสินค้าให้คุณ` },
   confirmed: { type: "order", title: "ยืนยันคำสั่งซื้อแล้ว", text: (n) => `คำสั่งซื้อ #${n} ได้รับการยืนยันแล้ว` },
   shipped: { type: "shipping", email: true, title: "จัดส่งสินค้าแล้ว", text: (n) => `คำสั่งซื้อ #${n} ออกจากคลังแล้ว ดูเลขพัสดุได้ในหน้าคำสั่งซื้อ` },
-  delivered: { type: "shipping", title: "จัดส่งสำเร็จ", text: (n) => `คำสั่งซื้อ #${n} จัดส่งถึงปลายทางแล้ว` },
+  delivered: {
+    type: "shipping",
+    title: "จัดส่งสำเร็จ",
+    text: (n) => `คำสั่งซื้อ #${n} จัดส่งถึงปลายทางแล้ว รีวิวสินค้าในหน้าคำสั่งซื้อ รับ ${REVIEW_REWARD_POINTS} แต้มต่อชิ้น`,
+  },
   cancelled: {
     type: "order",
     email: true,
