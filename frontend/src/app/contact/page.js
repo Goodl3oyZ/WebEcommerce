@@ -1,61 +1,71 @@
+import Link from "next/link";
+import { Mail, MessageCircle, Package, HelpCircle } from "lucide-react";
+import Container from "@/components/shop/Container";
+import OpenChatButton from "@/components/content/OpenChatButton";
+import { CONTACT_EMAIL } from "@/components/legal/LegalPage";
+
+export const metadata = {
+  title: "ติดต่อเรา",
+  description: "แชทกับทีมงาน ติดตามคำสั่งซื้อ และช่องทางติดต่อร้าน",
+};
+
+const card = "flex flex-col rounded-2xl border border-border bg-surface p-6";
+
 export default function ContactPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Contact Us</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Get in Touch</h2>
-          <p className="text-fg-muted mb-4">
-            Have questions or need assistance? We&apos;re here to help!
-          </p>
-          <div className="space-y-3">
-            <div>
-              <strong>Email:</strong> support@challenge.com
+    <Container className="py-12 sm:py-16">
+      <div className="mx-auto max-w-4xl">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">ติดต่อเรา</h1>
+        <p className="mt-3 max-w-2xl text-fg-muted">
+          ทางที่เร็วที่สุดคือแชทกับทีมงาน ถ้าเป็นเรื่องคำสั่งซื้อ แจ้งเลขคำสั่งซื้อมาด้วยจะช่วยให้ตอบได้ไวขึ้น
+        </p>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          <section className={`${card} sm:col-span-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6`}>
+            <div className="flex gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand/20" aria-hidden>
+                <MessageCircle className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="font-semibold text-fg">แชทกับทีมงาน</h2>
+                <p className="mt-1 text-sm text-fg-muted">
+                  เปิดได้ทุกหน้าจากปุ่ม &quot;ติดต่อทีมงาน&quot; มุมขวาล่าง ต้องเข้าสู่ระบบก่อน เพื่อให้ทีมงานเห็นคำสั่งซื้อของคุณ
+                </p>
+              </div>
             </div>
-            <div>
-              <strong>Phone:</strong> +1 (555) 123-4567
-            </div>
-            <div>
-              <strong>Address:</strong> 123 Main Street, City, Country
-            </div>
-          </div>
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Send us a Message</h2>
-          <form className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Your name"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input
-                type="email"
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="your@email.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Message</label>
-              <textarea
-                rows="4"
-                className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Your message"
-              ></textarea>
-            </div>
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Send Message
-            </button>
-          </form>
+            <OpenChatButton className="mt-4 self-start sm:mt-0 sm:self-center" />
+          </section>
+
+          <section className={card}>
+            <Package className="h-5 w-5 text-fg-muted" aria-hidden />
+            <h2 className="mt-3 font-semibold text-fg">ติดตามคำสั่งซื้อ</h2>
+            <p className="mt-1 flex-1 text-sm text-fg-muted">ดูสถานะ เลขพัสดุ ขอคืนเงิน หรือยกเลิกคำสั่งซื้อที่ยังไม่ชำระได้เอง</p>
+            <Link href="/orders" className="mt-4 text-sm font-semibold text-fg underline underline-offset-4">
+              คำสั่งซื้อของฉัน
+            </Link>
+          </section>
+
+          <section className={card}>
+            <HelpCircle className="h-5 w-5 text-fg-muted" aria-hidden />
+            <h2 className="mt-3 font-semibold text-fg">คำถามที่พบบ่อย</h2>
+            <p className="mt-1 flex-1 text-sm text-fg-muted">การชำระเงิน การจัดส่ง การคืนเงิน และแต้มสะสม</p>
+            <Link href="/faq" className="mt-4 text-sm font-semibold text-fg underline underline-offset-4">
+              ดูคำถามทั้งหมด
+            </Link>
+          </section>
+
+          {CONTACT_EMAIL && (
+            <section className={`${card} sm:col-span-2`}>
+              <Mail className="h-5 w-5 text-fg-muted" aria-hidden />
+              <h2 className="mt-3 font-semibold text-fg">อีเมล</h2>
+              <p className="mt-1 text-sm text-fg-muted">สำหรับเรื่องที่ไม่เร่งด่วน หรือขอลบข้อมูลส่วนบุคคล</p>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="mt-4 text-sm font-semibold text-fg underline underline-offset-4">
+                {CONTACT_EMAIL}
+              </a>
+            </section>
+          )}
         </div>
       </div>
-    </div>
+    </Container>
   );
 }

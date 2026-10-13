@@ -173,6 +173,8 @@ app.use(limiter);
 if (ENV.SERVER.NODE_ENV !== "test") {
   app.use(morgan(isProduction ? "combined" : "dev"));
 }
+// Articles carry editor HTML; everything else keeps the small default limit.
+app.use("/api/content/admin", express.json({ limit: "300kb" }));
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(compression());

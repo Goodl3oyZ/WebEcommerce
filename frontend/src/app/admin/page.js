@@ -17,6 +17,7 @@ import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { SeedDataPanel } from "@/components/admin/SeedDataPanel";
 import { SupportPanel } from "@/components/admin/SupportPanel";
+import { ContentPanel } from "@/components/admin/ContentPanel";
 import { adminAPI } from "@/lib/api/admin";
 import DashboardSummary from "@/components/admin/DashboardSummary";
 import { isAdmin } from "@/lib/auth";
@@ -122,6 +123,9 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="notifications" className="mt-0">
             <NotificationsPanel />
+          </TabsContent>
+          <TabsContent value="content" className="mt-0">
+            <ContentPanel />
           </TabsContent>
           <TabsContent value="reports" className="mt-0">
             <ReportsPanel />

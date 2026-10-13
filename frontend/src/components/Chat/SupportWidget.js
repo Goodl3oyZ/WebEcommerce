@@ -335,6 +335,13 @@ export default function SupportWidget() {
     return () => clearInterval(t);
   }, [user, connected, conv?.id, conv?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Other pages (e.g. /contact) open the chat with: window.dispatchEvent(new Event("support:open"))
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener("support:open", show);
+    return () => window.removeEventListener("support:open", show);
+  }, []);
+
   useEffect(() => {
     if (!open) return undefined;
     setUnread(0);

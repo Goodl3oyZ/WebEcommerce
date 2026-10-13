@@ -73,6 +73,12 @@ export const ADMIN_NAV = [
     keywords: "notifications",
   },
   {
+    value: "content",
+    label: "บทความและหน้าเว็บ",
+    group: "ปฏิบัติการ",
+    keywords: "blog articles content about page cms",
+  },
+  {
     value: "reports",
     label: "รายงาน",
     group: "ระบบ",

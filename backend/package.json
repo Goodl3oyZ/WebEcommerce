@@ -18,6 +18,7 @@
     "seed": "node src/seed/seed.js",
     "seed:address": "node src/seed/seed-address-thai.js",
     "seed:shipping": "node src/seed/seed-shipping-payment.js",
+    "seed:content": "node src/seed/seed-content.js",
     "seed:all": "node src/seed/seed.js && node src/seed/seed-shipping-payment.js && node src/seed/seed-address-thai.js",
     "clearSeed": "node src/seed/clear.js",
     "db:reset": "npm run migrate && npm run clearSeed && npm run seed:all",

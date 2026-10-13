@@ -30,7 +30,6 @@ const columns = [
     links: [
       { href: "/about", label: "เรื่องราวของเรา" },
       { href: "/blog", label: "บทความ" },
-      { href: "/careers", label: "ร่วมงานกับเรา" },
     ],
   },
 ];

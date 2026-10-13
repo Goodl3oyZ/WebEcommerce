@@ -2,6 +2,7 @@ import addressDataRoutes from "./addressDataRoutes.js";
 import addressRoute from "./addressRoutes.js";
 import authRoutes from "./authRoutes.js";
 import oauthRoutes from "./oauthRoutes.js";
+import contentRoutes from "./contentRoutes.js";
 import userRoutes from "./userRoutes.js";
 import productRoutes from "./productRoutes.js";
 import categoryRoutes from "./categoryRoutes.js";
@@ -55,6 +56,7 @@ export const routeModules = [
   ["/api/inventory", inventoryRoutes],
   ["/api/notifications", notificationRoutes],
   ["/api/support", supportRoutes],
+  ["/api/content", contentRoutes],
 ];
 
 // Aliases kept only for backward compatibility; excluded from coverage checks.

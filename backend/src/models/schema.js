@@ -199,6 +199,34 @@ export const seedRecords = pgTable(
   })
 );
 
+// Content written in the admin panel: blog articles ("article") and site
+// pages such as About ("page"). Content is HTML from the editor; it is
+// sanitized when rendered.
+export const posts = pgTable(
+  "posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: varchar("kind", { length: 20 }).notNull().default("article"),
+    slug: varchar("slug", { length: 160 }).notNull().unique(),
+    title: varchar("title", { length: 200 }).notNull(),
+    excerpt: varchar("excerpt", { length: 500 }),
+    content: text("content").notNull().default(""),
+    coverImage: varchar("cover_image", { length: 500 }),
+    status: varchar("status", { length: 20 }).notNull().default("draft"),
+    publishedAt: timestamp("published_at"),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    listIdx: index("posts_kind_status_published_idx").on(table.kind, table.status, table.publishedAt),
+  })
+);
+
+export const postsRelations = relations(posts, ({ one }) => ({
+  author: one(users, { fields: [posts.authorId], references: [users.id] }),
+}));
+
 // Every stock change made by orders (reserve / release), for auditing.
 export const inventoryMovements = pgTable(
   "inventory_movements",
@@ -1667,6 +1695,7 @@ export const allRelations = {
   productDiscounts: productDiscountsRelations,
   categoryDiscounts: categoryDiscountsRelations,
   notifications: notificationsRelations,
+  posts: postsRelations,
   refunds: refundsRelations,
   suppliers: suppliersRelations,
   supplierProducts: supplierProductsRelations,

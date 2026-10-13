@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { CreditCard, Headphones, PackageSearch, Truck } from "lucide-react";
+import { ArrowRight, CreditCard, Headphones, PackageSearch, Truck } from "lucide-react";
 import { Reveal } from "./kit";
 
 // Only what the shop actually does (see checkout, payments, orders and the support chat).
@@ -12,66 +11,6 @@ const SERVICES = [
   { Icon: PackageSearch, title: "ติดตามคำสั่งซื้อ", text: "ดูสถานะและเลขพัสดุได้ในบัญชีของคุณ" },
   { Icon: Headphones, title: "คุยกับทีมงาน", text: "ทักแชทจากปุ่ม “ติดต่อทีมงาน” มุมขวาล่างได้ทุกหน้า" },
 ];
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-/** No newsletter service exists yet: validate, then say so instead of pretending to subscribe. */
-function Newsletter() {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState({ kind: "idle" });
-
-  const submit = (e) => {
-    e.preventDefault();
-    if (!EMAIL.test(email.trim())) {
-      setState({ kind: "invalid" });
-      return;
-    }
-    setState({ kind: "unavailable" });
-  };
-
-  return (
-    <form onSubmit={submit} noValidate className="w-full max-w-md">
-      <label htmlFor="newsletter-email" className="text-sm font-medium text-fg">
-        อีเมล
-      </label>
-      <div className={`mt-2 flex rounded-full border bg-white/[0.04] p-1 transition-colors focus-within:border-brand ${state.kind === "invalid" ? "border-danger" : "border-white/15"}`}>
-        <input
-          id="newsletter-email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (state.kind !== "idle") setState({ kind: "idle" });
-          }}
-          placeholder="you@example.com"
-          aria-invalid={state.kind === "invalid"}
-          aria-describedby="newsletter-status"
-          className="min-w-0 flex-1 border-0 bg-transparent px-4 text-sm text-fg placeholder:text-fg-subtle focus:outline-none focus:ring-0"
-        />
-        <button type="submit" className="h-11 shrink-0 rounded-full bg-brand px-5 text-sm font-semibold text-brand-ink transition-transform hover:bg-brand-hover active:scale-[0.97]">
-          แจ้งฉัน
-        </button>
-      </div>
-      <p id="newsletter-status" role="status" className="mt-3 min-h-[2.5rem] text-sm">
-        {state.kind === "invalid" ? (
-          <span className="text-danger">กรอกอีเมลให้ถูกต้อง เช่น name@example.com</span>
-        ) : state.kind === "unavailable" ? (
-          <span className="text-fg-muted">
-            ระบบรับข่าวสารทางอีเมลยังไม่เปิดให้บริการ อีเมลนี้ยังไม่ถูกบันทึก{" "}
-            <Link href="/auth/register" className="font-medium text-brand underline-offset-4 hover:underline">
-              สมัครสมาชิก
-            </Link>{" "}
-            เพื่อรับคูปองและติดตามคำสั่งซื้อได้เลย
-          </span>
-        ) : (
-          <span className="text-fg-subtle">ยังไม่เปิดรับสมัคร เมื่อเปิดแล้วจะประกาศบนหน้านี้</span>
-        )}
-      </p>
-    </form>
-  );
-}
 
 export default function Closing() {
   return (
@@ -97,23 +36,34 @@ export default function Closing() {
         </div>
       </section>
 
-      <section aria-labelledby="news-title" className="relative overflow-hidden border-t border-white/10 py-20 sm:py-28">
+      <section aria-labelledby="closing-title" className="relative overflow-hidden border-t border-white/10 py-20 sm:py-28">
         <div className="pointer-events-none absolute -right-40 top-1/2 h-[32rem] w-[32rem] -translate-y-1/2 rounded-full bg-brand/10 blur-[120px]" aria-hidden />
         <div className="relative mx-auto grid max-w-[90rem] items-end gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:px-10">
           <Reveal>
             <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-brand">
               <span className="h-px w-6 bg-brand" aria-hidden />
-              Stay in the loop
+              Train with data
             </p>
-            <h2 id="news-title" className="mt-4 font-display text-4xl font-bold uppercase leading-[0.95] tracking-tight text-fg sm:text-6xl">
-              New tech.
+            <h2 id="closing-title" className="mt-4 font-display text-4xl font-bold uppercase leading-[0.95] tracking-tight text-fg sm:text-6xl">
+              Know more.
               <br />
-              First.
+              Train better.
             </h2>
-            <p className="mt-5 max-w-md text-base text-fg-muted">รับข่าวสินค้าใหม่และวิธีใช้ข้อมูลจากอุปกรณ์ให้ซ้อมได้ดีขึ้น</p>
+            <p className="mt-5 max-w-md text-base text-fg-muted">เลือกอุปกรณ์ที่เหมาะกับการซ้อมของคุณ หรืออ่านวิธีใช้ข้อมูลจากอุปกรณ์ให้ได้ประโยชน์จริง</p>
           </Reveal>
-          <Reveal delay={0.1} className="lg:justify-self-end">
-            <Newsletter />
+          <Reveal delay={0.1} className="flex flex-wrap gap-3 lg:justify-self-end">
+            <Link
+              href="/products"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-brand px-6 text-sm font-semibold text-brand-ink transition-transform hover:bg-brand-hover active:scale-[0.97]"
+            >
+              เลือกซื้อสินค้า <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+            <Link
+              href="/blog"
+              className="inline-flex h-12 items-center rounded-full border border-white/20 px-6 text-sm font-semibold text-fg transition-colors hover:border-white/50"
+            >
+              อ่านบทความ
+            </Link>
           </Reveal>
         </div>
       </section>

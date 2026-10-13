@@ -7,5 +7,6 @@ import "./catalog.docs.js";
 import "./fulfilment.docs.js";
 import "./operations.docs.js";
 import "./support.docs.js";
+import "./content.docs.js";
 
 export { buildPaths } from "./registry.js";

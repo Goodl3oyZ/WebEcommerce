@@ -11,6 +11,7 @@ import {
   FaLink,
   FaUndo,
   FaRedo,
+  FaQuoteRight,
 } from "react-icons/fa";
 
 const MenuBar = ({ editor }) => {
@@ -21,6 +22,7 @@ const MenuBar = ({ editor }) => {
   return (
     <div className="border-b border-border p-2 flex flex-wrap gap-2 bg-surface-muted">
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleBold().run()}
         disabled={!editor.can().chain().focus().toggleBold().run()}
         className={`p-2 rounded ${
@@ -33,6 +35,7 @@ const MenuBar = ({ editor }) => {
         <FaBold size={14} />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleItalic().run()}
         disabled={!editor.can().chain().focus().toggleItalic().run()}
         className={`p-2 rounded ${
@@ -44,7 +47,29 @@ const MenuBar = ({ editor }) => {
       >
         <FaItalic size={14} />
       </button>
+      {[2, 3].map((level) => (
+        <button
+          key={level}
+          type="button"
+          onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
+          className={`rounded px-2.5 py-1 text-sm font-semibold ${
+            editor.isActive("heading", { level }) ? "bg-fg text-canvas" : "bg-surface hover:bg-surface-muted"
+          }`}
+          title={`หัวข้อระดับ ${level}`}
+        >
+          H{level}
+        </button>
+      ))}
       <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        className={`p-2 rounded ${editor.isActive("blockquote") ? "bg-fg text-canvas" : "bg-surface hover:bg-surface-muted"}`}
+        title="Quote"
+      >
+        <FaQuoteRight size={14} />
+      </button>
+      <button
+        type="button"
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         className={`p-2 rounded ${
           editor.isActive("bulletList")
@@ -56,6 +81,7 @@ const MenuBar = ({ editor }) => {
         <FaListUl size={14} />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         className={`p-2 rounded ${
           editor.isActive("orderedList")
@@ -67,6 +93,7 @@ const MenuBar = ({ editor }) => {
         <FaListOl size={14} />
       </button>
       <button
+        type="button"
         onClick={() => {
           const url = window.prompt("Enter URL");
           if (url) {
@@ -84,6 +111,7 @@ const MenuBar = ({ editor }) => {
       </button>
       <div className="border-l border-border mx-2"></div>
       <button
+        type="button"
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().chain().focus().undo().run()}
         className="p-2 rounded bg-surface hover:bg-surface-muted disabled:opacity-50"
@@ -92,6 +120,7 @@ const MenuBar = ({ editor }) => {
         <FaUndo size={14} />
       </button>
       <button
+        type="button"
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().chain().focus().redo().run()}
         className="p-2 rounded bg-surface hover:bg-surface-muted disabled:opacity-50"
@@ -125,7 +154,7 @@ export default function TiptapEditor({
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none p-4 min-h-[200px]",
+          "prose prose-sm sm:prose max-w-none dark:prose-invert focus:outline-none p-4 min-h-[200px]",
       },
     },
     immediatelyRender: false, // SSR hydration fix
