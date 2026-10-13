@@ -29,7 +29,8 @@
     "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
     "docker:dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
     "test:infra:down": "docker compose -f docker-compose.test.yml down",
-    "test:baseline:prune": "node scripts/prune-route-baseline.js"
+    "test:baseline:prune": "node scripts/prune-route-baseline.js",
+    "omise:check": "node scripts/omise-live-check.mjs"
   },
   "keywords": [],
   "author": "",

@@ -17,6 +17,7 @@ export const paymentsAPI = {
     const validatedData = {
       orderId: data.orderId,
       method,
+      ...(data.cardToken ? { cardToken: data.cardToken } : {}),
       amount: data.amount,
       currency: data.currency || "THB",
       paymentDetails,
@@ -40,6 +41,18 @@ export const paymentsAPI = {
     } catch (error) {
       throw error.response?.data || { message: "Update payment status failed" };
     }
+  },
+
+  /** Payments of one order, newest first. */
+  getOrderPayments: async (orderId) => {
+    const response = await apiClient.get(`/payments/order/${orderId}`);
+    return response.data;
+  },
+
+  /** Current status; the server re-checks a pending charge with Omise. */
+  getPaymentStatus: async (paymentId) => {
+    const response = await apiClient.get(`/payments/${paymentId}/status`);
+    return response.data;
   },
 
   // Get payment details

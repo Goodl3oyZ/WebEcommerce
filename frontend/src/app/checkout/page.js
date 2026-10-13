@@ -302,6 +302,11 @@ export default function CheckoutPage() {
         }
         toast("สร้างคำสั่งซื้อแล้ว ชำระเงินได้ที่หน้าคำสั่งซื้อ");
       } else if (payKind === "card") {
+        // The bank wants 3-D Secure: Omise sends the customer back to the order page.
+        if (order?.charge?.authorizeUri) {
+          window.location.assign(order.charge.authorizeUri);
+          return;
+        }
         if (order?.paymentStatus === "completed") toast.success("ชำระเงินสำเร็จ ขอบคุณที่สั่งซื้อ");
         else toast("กำลังรอยืนยันการชำระเงิน");
       }

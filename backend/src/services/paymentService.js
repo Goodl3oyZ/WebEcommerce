@@ -14,6 +14,7 @@ import { toSatang, fromSatang } from "../utils/money.js";
 import { paginationMeta } from "../utils/pagination.js";
 import { setOrderStatus, cancelOrder } from "./orderLifecycle.js";
 import { loyaltyService } from "./loyaltyService.js";
+import { ENV } from "../config/loadENV.js";
 
 /** Omise charge status -> our payment status. */
 export function mapChargeStatus(omiseStatus) {
@@ -42,6 +43,25 @@ const chargeSummary = (charge) => ({
   qrCodeUrl: charge.source?.scannable_code?.image?.download_uri ?? null,
   cardLast4: charge.card?.last_digits ?? null,
 });
+
+/**
+ * The bank page a card charge is waiting on (3-D Secure), if any. Omise also
+ * returns authorize_uri for charges that already succeeded; only a pending
+ * charge needs the customer to go there.
+ */
+export const authorizeUriOf = (charge) =>
+  charge?.status === "pending" && charge.authorize_uri ? charge.authorize_uri : null;
+
+/** Fields of a charge that the storefront needs to continue the payment. */
+export const chargeForClient = (charge) =>
+  charge && {
+    id: charge.id,
+    status: charge.status,
+    qrCodeUrl: charge.source?.scannable_code?.image?.download_uri ?? null,
+    authorizeUri: authorizeUriOf(charge),
+    // Kept for existing clients that read the raw Omise shape.
+    source: charge.source ?? null,
+  };
 
 function dateRange(column, startDate, endDate) {
   const conditions = [];
@@ -242,7 +262,14 @@ export const paymentService = {
     let charge;
     if (method === "credit_card" || method === "card") {
       if (!cardToken) throw ApiError.badRequest("Missing card token");
-      charge = await createChargeOrUncertain({ amount, currency: "thb", card: cardToken, description, metadata });
+      charge = await createChargeOrUncertain({
+        amount,
+        currency: "thb",
+        card: cardToken,
+        description,
+        metadata,
+        returnUri: `${ENV.SERVER.FRONTEND_URL}/orders/${payment.orderId}?payment=return`,
+      });
     } else if (method === "promptpay") {
       const source = await omiseService.createSource({ type: "promptpay", amount, currency: "thb" });
       if (!source?.id) throw new ApiError("Omise source creation failed", 502);

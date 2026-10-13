@@ -1,4 +1,4 @@
-import { paymentService } from "../services/paymentService.js";
+import { paymentService, chargeForClient } from "../services/paymentService.js";
 import { parsePagination } from "../utils/pagination.js";
 import { isAdminRole } from "../utils/roles.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -39,12 +39,7 @@ export const paymentController = {
       success: true,
       data: {
         payment: result.payment,
-        charge: result.charge && {
-          id: result.charge.id,
-          status: result.charge.status,
-          qrCodeUrl: result.charge.source?.scannable_code?.image?.download_uri ?? null,
-          source: result.charge.source ?? null,
-        },
+        charge: chargeForClient(result.charge),
       },
     });
   },

@@ -408,6 +408,29 @@ export default function OrderDetailsPage() {
   useEffect(() => {
     loadOrderDetails();
   }, [loadOrderDetails]);
+
+  // Back from the bank's 3-D Secure page: ask for the result now instead of
+  // waiting for the webhook.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "return") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    (async () => {
+      try {
+        const payments = await paymentsAPI.getOrderPayments(id);
+        const latest = Array.isArray(payments) ? payments[0] : null;
+        if (!latest) return;
+        const status = await paymentsAPI.getPaymentStatus(latest.id);
+        if (status?.status === "completed") toast.success("ชำระเงินสำเร็จ ขอบคุณที่สั่งซื้อ");
+        else if (status?.status === "failed") toast.error("ธนาคารไม่อนุมัติการชำระเงิน ลองใหม่หรือใช้บัตรอื่น");
+        else toast("กำลังรอผลจากธนาคาร สถานะจะอัปเดตอัตโนมัติ");
+      } catch {
+        // The webhook and the payment worker still settle it.
+      } finally {
+        loadOrderDetails();
+      }
+    })();
+  }, [id, loadOrderDetails]);
   useEffect(() => {
     if (showToast) {
       const timer = setTimeout(() => setShowToast(false), 2500);
@@ -430,6 +453,11 @@ export default function OrderDetailsPage() {
       }
       const result = await paymentsAPI.createPayment(body);
       const { payment, charge } = result?.data || {};
+      if (charge?.authorizeUri) {
+        // 3-D Secure: the bank's page returns here with ?payment=return.
+        window.location.assign(charge.authorizeUri);
+        return;
+      }
       if (payment?.status === "completed") {
         toast.success("ชำระเงินสำเร็จ!");
         setShowPaymentModal(false);

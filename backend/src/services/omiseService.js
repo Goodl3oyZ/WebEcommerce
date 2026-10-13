@@ -39,6 +39,7 @@ export const omiseService = {
     metadata,
     source,
     card,
+    returnUri,
   }) {
     try {
       const charge = await omise.charges.create({
@@ -48,6 +49,8 @@ export const omiseService = {
         metadata,
         ...(source ? { source } : {}),
         ...(card ? { card } : {}),
+        // Where the bank's 3-D Secure page sends the customer back to.
+        ...(returnUri ? { return_uri: returnUri } : {}),
       });
 
       return charge;

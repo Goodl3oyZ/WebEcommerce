@@ -20,7 +20,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ORDER_STATUSES } from "../utils/orderStatus.js";
 import { writeAuditLog } from "./auditService.js";
 import { shippingService } from "./shippingService.js";
-import { paymentService } from "./paymentService.js";
+import { paymentService, chargeForClient } from "./paymentService.js";
 import { settingsService } from "./settingsService.js";
 import { couponService } from "./couponService.js";
 import { setOrderStatus, cancelOrder, recordMovements } from "./orderLifecycle.js";
@@ -382,15 +382,7 @@ export const orderService = {
     }
 
     const finalOrder = await this.getOrderById(userId, order.id);
-    if (charge) {
-      finalOrder.charge = {
-        id: charge.id,
-        status: charge.status,
-        qrCodeUrl: charge.source?.scannable_code?.image?.download_uri ?? null,
-        // Kept for existing clients that read the raw Omise shape.
-        source: charge.source ?? null,
-      };
-    }
+    if (charge) finalOrder.charge = chargeForClient(charge);
     return finalOrder;
   },
 

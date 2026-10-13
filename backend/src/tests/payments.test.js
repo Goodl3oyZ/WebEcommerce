@@ -49,6 +49,50 @@ async function paidOrder() {
   return { agent, user, order: res.body.data, payment };
 }
 
+describe("3-D Secure card payments", () => {
+  test("a card waiting on the bank sends the customer there, and the return confirms it", async () => {
+    const { agent, user } = await loginAs("user");
+    const setup = await checkoutSetup(user, { price: "100.00" });
+    const chargeId = `chrg_test_${randomUUID().slice(0, 8)}`;
+    omiseService.createCharge.mockImplementationOnce(async ({ amount }) => ({
+      id: chargeId,
+      status: "pending",
+      amount,
+      authorize_uri: "https://api.omise.co/payments/test/authorize",
+    }));
+
+    const res = await agent.post("/api/orders/checkout").send(setup.body());
+    expect(res.status).toBe(201);
+    const order = res.body.data;
+    expect(omiseService.createCharge.mock.calls[0][0].returnUri).toBe(
+      `http://localhost:3000/orders/${order.id}?payment=return`
+    );
+    expect(res.body.data.charge).toMatchObject({ status: "pending", authorizeUri: "https://api.omise.co/payments/test/authorize" });
+    expect((await getOrderRow(order.id)).status).toBe("pending");
+
+    // Back from the bank: the page asks for the payment's status, which checks Omise.
+    omiseService.getCharge.mockResolvedValueOnce({ id: chargeId, status: "successful", paid: true });
+    const [payment] = (await agent.get(`/api/payments/order/${order.id}`)).body;
+    expect((await agent.get(`/api/payments/${payment.id}/status`)).body.status).toBe("completed");
+    expect(await getOrderRow(order.id)).toMatchObject({ status: "paid", paymentStatus: "completed" });
+  });
+
+  test("a charge that already succeeded is not sent to the bank page", async () => {
+    const { agent, user } = await loginAs("user");
+    const setup = await checkoutSetup(user, { price: "100.00" });
+    omiseService.createCharge.mockImplementationOnce(async ({ amount }) => ({
+      id: `chrg_test_${randomUUID().slice(0, 8)}`,
+      status: "successful",
+      paid: true,
+      amount,
+      authorize_uri: "https://api.omise.co/payments/test/authorize",
+    }));
+    const res = await agent.post("/api/orders/checkout").send(setup.body());
+    expect(res.body.data.charge.authorizeUri).toBeNull();
+    expect(res.body.data.paymentStatus).toBe("completed");
+  });
+});
+
 describe("POST /api/payments (pay or retry an order)", () => {
   test("paying again with PromptPay returns the open QR instead of a second charge", async () => {
     const { agent, order, payment } = await pendingPromptPayOrder();
