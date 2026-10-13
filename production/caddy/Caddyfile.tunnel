@@ -10,5 +10,10 @@
 }
 
 :80 {
+	# Access log to stdout (docker logs caddy), rotated by the Docker log driver.
+	log {
+		output stdout
+		format json
+	}
 	import /etc/caddy/routes.caddy
 }

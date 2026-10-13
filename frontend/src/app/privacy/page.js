@@ -19,7 +19,7 @@ export default function PrivacyPage() {
             <strong>บัญชีผู้ใช้:</strong> ชื่อ อีเมล รหัสผ่าน (เก็บแบบเข้ารหัสทางเดียว เราอ่านรหัสผ่านของคุณไม่ได้) เบอร์โทร และรูปโปรไฟล์
           </li>
           <li>
-            <strong>เข้าสู่ระบบด้วย Google, Facebook หรือ GitHub:</strong> ชื่อ อีเมล รูปโปรไฟล์ และรหัสผู้ใช้ของบริการนั้น
+            <strong>เข้าสู่ระบบด้วย Google หรือ GitHub:</strong> ชื่อ อีเมล รูปโปรไฟล์ และรหัสผู้ใช้ของบริการนั้น
             เราไม่ได้รับรหัสผ่านของบัญชีเหล่านั้น และไม่โพสต์อะไรแทนคุณ
           </li>
           <li>
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
             <strong>Google (Gmail):</strong> ส่งอีเมลยืนยันบัญชี ตั้งรหัสผ่านใหม่ และแจ้งสถานะคำสั่งซื้อ
           </li>
           <li>
-            <strong>Google, Facebook, GitHub:</strong> เฉพาะเมื่อคุณเลือกเข้าสู่ระบบด้วยบริการนั้น
+            <strong>Google, GitHub:</strong> เฉพาะเมื่อคุณเลือกเข้าสู่ระบบด้วยบริการนั้น
           </li>
           <li>
             <strong>Cloudflare:</strong> เครือข่ายที่ส่งหน้าเว็บถึงคุณอย่างปลอดภัย (HTTPS)

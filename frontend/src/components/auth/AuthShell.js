@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { forwardRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { FaFacebook, FaGithub, FaGoogle } from "react-icons/fa";
+import { FaGithub, FaGoogle } from "react-icons/fa";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { config } from "@/lib/config";
 
@@ -99,9 +99,10 @@ export const Field = forwardRef(function Field({ label, error, type = "text", id
   );
 });
 
+// Facebook login still works in the API; its button is hidden until the
+// Facebook app is published (Meta requires app review steps first).
 const PROVIDERS = [
   { id: "google", label: "Google", Icon: FaGoogle },
-  { id: "facebook", label: "Facebook", Icon: FaFacebook },
   { id: "github", label: "GitHub", Icon: FaGithub },
 ];
 
@@ -114,7 +115,7 @@ export function SocialLogin() {
         หรือดำเนินการต่อด้วย
         <span className="h-px flex-1 bg-border" />
       </div>
-      <div className="mt-5 grid grid-cols-3 gap-2.5">
+      <div className="mt-5 grid grid-cols-2 gap-2.5">
         {PROVIDERS.map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -125,8 +126,7 @@ export function SocialLogin() {
             className="flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-surface text-sm font-medium text-fg transition-colors hover:border-fg/40 hover:bg-fg/5"
           >
             <Icon className="h-4 w-4" aria-hidden />
-            <span className="hidden sm:inline">{label}</span>
-            <span className="sr-only sm:hidden">เข้าสู่ระบบด้วย {label}</span>
+            {label}
           </button>
         ))}
       </div>
