@@ -2,6 +2,9 @@
 // because dotenv never overrides variables that are already set.
 export const testEnv = {
   NODE_ENV: "test",
+  // Same clock as CI and the production containers, so date handling that
+  // only breaks in UTC (or only in local time) fails here too.
+  TZ: "UTC",
   DATABASE_URL: "postgresql://test:test@localhost:55432/webecommerce_test",
   REDIS_URL: "redis://localhost:56379",
   MINIO_HOST: "localhost",

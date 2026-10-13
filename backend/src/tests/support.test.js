@@ -24,6 +24,18 @@ async function makeAgent(admin, overrides = {}) {
 }
 
 describe("customer side", () => {
+  test("queue position counts the conversation itself (timestamps with microseconds)", async () => {
+    const { sql, eq } = await import("drizzle-orm");
+    const { agent } = await loginAs("user");
+    const created = (await start(agent)).body;
+    // JS Dates keep milliseconds only; the database keeps microseconds.
+    await db
+      .update(schema.supportConversations)
+      .set({ createdAt: sql`'2001-02-03 04:05:06.789123'::timestamp` })
+      .where(eq(schema.supportConversations.id, created.id));
+    expect((await agent.get("/api/support/conversations/current")).body.conversation.queuePosition).toBe(1);
+  });
+
   test("config, start, one open conversation at a time, current and history", async () => {
     const { agent } = await loginAs("user");
     const config = await agent.get("/api/support/config");

@@ -68,7 +68,14 @@ async function queuePosition(conv) {
   const [{ n }] = await db
     .select({ n: count() })
     .from(supportConversations)
-    .where(and(eq(supportConversations.status, "waiting"), sql`${supportConversations.createdAt} <= ${conv.createdAt}`));
+    // Compare in SQL: the JS Date of conv.createdAt has lost the microseconds,
+    // which would leave this conversation out of its own count.
+    .where(
+      and(
+        eq(supportConversations.status, "waiting"),
+        sql`${supportConversations.createdAt} <= (select created_at from support_conversations where id = ${conv.id})`
+      )
+    );
   return Number(n);
 }
 
@@ -238,12 +245,8 @@ export const supportService = {
       if (Number(lastMinute) >= s.messagesPerMinute) {
         throw tooMany("You are sending messages too quickly. Please wait a moment.", "SUPPORT_RATE_LIMIT");
       }
-      const [lastAgent] = await db
-        .select({ at: supportMessages.createdAt })
-        .from(supportMessages)
-        .where(and(eq(supportMessages.conversationId, id), eq(supportMessages.senderRole, "agent")))
-        .orderBy(desc(supportMessages.createdAt))
-        .limit(1);
+      // Customer messages since the last agent reply (compared in SQL, at full
+      // timestamp precision).
       const [{ n: unanswered }] = await db
         .select({ n: count() })
         .from(supportMessages)
@@ -251,7 +254,7 @@ export const supportService = {
           and(
             eq(supportMessages.conversationId, id),
             eq(supportMessages.senderRole, "customer"),
-            ...(lastAgent ? [sql`${supportMessages.createdAt} > ${lastAgent.at}`] : [])
+            sql`${supportMessages.createdAt} > coalesce((select max(m.created_at) from support_messages m where m.conversation_id = ${id} and m.sender_role = 'agent'), '-infinity')`
           )
         );
       if (Number(unanswered) >= s.maxUnanswered) {
