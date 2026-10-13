@@ -27,6 +27,7 @@ import BrandMark from "@/components/brand/BrandMark";
 import CartDrawer from "@/components/shop/CartDrawer";
 import SearchOverlay from "@/components/shop/SearchOverlay";
 import NotificationBell from "@/components/shop/NotificationBell";
+import { useMaintenanceBlocked } from "@/components/layout/MaintenanceGate";
 
 // Shown first in the menu when the shop has them (by category name).
 const PREFERRED_CATEGORIES = ["อุปกรณ์สวมใส่อัจฉริยะ", "รองเท้า", "ฟื้นฟูร่างกาย", "อุปกรณ์ฟิตเนส"];
@@ -145,7 +146,9 @@ export default function Header() {
   const openCart = useUiStore((s) => s.openCart);
   const closeCart = useUiStore((s) => s.closeCart);
   const closeSearch = useUiStore((s) => s.closeSearch);
-  const onHome = pathname === "/";
+  // The maintenance page replaces the dark home hero, so use the normal header.
+  const maintenanceBlocked = useMaintenanceBlocked();
+  const onHome = pathname === "/" && !maintenanceBlocked;
   const cartCount = useCartStore((s) => s.items.reduce((sum, i) => sum + (i.quantity || 0), 0));
   const fetchCart = useCartStore((s) => s.fetchCartFromBackend);
 

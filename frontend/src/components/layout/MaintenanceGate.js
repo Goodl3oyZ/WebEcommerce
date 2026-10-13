@@ -9,16 +9,29 @@ import Container from "@/components/shop/Container";
 
 const STAFF = ["admin", "super_admin", "moderator"];
 
+// Policy pages stay readable: login providers (e.g. Facebook) check them.
+const OPEN_PATHS = ["/admin", "/auth", "/privacy", "/data-deletion"];
+
+/**
+ * True when this visitor sees the maintenance page instead of the current
+ * page. The header and footer use it to drop the home page's dark,
+ * transparent styling, which only suits the home hero.
+ */
+export function useMaintenanceBlocked() {
+  const { maintenance } = useSiteSettings();
+  const { user } = useAuth();
+  const pathname = usePathname() || "";
+  return Boolean(maintenance) && !OPEN_PATHS.some((p) => pathname.startsWith(p)) && !STAFF.includes(user?.role);
+}
+
 /** Shows a "closed for maintenance" page to customers while maintenance is on. */
 export default function MaintenanceGate({ children }) {
   const { maintenance, siteName } = useSiteSettings();
   const { user } = useAuth();
   const pathname = usePathname() || "";
-  // Policy pages stay readable: login providers (e.g. Facebook) check them.
-  const exempt =
-    ["/admin", "/auth", "/privacy", "/data-deletion"].some((p) => pathname.startsWith(p)) || STAFF.includes(user?.role);
+  const blocked = useMaintenanceBlocked();
 
-  if (!maintenance || exempt) {
+  if (!blocked) {
     return (
       <>
         {/* Floating, so it never shifts the page (the home hero sits under

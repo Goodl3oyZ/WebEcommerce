@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { FiFacebook, FiGithub, FiInstagram } from "react-icons/fi";
 import Container from "@/components/shop/Container";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { useMaintenanceBlocked } from "@/components/layout/MaintenanceGate";
 
 const columns = [
   {
@@ -43,10 +44,12 @@ const socials = [
 export default function Footer() {
   const pathname = usePathname();
   const { siteName } = useSiteSettings();
+  const maintenanceBlocked = useMaintenanceBlocked();
+  const onHome = pathname === "/" && !maintenanceBlocked;
   if (pathname?.startsWith("/admin")) return null;
 
   return (
-    <footer className={`${pathname === "/" ? "border-t border-white/10" : "mt-20"} bg-[#0f0f0f] text-white`}>
+    <footer className={`${onHome ? "border-t border-white/10" : "mt-20"} bg-[#0f0f0f] text-white`}>
       <Container className="py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
