@@ -10,7 +10,7 @@ Context doc for Cursor agents working on the Express API in `backend/`.
 | HTTP | Express 5 |
 | ORM | Drizzle ORM + PostgreSQL 15 |
 | Cache / sessions | Redis 7 (`connect-redis`, rate-limit-redis) |
-| Object storage | MinIO (buckets: `products`, `profiles`, `stores`, `reviews`) |
+| Object storage | SeaweedFS S3 (buckets: `products`, `profiles`, `stores`, `reviews`, `brands`, `categories`) |
 | Auth | JWT (access + refresh), express-session, Passport OAuth |
 | Realtime | Socket.IO on same HTTP server |
 | Validation | Zod DTOs + `validationMiddleware` |
@@ -50,7 +50,7 @@ backend/
 ├── Dockerfile.dev           # Dev image (nodemon, no full COPY)
 ├── docker-compose.dev.yml   # Local development stack (+ frontend)
 ├── docker-compose.dev.yml   # Dev stack with volume mounts
-├── scripts/init-minio.sh    # One-shot bucket init (minio-init service)
+├── scripts/init-buckets.mjs # Bucket init (npm run storage:init, run on backend start)
 ├── migrations/              # Drizzle SQL migrations
 ├── src/
 │   ├── config/              # db, redis, minio, passport, loadENV
@@ -82,8 +82,7 @@ Route → Controller → Service → DB (Drizzle) / MinIO / Redis / External API
 |---------|-----------|---------|
 | db | flukedb | PostgreSQL |
 | redis | flukeredis | Sessions, lockout, rate limits |
-| minio | flukeminio | S3-compatible file storage |
-| minio-init | minio-init | Creates buckets once, then exits |
+| seaweedfs | fluke-storage | S3-compatible file storage (same as production) |
 | backend | backend | Node API |
 | frontend | frontend | Next.js (separate build context) |
 | pgadmin | pgadmin | DB UI |
@@ -92,7 +91,7 @@ Route → Controller → Service → DB (Drizzle) / MinIO / Redis / External API
 
 - DB: `db:5432`
 - Redis: `redis:6379`
-- MinIO: `minio:9000`
+- Storage: `seaweedfs:8333` (host: `localhost:9000`)
 - Backend (from frontend container): `backend:5000`
 
 **Dev vs prod:**
@@ -350,11 +349,11 @@ User inbox + read/mark/delete; admin broadcast via `POST /` and `/admin/*`.
 
 ---
 
-## File storage (MinIO)
+## File storage (S3: SeaweedFS)
 
 - Client: `src/config/minio.js`
 - URLs in production use `MINIO_HOST`; dev often exposes `localhost:9000`
-- Bucket init: `minio-init` service runs `scripts/init-minio.sh`
+- Bucket init: `npm run storage:init` (backend dev command runs it on start)
 - Product images stored as keys in DB; `productService` resolves to full URLs via `getFileUrl()`
 
 ---

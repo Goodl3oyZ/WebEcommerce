@@ -39,43 +39,30 @@ services:
       timeout: 3s
       retries: 10
 
-  minio:
-    image: minio/minio
-    container_name: flukeminio
+  # S3-compatible storage, the same SeaweedFS image and start script as
+  # production (MinIO's images are no longer published for servers). Served on
+  # localhost:${MINIO_API_PORT} so image URLs look the same as before.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47
+    container_name: fluke-storage
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /scripts/start.sh > /tmp/start.sh && exec /bin/sh /tmp/start.sh"]
+    environment:
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "${MINIO_API_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      - "${MINIO_API_PORT}:8333"
     volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
+      - ../production/seaweedfs/start.sh:/scripts/start.sh:ro
+      - seaweedfs_data:/data
     networks:
       - backend-net
-
-  # One-shot init: creates buckets/policies once MinIO is up, then exits (see README).
-  minio-init:
-    image: minio/mc
-    container_name: minio-init
-    restart: "no"
-    depends_on:
-      minio:
-        condition: service_started
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    entrypoint:
-      [
-        "/bin/sh",
-        "-c",
-        "tr -d '\\r' < /scripts/init-minio.sh > /tmp/init-minio.sh && chmod +x /tmp/init-minio.sh && /bin/sh /tmp/init-minio.sh",
-      ]
-    volumes:
-      - ./scripts/init-minio.sh:/scripts/init-minio.sh:ro
-    networks:
-      - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   backend:
     build:
@@ -89,7 +76,10 @@ services:
       BACKEND_PORT: "5000"
       DATABASE_URL: postgresql://postgres:postgres@db:5432/webecommerce
       REDIS_URL: redis://redis:6379
-      MINIO_HOST: minio
+      MINIO_HOST: seaweedfs
+      MINIO_API_PORT: "8333"
+      # Browsers reach storage through the published port.
+      MINIO_PUBLIC_URL: http://localhost:${MINIO_API_PORT}
       DB_SSL: "false"
     ports:
       - "${BACKEND_PORT}:5000"
@@ -101,16 +91,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_started
-      minio-init:
-        condition: service_completed_successfully
+      seaweedfs:
+        condition: service_healthy
     networks:
       - backend-net
     restart: unless-stopped
     # --legacy-watch polls for changes: file events from a Windows/macOS host
     # folder do not reach the container, so plain watching never reloads.
-    command: ["sh", "-c", "npm run migrate && nodemon --legacy-watch --watch src --ext js,json --exec \"node index.js\""]
+    command: ["sh", "-c", "npm run migrate && npm run storage:init && nodemon --legacy-watch --watch src --ext js,json --exec \"node index.js\""]
     healthcheck:
       test:
         [
@@ -169,7 +157,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  seaweedfs_data:
 
 networks:
   backend-net:
