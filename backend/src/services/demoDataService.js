@@ -21,6 +21,7 @@ import {
   coupons,
   discounts,
   products,
+  productAttributes,
   productVariants,
   seedRecords,
   stores,
@@ -247,6 +248,10 @@ export const demoDataService = {
         await tx.insert(productVariants).values(
           item.variants.map((v) => ({ productId: product.id, color: v.color, size: v.size, sku: v.sku, stock: v.stock, price: String(v.price) }))
         );
+        const specs = Object.entries(item.attributes ?? {});
+        if (specs.length) {
+          await tx.insert(productAttributes).values(specs.map(([name, value]) => ({ productId: product.id, name, value })));
+        }
         await record(tx, "products", product.id);
         created.products += 1;
       }

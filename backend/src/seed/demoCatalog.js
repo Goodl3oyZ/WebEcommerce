@@ -13,18 +13,106 @@ export const DEMO_CATALOG_CATEGORIES = [
   { key: "footwear", name: "รองเท้า", description: "รองเท้าวิ่งและรองเท้าเทรนนิ่ง" },
   { key: "equipment", name: "อุปกรณ์ฟิตเนส", description: "ดัมเบล เคตเทิลเบล และอุปกรณ์สำหรับโฮมยิม" },
   { key: "accessories", name: "แอคเซสซอรี่", description: "ขวดน้ำ หมวก และของใช้ติดกระเป๋ายิม" },
+  { key: "wearables", name: "อุปกรณ์สวมใส่อัจฉริยะ", description: "สมาร์ทวอทช์ สมาร์ทริง และสายรัดข้อมือวัดกิจกรรม" },
+  { key: "recovery", name: "ฟื้นฟูร่างกาย", description: "เครื่องนวดและอุปกรณ์ช่วยฟื้นตัวหลังซ้อม" },
 ];
 
 export const DEMO_CATALOG_BRANDS = [
   { key: "northform", name: "Northform", description: "เสื้อผ้าเทรนนิ่งเรียบง่าย ใส่ได้ทุกวัน" },
   { key: "ironworks", name: "Ironworks", description: "อุปกรณ์เหล็กสำหรับยิมและโฮมยิม" },
   { key: "stridelab", name: "Stride Lab", description: "รองเท้าและของใช้สำหรับนักวิ่ง" },
+  { key: "pulselabs", name: "Pulse Labs", description: "อุปกรณ์สวมใส่และเทคโนโลยีเพื่อการฟื้นตัว" },
 ];
 
 const sizes = (prefix, color, list, stock, price) =>
   list.map((size, i) => ({ color, size, sku: `${prefix}-${color.toUpperCase().replace(/\s+/g, "")}-${size}`, stock: stock[i] ?? stock.at(-1), price }));
 
+// Specs (attributes) are sample merchandising data for the demo brands. They
+// describe tracking features only; none of these are medical devices.
 export const DEMO_CATALOG_PRODUCTS = [
+  {
+    name: "Pulse One Smartwatch",
+    description:
+      "สมาร์ทวอทช์สำหรับคนที่ซ้อมจริงจัง วัดอัตราการเต้นของหัวใจด้วยแสง นับก้าว บันทึกการวิ่งด้วย GPS ในตัว และสรุปการนอนทุกเช้า ใช้เพื่อติดตามกิจกรรม ไม่ใช่อุปกรณ์ทางการแพทย์",
+    price: 6990,
+    category: "wearables",
+    brand: "pulselabs",
+    images: ["watch-1.jpg", "watch-2.jpg"],
+    attributes: {
+      หน้าจอ: "AMOLED 1.43 นิ้ว",
+      เซนเซอร์: "วัดชีพจรด้วยแสง, ตรวจจับการเคลื่อนไหว 6 แกน",
+      ระบุตำแหน่ง: "GPS ในตัว",
+      แบตเตอรี่: "สูงสุด 7 วัน (ใช้งานทั่วไป)",
+      กันน้ำ: "5 ATM",
+      น้ำหนัก: "38 กรัม (ไม่รวมสาย)",
+    },
+    variants: [
+      { color: "Mist", size: "42 mm", sku: "DEMO-WATCH-MIST", stock: 14, price: 6990 },
+      { color: "Graphite", size: "42 mm", sku: "DEMO-WATCH-GRAPHITE", stock: 9, price: 6990 },
+    ],
+  },
+  {
+    name: "Halo Smart Ring",
+    description:
+      "สมาร์ทริงไทเทเนียม บาง เบา ใส่นอนได้ทั้งคืน ติดตามระยะการนอน ชีพจรขณะพัก และแนวโน้มอุณหภูมิผิว ข้อมูลใช้เพื่อดูแลตัวเอง ไม่ใช่การวินิจฉัยโรค",
+    price: 8990,
+    category: "wearables",
+    brand: "pulselabs",
+    images: ["ring-1.jpg", "ring-2.jpg"],
+    attributes: {
+      วัสดุ: "ไทเทเนียม เคลือบ PVD",
+      เซนเซอร์: "วัดชีพจรด้วยแสง, อุณหภูมิผิว, ตรวจจับการเคลื่อนไหว",
+      ติดตาม: "การนอน, ชีพจรขณะพัก, กิจกรรมประจำวัน",
+      แบตเตอรี่: "สูงสุด 5 วัน",
+      กันน้ำ: "100 เมตร",
+      น้ำหนัก: "3-5 กรัม ตามขนาด",
+    },
+    variants: sizes("DEMO-RING", "Black", ["7", "8", "9", "10", "11", "12"], [3, 6, 8, 8, 5, 2], 8990),
+  },
+  {
+    name: "Pulse Band 2",
+    description: "สายรัดข้อมือวัดกิจกรรม จอสี น้ำหนักเบา ใส่ได้ทั้งวันทั้งคืน นับก้าว วัดชีพจร และเตือนให้ลุกเดิน",
+    price: 1490,
+    category: "wearables",
+    brand: "pulselabs",
+    images: ["band-1.jpg", "band-2.jpg"],
+    attributes: {
+      หน้าจอ: "AMOLED 1.1 นิ้ว",
+      เซนเซอร์: "วัดชีพจรด้วยแสง, ตรวจจับการเคลื่อนไหว",
+      แบตเตอรี่: "สูงสุด 14 วัน",
+      กันน้ำ: "5 ATM",
+    },
+    variants: [{ color: "Black", size: "Free size", sku: "DEMO-BAND-BLACK", stock: 30, price: 1490 }],
+  },
+  {
+    name: "Recover Pro Massage Gun",
+    description: "เครื่องนวดกล้ามเนื้อแบบพกพา ปรับได้ 5 ระดับ หัวนวด 4 แบบ เสียงเบา ใช้คลายกล้ามเนื้อหลังซ้อม",
+    price: 4990,
+    category: "recovery",
+    brand: "pulselabs",
+    images: ["massager-1.jpg", "massager-2.jpg"],
+    attributes: {
+      ระดับความแรง: "5 ระดับ",
+      หัวนวด: "4 แบบ",
+      แบตเตอรี่: "สูงสุด 6 ชั่วโมง",
+      น้ำหนัก: "650 กรัม",
+    },
+    variants: [{ color: "Black", size: "Standard", sku: "DEMO-MASSAGER-BLACK", stock: 12, price: 4990 }],
+  },
+  {
+    name: "Stride Sport Buds",
+    description: "หูฟังไร้สายสำหรับวิ่ง ใส่กระชับ กันเหงื่อ มีโหมดฟังเสียงรอบข้างเพื่อความปลอดภัยเวลาวิ่งบนถนน",
+    price: 2490,
+    category: "accessories",
+    brand: "stridelab",
+    images: ["buds-1.jpg", "buds-2.jpg"],
+    attributes: {
+      กันน้ำกันเหงื่อ: "IPX5",
+      แบตเตอรี่: "8 ชั่วโมง (รวมเคส 30 ชั่วโมง)",
+      การเชื่อมต่อ: "Bluetooth 5.3",
+    },
+    variants: [{ color: "Black", size: "Standard", sku: "DEMO-BUDS-BLACK", stock: 20, price: 2490 }],
+  },
   {
     name: "Essential Cotton Tee",
     description: "เสื้อยืดคอตตอน 100% ผ้าหนานุ่ม ทรงตรง ใส่เทรนหรือใส่เที่ยวก็ได้ ซักแล้วไม่ย้วย",

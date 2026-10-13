@@ -22,3 +22,13 @@ Free photos from [Unsplash](https://unsplash.com/license) (free for commercial u
 - `sportsbra-1.jpg`: https://images.unsplash.com/photo-1606902965551-dce093cda6e7
 - `cap-1.jpg`: https://images.unsplash.com/photo-1521369909029-2afed882baee
 - `cap-2.jpg`: https://images.unsplash.com/photo-1691256676359-20e5c6d4bc92
+- `watch-1.jpg`: https://images.unsplash.com/photo-1660844817855-3ecc7ef21f12
+- `watch-2.jpg`: https://images.unsplash.com/photo-1690016424217-03f4d9427a6a
+- `ring-1.jpg`: https://images.unsplash.com/photo-1760088348194-a5ac70a8aa9f
+- `ring-2.jpg`: https://images.unsplash.com/photo-1758577515333-e71b713059f1
+- `band-1.jpg`: https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6
+- `band-2.jpg`: https://images.unsplash.com/photo-1561212942-0d77ee345b35
+- `massager-1.jpg`: https://images.unsplash.com/photo-1746278925373-c3d823caa6d6
+- `massager-2.jpg`: https://images.unsplash.com/photo-1746278925416-9d6c71f55c2d
+- `buds-1.jpg`: https://images.unsplash.com/photo-1632200004922-bc18602c79fc
+- `buds-2.jpg`: https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1

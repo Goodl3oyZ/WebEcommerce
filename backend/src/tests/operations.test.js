@@ -264,14 +264,14 @@ describe("demo data", () => {
 
     const status = await superAdmin.get("/api/admin/demo-data");
     expect(status.status).toBe(200);
-    expect(status.body.catalog.products).toHaveLength(11);
-    expect(status.body.catalog.images).toBe(20);
+    expect(status.body.catalog.products).toHaveLength(16);
+    expect(status.body.catalog.images).toBe(30);
 
     const installed = await superAdmin.post("/api/admin/demo-data");
     expect(installed.status).toBe(201);
-    expect(installed.body.created.products + installed.body.created.skipped).toBe(11);
+    expect(installed.body.created.products + installed.body.created.skipped).toBe(16);
     const again = await superAdmin.post("/api/admin/demo-data");
-    expect(again.body.created).toMatchObject({ products: 0, skipped: 11 });
+    expect(again.body.created).toMatchObject({ products: 0, skipped: 16 });
 
     // Visible in the shop with a working photo.
     const tee = await db.query.productVariants.findFirst({ where: eq(schema.productVariants.sku, "DEMO-TEE-BLACK-M") });
@@ -279,6 +279,10 @@ describe("demo data", () => {
     const image = (page.body.data ?? page.body).imageUrl[0];
     expect(image).toMatch(/\/products\/demo\/tee-black-1\.jpg$/);
     expect((await fetch(image)).status).toBe(200);
+    // Specs are stored as product attributes.
+    const watch = await db.query.productVariants.findFirst({ where: eq(schema.productVariants.sku, "DEMO-WATCH-MIST") });
+    const watchPage = await (await newAgent()).get(`/api/products/${watch.productId}`);
+    expect((watchPage.body.data ?? watchPage.body).attributes).toMatchObject({ กันน้ำ: "5 ATM" });
 
     const plan = (await superAdmin.get("/api/admin/demo-data")).body.removal.groups;
     const products = plan.find((g) => g.key === "products").items;
@@ -289,9 +293,9 @@ describe("demo data", () => {
     expect((await superAdmin.post("/api/admin/demo-data/remove").send({})).status).toBe(400);
     const removed = await superAdmin.post("/api/admin/demo-data/remove").send({ confirm: "REMOVE DEMO DATA" });
     expect(removed.status).toBe(200);
-    expect(removed.body.removed.products.deleted).toBeGreaterThanOrEqual(12);
+    expect(removed.body.removed.products.deleted).toBeGreaterThanOrEqual(17);
     expect(removed.body.removed.products.hidden).toBeGreaterThanOrEqual(1);
-    expect(removed.body.removed.images.deleted).toBe(20);
+    expect(removed.body.removed.images.deleted).toBe(30);
 
     const demoLeft = await db.select().from(schema.productVariants).where(sql`${schema.productVariants.sku} like 'DEMO-%'`);
     expect(demoLeft).toHaveLength(0);
