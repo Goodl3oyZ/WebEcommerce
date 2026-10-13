@@ -408,7 +408,7 @@
   }
 }
 
-/* Page loader: appears after 250 ms (no flash on fast loads); the bar sweeps. */
+/* Page loader: appears after 250 ms so fast loads do not flash it. */
 @keyframes page-loader-in {
   from {
     opacity: 0;
@@ -417,24 +417,7 @@
     opacity: 1;
   }
 }
-@keyframes page-loader-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(300%);
-  }
-}
 .page-loader {
-  animation: page-loader-in 0.3s ease-out 0.25s both;
+  animation: page-loader-in 0.2s ease-out 0.25s both;
 }
-.page-loader-bar {
-  animation: page-loader-sweep 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .page-loader-bar {
-    animation: none;
-    width: 100%;
-    opacity: 0.6;
-  }
-}
+
