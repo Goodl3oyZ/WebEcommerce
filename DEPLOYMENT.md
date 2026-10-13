@@ -43,6 +43,20 @@ docker compose --env-file .env.production -f docker-compose.prod.yml \
   run --rm backend npm run seed:all
 ```
 
+## First super admin
+
+Only a super admin can grant admin roles in the app, so the first one is set
+from the command line. Sign up on the site first (email sign-ups must click the
+verification link; Google/GitHub accounts are verified already), then:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml   exec backend npm run user:role -- you@example.com super_admin
+```
+
+(Behind the tunnel, add `-f docker-compose.tunnel.yml`.) Roles: `user`,
+`moderator`, `admin`, `super_admin`. The user signs out and in again to get it.
+Later admins can be promoted from the admin panel.
+
 ## Behind Cloudflare Tunnel (no open ports)
 
 When the server is reached through `cloudflared` instead of ports 80/443, add
