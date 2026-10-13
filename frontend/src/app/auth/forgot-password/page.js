@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import Link from "next/link";
-import { toast } from "react-hot-toast";
+import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import AuthShell, { EMAIL_RULES, Field } from "@/components/auth/AuthShell";
 import { authAPI } from "@/lib/api/auth";
 
 export default function ForgotPasswordPage() {
-  const [sent, setSent] = useState(false);
+  const [sentTo, setSentTo] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
   const {
     register,
     handleSubmit,
@@ -17,74 +19,68 @@ export default function ForgotPasswordPage() {
   } = useForm();
 
   const onSubmit = async ({ email }) => {
+    setFormError("");
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
       await authAPI.forgotPassword(email.trim());
-      setSent(true);
+      setSentTo(email.trim());
     } catch (error) {
-      toast.error(error.message || "ส่งคำขอไม่สำเร็จ กรุณาลองใหม่");
+      setFormError(error.status === 429 ? "ขอบ่อยเกินไป กรุณารอสักครู่" : "ส่งคำขอไม่สำเร็จ กรุณาลองใหม่");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-muted py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-fg">
-            Forgot your password?
-          </h2>
-          <p className="mt-2 text-center text-sm text-fg-muted">
-            Enter your email and we&apos;ll send you a link to reset it.
+  const back = (
+    <Link href="/auth/login" className="font-semibold text-fg underline-offset-4 hover:underline">
+      กลับไปหน้าเข้าสู่ระบบ
+    </Link>
+  );
+
+  if (sentTo) {
+    return (
+      <AuthShell footer={back} image="/landing/recover.webp">
+        <div role="status" className="rounded-2xl border border-border bg-surface p-6 text-center sm:p-8">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand/20 text-fg" aria-hidden>
+            <MailCheck className="h-6 w-6" />
+          </span>
+          <h1 className="mt-4 text-xl font-semibold text-fg">ตรวจสอบอีเมลของคุณ</h1>
+          <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+            ถ้า <span className="font-medium text-fg break-all">{sentTo}</span> มีบัญชีอยู่ เราส่งลิงก์ตั้งรหัสผ่านใหม่ไปแล้ว
+            ลิงก์ใช้ได้ 30 นาทีและใช้ได้ครั้งเดียว
           </p>
+          <p className="mt-3 text-xs text-fg-subtle">ไม่เจออีเมล? ลองดูในโฟลเดอร์สแปมหรือโปรโมชัน</p>
         </div>
+      </AuthShell>
+    );
+  }
 
-        {sent ? (
-          <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-            If an account exists for that email, a reset link is on its way. The link
-            expires in 30 minutes.
-          </div>
-        ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                {...register("email", {
-                  required: "Email is required",
-                  pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: "Invalid email address",
-                  },
-                })}
-                type="email"
-                autoComplete="email"
-                className="appearance-none relative block w-full px-3 py-2 border border-border placeholder-gray-500 text-fg rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Email address"
-              />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-              )}
-            </div>
-            <Button
-              type="submit"
-              className="w-full" size="lg"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Sending..." : "Send reset link"}
-            </Button>
-          </form>
+  return (
+    <AuthShell
+      title="ลืมรหัสผ่าน"
+      subtitle="กรอกอีเมลที่ใช้สมัคร เราจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ให้"
+      image="/landing/recover.webp"
+      footer={back}
+    >
+      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
+        {formError && (
+          <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            {formError}
+          </p>
         )}
-
-        <p className="text-center text-sm">
-          <Link href="/auth/login" className="font-medium text-blue-600 hover:text-blue-500">
-            Back to sign in
-          </Link>
-        </p>
-      </div>
-    </div>
+        <Field
+          id="email"
+          label="อีเมล"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          error={errors.email?.message}
+          {...register("email", EMAIL_RULES)}
+        />
+        <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? "กำลังส่ง..." : "ส่งลิงก์ตั้งรหัสผ่านใหม่"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
