@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wrench } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,10 +21,17 @@ export default function MaintenanceGate({ children }) {
   if (!maintenance || exempt) {
     return (
       <>
+        {/* Floating, so it never shifts the page (the home hero sits under
+            the transparent header). */}
         {maintenance && STAFF.includes(user?.role) && !pathname.startsWith("/admin") && (
-          <p className="bg-warning-soft py-2 text-center text-xs font-medium text-warning">
-            โหมดปิดปรับปรุงเปิดอยู่: ลูกค้าจะเห็นหน้าปิดปรับปรุงและสั่งซื้อไม่ได้
-          </p>
+          <Link
+            href="/admin"
+            role="status"
+            className="fixed bottom-4 left-4 z-[104] flex max-w-[calc(100vw-6rem)] items-center gap-2 rounded-full border border-warning/30 bg-warning-soft px-4 py-2 text-xs font-semibold text-warning shadow-lg sm:bottom-6 sm:left-6"
+          >
+            <Wrench className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate">ปิดปรับปรุงอยู่ ลูกค้าเห็นหน้าปิดปรับปรุง · ไปหน้าตั้งค่า</span>
+          </Link>
         )}
         {children}
       </>
