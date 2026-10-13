@@ -23,6 +23,7 @@
     "db:reset": "npm run migrate && npm run clearSeed && npm run seed:all",
     "docs:validate": "node scripts/validate-swagger.js",
     "storage:init": "node scripts/init-buckets.mjs",
+    "user:role": "node scripts/set-role.mjs",
     "audit:routes": "node scripts/audit-routes.js",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",

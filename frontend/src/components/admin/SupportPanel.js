@@ -448,7 +448,7 @@ function SupportSettings() {
             type="checkbox"
             checked={s.enabled}
             onChange={(e) => setS((x) => ({ ...x, enabled: e.target.checked }))}
-            className="h-4 w-4 rounded border-border text-fg focus:ring-fg"
+            className="h-4 w-4 rounded focus:ring-fg"
           />
           <span className="font-medium text-fg">เปิดให้ลูกค้าเริ่มแชทใหม่</span>
         </label>
@@ -610,7 +610,7 @@ function SupportSettings() {
                       aria-label={`${a.name} เป็นผู้ตอบแชท`}
                       checked={a.isAgent}
                       onChange={(e) => updateAgent(a, { isAgent: e.target.checked })}
-                      className="h-4 w-4 rounded border-border text-fg focus:ring-fg"
+                      className="h-4 w-4 rounded focus:ring-fg"
                     />
                   </td>
                   <td>

@@ -87,7 +87,7 @@ function ChoiceCard({ name, value, checked, onChange, children }) {
         checked ? "border-fg bg-fg/[0.03] ring-1 ring-fg" : "border-border hover:border-fg/50"
       }`}
     >
-      <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="mt-0.5 h-4 w-4 border-border text-fg focus:ring-fg" />
+      <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="mt-0.5 h-4 w-4 focus:ring-fg" />
       <span className="min-w-0 flex-1 text-sm">{children}</span>
     </label>
   );

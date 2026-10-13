@@ -179,7 +179,7 @@ export function ReviewsPanel() {
                     setEditingId(null);
                     reset();
                   }}
-                  className="flex items-center gap-2 bg-fg-subtle hover:bg-fg-subtle text-white text-base px-5 py-2 rounded-lg shadow transition"
+                  className="flex items-center gap-2 bg-fg hover:bg-fg/85 text-canvas text-base px-5 py-2 rounded-lg shadow transition"
                 >
                   <FaTimesCircle /> Cancel
                 </button>

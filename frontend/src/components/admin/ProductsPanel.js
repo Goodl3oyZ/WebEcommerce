@@ -950,7 +950,7 @@ export function ProductsPanel() {
                           type="checkbox"
                           id="hasVariants"
                           {...register("hasVariants")}
-                          className="h-4 w-4 text-fg border-border rounded focus:ring-fg"
+                          className="h-4 w-4 rounded focus:ring-fg"
                         />
                         <label
                           htmlFor="hasVariants"
@@ -1309,7 +1309,7 @@ export function ProductsPanel() {
                       <button
                         type="button"
                         onClick={() => setCurrentStep(0)}
-                        className="bg-fg-subtle text-white px-6 py-2 rounded-md hover:bg-fg flex items-center gap-2"
+                        className="bg-fg text-canvas px-6 py-2 rounded-md hover:bg-fg/85 flex items-center gap-2"
                       >
                         <FaArrowLeft />
                         กลับ
@@ -1452,7 +1452,7 @@ export function ProductsPanel() {
                       <button
                         type="button"
                         onClick={() => setCurrentStep(watchHasVariants ? 1 : 0)} // Go back to step 1 if hasVariants, else step 0
-                        className="bg-fg-subtle text-white px-6 py-2 rounded-md hover:bg-fg flex items-center gap-2"
+                        className="bg-fg text-canvas px-6 py-2 rounded-md hover:bg-fg/85 flex items-center gap-2"
                       >
                         <FaArrowLeft />
                         กลับ

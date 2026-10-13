@@ -143,7 +143,7 @@ function Filters({ params, categories, brands, update }) {
           type="checkbox"
           checked={params.get("inStock") === "true"}
           onChange={(e) => update({ inStock: e.target.checked ? "true" : "" })}
-          className="h-4 w-4 rounded border-border text-fg focus:ring-fg"
+          className="h-4 w-4 rounded focus:ring-fg"
         />
         แสดงเฉพาะสินค้าที่มีของ
       </label>

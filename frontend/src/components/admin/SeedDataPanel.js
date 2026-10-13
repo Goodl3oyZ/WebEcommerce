@@ -151,7 +151,9 @@ export function SeedDataPanel() {
     try {
       setPreview(await adminAPI.getSeedPreview());
     } catch (e) {
-      setError(e?.response?.status === 403 ? "เฉพาะ super admin เท่านั้นที่ใช้งานส่วนนี้ได้" : e?.response?.data?.message || e.message);
+      // The API client throws APIError (status on the error itself).
+      const status = e?.status ?? e?.response?.status;
+      setError(status === 403 ? "FORBIDDEN" : e?.response?.data?.message || e.message);
     }
   }, []);
 
@@ -188,7 +190,17 @@ export function SeedDataPanel() {
         </p>
       </div>
 
-      {error ? (
+      {error === "FORBIDDEN" ? (
+        <div className="space-y-2 rounded-xl border border-border bg-surface-muted p-4 text-sm text-fg">
+          <p className="font-medium">ส่วนนี้ใช้ได้เฉพาะ super admin</p>
+          <p className="text-fg-muted">
+            Seed ลบข้อมูลทั้งร้านได้ จึงจำกัดไว้ที่ super admin บัญชีนี้เป็น admin ธรรมดา ให้ผู้ดูแลเซิร์ฟเวอร์รันคำสั่งด้านล่าง แล้วออกจากระบบและเข้าใหม่
+          </p>
+          <code className="block overflow-x-auto rounded-lg bg-canvas px-3 py-2 text-xs text-fg">
+            docker exec backend npm run user:role -- อีเมลของคุณ super_admin
+          </code>
+        </div>
+      ) : error ? (
         <p className="rounded-xl bg-danger-soft p-4 text-sm text-danger">{error}</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
