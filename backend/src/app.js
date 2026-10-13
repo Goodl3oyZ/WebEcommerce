@@ -97,6 +97,8 @@ app.use(
       "Authorization",
       "X-Requested-With",
       "Accept",
+      // Sent by checkout so a retried request cannot create a second order.
+      "Idempotency-Key",
     ],
     exposedHeaders: ["Content-Range", "X-Content-Range"],
     credentials: true,
