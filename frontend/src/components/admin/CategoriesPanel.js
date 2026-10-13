@@ -6,7 +6,7 @@ import { FaEdit, FaImage, FaPlusCircle, FaTags, FaTimesCircle, FaTrash } from "r
 import { categoriesAPI } from "@/lib/api";
 import { adminAPI } from "@/lib/api/admin";
 import { uploadAPI } from "@/lib/api/upload";
-import CategoryArt from "@/components/shop/CategoryArt";
+import EntityThumb from "@/components/admin/ui/EntityThumb";
 
 const EMPTY = { name: "", description: "", imageUrl: null };
 const card = "rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-6";
@@ -135,22 +135,10 @@ export function CategoriesPanel() {
         <div>
           <p className="text-sm font-medium text-fg">รูปหน้าปก</p>
           <div className="mt-2 grid grid-cols-[8rem_1fr] items-start gap-4">
-            <div className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-border">
-              <CategoryArt
-                compact
-                sizes="128px"
-                category={{
-                  name: form.name,
-                  imageUrl: form.imageUrl,
-                  coverImage: categories.find((c) => c.id === editingId)?.coverImage ?? null,
-                }}
-              />
-            </div>
+            <EntityThumb src={form.imageUrl} name={form.name} size={128} />
             <div className="space-y-2 text-xs text-fg-muted">
               <p>
-                {form.imageUrl
-                  ? "รูปนี้จะแสดงในหน้าแรก (Shop by category)"
-                  : "ยังไม่มีรูปหน้าปก: หน้าร้านจะใช้รูปสินค้าล่าสุดในหมวดนี้ หรือถ้ายังไม่มีสินค้าที่มีรูป จะแสดงชื่อหมวดแบบตัวอักษรใหญ่ (ตามตัวอย่าง)"}
+                {form.imageUrl ? "รูปประจำหมวดหมู่" : "ยังไม่มีรูป: แสดงตัวอักษรแรกของชื่อแทน (แบบเดียวกับแบรนด์)"}
               </p>
               <div className="flex flex-wrap gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-2 font-medium text-fg hover:bg-surface-muted">
@@ -174,7 +162,7 @@ export function CategoriesPanel() {
                   </button>
                 )}
               </div>
-              <p className="text-fg-subtle">JPEG/PNG/WebP แนะนำแนวนอน 4:3 ขนาด 1200×900 ขึ้นไป</p>
+              <p className="text-fg-subtle">JPEG/PNG/WebP สี่เหลี่ยมจัตุรัส 512×512 ขึ้นไป</p>
             </div>
           </div>
         </div>
@@ -216,9 +204,7 @@ export function CategoriesPanel() {
           <ul className="divide-y divide-border">
             {categories.map((c) => (
               <li key={c.id} className={`flex items-center gap-4 py-3 ${editingId === c.id ? "bg-surface-muted/60" : ""}`}>
-                <div className="group relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border">
-                  <CategoryArt category={c} sizes="80px" compact />
-                </div>
+                <EntityThumb src={c.imageUrl} name={c.name} size={48} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-fg">{c.name}</p>
                   <p className="truncate text-xs text-fg-muted">

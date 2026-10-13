@@ -22,7 +22,7 @@ import useCartStore from "@/store/cartStore";
 import Image from "next/image";
 import ProductImage from "@/components/ui/ProductImage";
 import ShipmentProgress, { ReviewItemLink } from "@/components/shop/ShipmentProgress";
-import { carrierName, trackingUrl } from "@/lib/shipping";
+import { ORDER_STATUS_TH, carrierName, trackingUrl } from "@/lib/shipping";
 
 const ORDER_STATUS = {
   PENDING: "รอการชำระเงิน",
@@ -128,8 +128,26 @@ function getOrderProgressStatus(order, tracking) {
   };
 }
 
+const BADGE_TONE = {
+  delivered: "bg-success-soft text-success",
+  shipped: "bg-info-soft text-info",
+  processing: "bg-info-soft text-info",
+  paid: "bg-success-soft text-success",
+  confirmed: "bg-success-soft text-success",
+  pending: "bg-warning-soft text-warning",
+  cancelled: "bg-surface-muted text-fg-muted",
+  refunded: "bg-surface-muted text-fg-muted",
+  refund_requested: "bg-warning-soft text-warning",
+};
+
+/** The order's own status (the shipment record may not exist yet). */
 function OrderStatusBadge({ status, tracking }) {
-  const progress = getOrderProgressStatus(status, tracking);
+  const legacy = getOrderProgressStatus(status, tracking);
+  const progress = {
+    ...legacy,
+    label: ORDER_STATUS_TH[status?.status] ?? legacy.label,
+    color: BADGE_TONE[status?.status] ?? legacy.color,
+  };
   const Icon = progress.icon;
   return (
     <span
@@ -182,12 +200,14 @@ function OrderSummary({ order }) {
         <span>VAT 7%</span>
         <span>฿{Number(order.tax).toLocaleString()}</span>
       </div>
-      <div className="flex justify-between text-sm mb-1">
-        <span>ส่วนลด</span>
-        <span className="text-red-600">
-          -฿{Number(order.discount).toLocaleString()}
-        </span>
-      </div>
+      {Number(order.discount ?? order.discountAmount ?? 0) > 0 && (
+        <div className="flex justify-between text-sm mb-1">
+          <span>ส่วนลด</span>
+          <span className="text-danger">
+            -฿{Number(order.discount ?? order.discountAmount).toLocaleString()}
+          </span>
+        </div>
+      )}
       <hr className="my-2" />
       <div className="flex justify-between text-lg font-bold">
         <span>ยอดรวม</span>

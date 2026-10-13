@@ -77,6 +77,11 @@ export const productController = {
     res.status(204).send();
   },
 
+  async adminListReviews(req, res) {
+    const { rating, search } = req.query;
+    res.json(await productService.adminListReviews({ rating, search }, parsePagination(req.query, { defaultLimit: 20 })));
+  },
+
   async reviewEligibility(req, res) {
     res.json(await productService.reviewEligibility(req.params.id, req.user.id));
   },

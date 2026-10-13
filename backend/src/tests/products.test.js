@@ -187,6 +187,22 @@ describe("reviews", () => {
     expect(history.body.history.filter((h) => h.type === "review")).toHaveLength(1);
   });
 
+  test("admins list every review (filter by stars or text) and can remove one", async () => {
+    const item = await createProduct();
+    const { agent, user } = await loginAs("user");
+    const { agent: admin } = await loginAs("admin");
+    await orderWithProduct(user.id, item, "delivered");
+    const word = `zebra${randomUUID().slice(0, 6)}`;
+    const review = (await agent.post(`/api/products/${item.product.id}/review`).send({ rating: 2, comment: `Strap broke ${word}` })).body;
+
+    const found = await admin.get("/api/products/admin/reviews").query({ search: word });
+    expect(found.body.reviews.map((r) => r.id)).toEqual([review.id]);
+    expect(found.body.reviews[0]).toMatchObject({ product: { id: item.product.id }, user: { id: user.id } });
+    expect((await admin.get("/api/products/admin/reviews").query({ search: word, rating: 5 })).body.reviews).toHaveLength(0);
+    expect((await agent.get("/api/products/admin/reviews")).status).toBe(403);
+    expect((await admin.delete(`/api/products/${item.product.id}/review/${review.id}`)).status).toBe(204);
+  });
+
   test("validation and authentication", async () => {
     const item = await createProduct();
     const { product } = item;

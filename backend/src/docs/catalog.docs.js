@@ -32,6 +32,15 @@ documentRoutes("Products", [
   { method: "get", path: "/api/products/:id/reviews", summary: "A product's reviews and average rating", auth: "public", query: productDto.pageQuery, responses: { 200: "Reviews and pagination", 404: "Product not found" } },
   {
     method: "get",
+    path: "/api/products/admin/reviews",
+    summary: "All product reviews (moderation)",
+    description: "Newest first, with product and reviewer. Filter by `rating` or `search` (product, reviewer, comment). Remove one with DELETE /api/products/:id/review/:reviewId.",
+    auth: "admin",
+    query: productDto.adminReviewsQuery,
+    responses: { 200: "Reviews and pagination" },
+  },
+  {
+    method: "get",
     path: "/api/products/:id/review/eligibility",
     summary: "Can I review this product?",
     description:

@@ -25,7 +25,7 @@ export const ADMIN_NAV = [
   },
   {
     value: "reviews",
-    label: "รีวิวร้านค้า",
+    label: "รีวิวสินค้า",
     group: "แคตตาล็อก",
     keywords: "reviews ratings",
   },

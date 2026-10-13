@@ -30,6 +30,14 @@ router.get(
   validationMiddleware(productDto.listQuery, "query"),
   productController.getProductsByCategory
 );
+// Admin: every product review, newest first (before "/:id/..." so "admin" is not read as an id).
+router.get(
+  "/admin/reviews",
+  authMiddleware,
+  requireAdmin,
+  validationMiddleware(productDto.adminReviewsQuery, "query"),
+  productController.adminListReviews
+);
 router.get(
   "/:id/reviews",
   validationMiddleware(productDto.pageQuery, "query"),

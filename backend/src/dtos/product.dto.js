@@ -75,6 +75,13 @@ const atLeastOne = { message: "At least one field must be provided for update" }
 export const productDto = {
   listQuery,
   searchQuery: z.preprocess(normaliseSort, listFields.extend({ q: z.string().trim().min(1).max(100) })),
+  adminReviewsQuery: z.object({
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).optional().describe("Max 100 (larger values are capped)"),
+    rating: z.coerce.number().int().min(1).max(5).optional(),
+    search: z.string().trim().max(100).optional().describe("Product name, reviewer name or comment"),
+  }),
+
   pageQuery: z.object({
     page: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).optional(),

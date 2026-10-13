@@ -369,6 +369,36 @@ export const productService = {
     };
   },
 
+  /** Admin: all product reviews with product and reviewer, newest first. */
+  async adminListReviews({ rating, search }, pagination) {
+    const conditions = [];
+    if (rating) conditions.push(eq(productReviews.rating, rating));
+    if (search) {
+      const like = `%${search}%`;
+      conditions.push(
+        sql`(${productReviews.comment} ilike ${like}
+          or exists (select 1 from products p where p.id = ${productReviews.productId} and p.name ilike ${like})
+          or exists (select 1 from users u where u.id = ${productReviews.userId} and u.name ilike ${like}))`
+      );
+    }
+    const where = conditions.length ? and(...conditions) : undefined;
+    const [rows, [{ total }]] = await Promise.all([
+      db.query.productReviews.findMany({
+        where,
+        with: { user: reviewer, product: { columns: { id: true, name: true, imageUrl: true } } },
+        orderBy: [desc(productReviews.createdAt)],
+        limit: pagination.limit,
+        offset: pagination.offset,
+      }),
+      db.select({ total: sql`count(*)::int` }).from(productReviews).where(where),
+    ]);
+    const reviews = rows.map((r) => ({
+      ...r,
+      product: r.product && { ...r.product, imageUrl: resolveImages(r.product.imageUrl) },
+    }));
+    return { reviews, pagination: paginationMeta(total, pagination) };
+  },
+
   /**
    * Can this customer review the product? Only after receiving it in an
    * order, once per product. Also returns their review and the reward rule.
