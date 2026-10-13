@@ -311,7 +311,8 @@ describe("reports", () => {
     // Big enough to be today's top customer regardless of other test files' orders.
     const setup = await checkoutSetup(user, { price: "90000.00" });
     const order = (await agent.post("/api/orders/checkout").send(setup.body())).body.data;
-    const today = new Date().toISOString().slice(0, 10);
+    // Report days are Thai days (Asia/Bangkok), not UTC days.
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
     const range = { startDate: today, endDate: today };
 
     const sales = await admin.get("/api/reports/sales").query(range);
@@ -319,13 +320,19 @@ describe("reports", () => {
     expect(sales.body.totalRevenue).toBeGreaterThanOrEqual(Number(order.total));
     expect(sales.body.dailySales[0]).toMatchObject({ date: today });
     expect(sales.body.topProducts.length).toBeGreaterThan(0);
+    expect(sales.body.itemsSold).toBeGreaterThan(0);
+    const { grossSales, refunds, tax } = sales.body.breakdown;
+    expect(grossSales - refunds).toBeCloseTo(sales.body.totalRevenue, 2);
+    expect(tax).toBeGreaterThan(0);
     expect((await admin.get("/api/reports/sales").query({ groupBy: "month" })).body.groupBy).toBe("month");
 
     const orders = await admin.get("/api/reports/orders").query(range);
     expect(orders.body.statusBreakdown.some((s) => s.status === "paid")).toBe(true);
 
     const inventory = await admin.get("/api/reports/inventory");
-    expect(inventory.body).toEqual(expect.objectContaining({ totalProducts: expect.any(Number), lowStockItems: expect.any(Array) }));
+    expect(inventory.body).toEqual(
+      expect.objectContaining({ totalProducts: expect.any(Number), lowStockItems: expect.any(Array), outOfStockItems: expect.any(Array) })
+    );
     const store = await newStore();
     expect((await admin.get("/api/reports/inventory").query({ storeId: store.id })).body.totalProducts).toBe(0);
 

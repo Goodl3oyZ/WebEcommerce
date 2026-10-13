@@ -1,293 +1,280 @@
 "use client";
-import { useEffect, useState } from "react";
-import { adminAPI } from "@/lib/api";
-import toast from "react-hot-toast";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FaDownload, FaSyncAlt } from "react-icons/fa";
+import { adminAPI, categoriesAPI } from "@/lib/api";
 import { PanelSkeleton } from "@/components/admin/ui/PanelSkeleton";
 import ErrorState from "@/components/ErrorState";
-import EmptyState from "@/components/EmptyState";
+import {
+  PRESETS,
+  autoGroupBy,
+  downloadCsv,
+  presetRange,
+  previousRange,
+  rangeLabel,
+  today,
+} from "./reports/reportUtils";
+import {
+  CustomerReport,
+  InventoryReport,
+  OrdersReport,
+  SalesReport,
+  SupplierReport,
+  customerCsv,
+  inventoryCsv,
+  ordersCsv,
+  salesCsv,
+  supplierCsv,
+} from "./reports/ReportViews";
 
-const REPORT_TABS = [
-  { key: "sales", label: "ยอดขาย", icon: "💰" },
-  { key: "inventory", label: "สินค้าคงคลัง", icon: "📦" },
-  { key: "customer", label: "ลูกค้า", icon: "👥" },
+/**
+ * Reports: figures for a chosen period, compared with the period right before
+ * it, exportable as CSV. (The dashboard is the live "what needs attention now"
+ * view; this is for reviewing and handing numbers on.)
+ */
+const TABS = [
+  { id: "sales", label: "ยอดขาย", dated: true, compare: true, fetch: adminAPI.getSalesReport, View: SalesReport, csv: salesCsv },
+  { id: "orders", label: "ออเดอร์", dated: true, compare: true, fetch: adminAPI.getOrderReport, View: OrdersReport, csv: ordersCsv },
+  { id: "customer", label: "ลูกค้า", dated: true, compare: true, fetch: adminAPI.getCustomerReport, View: CustomerReport, csv: customerCsv },
+  { id: "inventory", label: "สินค้าคงคลัง", dated: false, fetch: adminAPI.getProductReport, View: InventoryReport, csv: inventoryCsv },
+  { id: "supplier", label: "ซัพพลายเออร์", dated: false, fetch: adminAPI.getSupplierReport, View: SupplierReport, csv: supplierCsv },
 ];
+const GROUPS = [
+  { id: "day", label: "วัน" },
+  { id: "week", label: "สัปดาห์" },
+  { id: "month", label: "เดือน" },
+];
+const TAB_KEY = "admin-report-tab";
 
-function StatCard({ label, value, sub, color = "blue" }) {
-  const colors = {
-    blue: "bg-surface-muted text-fg border-border",
-    green: "bg-success-soft text-success border-border",
-    orange: "bg-warning-soft text-warning border-border",
-    purple: "bg-surface-muted text-fg border-border",
-    red: "bg-danger-soft text-danger border-border",
-  };
-  return (
-    <div className={`rounded-xl border p-4 shadow-sm ${colors[color]}`}>
-      <div className="text-2xl font-extrabold">{value ?? "-"}</div>
-      <div className="text-sm font-medium mt-1">{label}</div>
-      {sub && <div className="text-xs opacity-70 mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
-function SalesReportView({ data }) {
-  if (!data)
-    return (
-      <EmptyState
-        title="ยังไม่มีข้อมูลยอดขาย"
-        description="เลือกช่วงวันที่แล้วกดดูรายงาน"
-      />
-    );
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="ยอดขายรวม" value={`฿${Number(data.totalRevenue || 0).toLocaleString("th-TH")}`} color="green" />
-        <StatCard label="ออเดอร์ทั้งหมด" value={data.totalOrders ?? 0} color="blue" />
-        <StatCard label="ออเดอร์เฉลี่ย" value={`฿${Number(data.averageOrderValue || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`} color="orange" />
-        <StatCard label="ยอดขาย (บาท)" value={`฿${Number(data.totalSales || data.totalRevenue || 0).toLocaleString("th-TH")}`} color="purple" />
-      </div>
-
-      {data.dailySales?.length > 0 && (
-        <div>
-          <h4 className="font-semibold text-fg mb-3">ยอดขายรายวัน (30 วันล่าสุด)</h4>
-          <div className="overflow-x-auto max-h-[70vh] rounded-xl border border-border">
-            <table className="min-w-full bg-surface text-sm">
-              <thead className="sticky top-0 z-10 bg-surface-muted">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-fg-muted">วันที่</th>
-                  <th className="px-4 py-3 text-right font-semibold text-fg-muted">จำนวนออเดอร์</th>
-                  <th className="px-4 py-3 text-right font-semibold text-fg-muted">ยอดขาย (บาท)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {data.dailySales.map((d, i) => (
-                  <tr key={i} className="hover:bg-surface-muted">
-                    <td className="px-4 py-2 text-fg">{d.date}</td>
-                    <td className="px-4 py-2 text-right text-fg">{d.count}</td>
-                    <td className="px-4 py-2 text-right font-semibold text-fg">฿{Number(d.total || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {data.statusBreakdown?.length > 0 && (
-        <div>
-          <h4 className="font-semibold text-fg mb-3">สถานะออเดอร์</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {data.statusBreakdown.map((s, i) => (
-              <StatCard key={i} label={s.status} value={s.count} sub={`฿${Number(s.total || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`} color={i % 2 === 0 ? "blue" : "green"} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function InventoryReportView({ data }) {
-  if (!data)
-    return (
-      <EmptyState
-        title="ยังไม่มีข้อมูลสินค้าคงคลัง"
-        description="เลือกช่วงวันที่แล้วกดดูรายงาน"
-      />
-    );
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="สินค้าทั้งหมด" value={data.totalProducts ?? 0} color="blue" />
-        <StatCard label="สินค้าใช้งานอยู่" value={data.activeProducts ?? 0} color="green" />
-        <StatCard label="ใกล้หมดสต็อก" value={data.lowStockCount ?? 0} color="orange" />
-        <StatCard label="หมดสต็อก" value={data.outOfStockCount ?? 0} color="red" />
-      </div>
-
-      {data.lowStockItems?.length > 0 && (
-        <div>
-          <h4 className="font-semibold text-fg mb-3 text-warning">⚠ สินค้าใกล้หมดสต็อก</h4>
-          <div className="overflow-x-auto max-h-[70vh] rounded-xl border border-border">
-            <table className="min-w-full bg-surface text-sm">
-              <thead className="sticky top-0 z-10 bg-warning-soft">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-warning">สินค้า</th>
-                  <th className="px-4 py-3 text-left font-semibold text-warning">SKU</th>
-                  <th className="px-4 py-3 text-right font-semibold text-warning">สต็อก</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {data.lowStockItems.map((item, i) => (
-                  <tr key={i} className="hover:bg-warning-soft">
-                    <td className="px-4 py-2 text-fg">{item.product?.name || item.name || "-"}</td>
-                    <td className="px-4 py-2 font-mono text-xs text-fg-muted">{item.sku || "-"}</td>
-                    <td className="px-4 py-2 text-right font-bold text-warning">{item.stock}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CustomerReportView({ data }) {
-  if (!data)
-    return (
-      <EmptyState
-        title="ยังไม่มีข้อมูลลูกค้า"
-        description="เลือกช่วงวันที่แล้วกดดูรายงาน"
-      />
-    );
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="ลูกค้าทั้งหมด" value={data.totalCustomers ?? 0} color="blue" />
-        <StatCard label="ลูกค้าใหม่ (30 วัน)" value={data.newCustomers ?? 0} color="green" />
-        <StatCard label="ลูกค้าประจำ" value={data.returningCustomers ?? 0} color="purple" />
-        <StatCard label="ยอดซื้อเฉลี่ย" value={`฿${Number(data.averageOrderValue || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`} color="orange" />
-      </div>
-
-      {data.topCustomers?.length > 0 && (
-        <div>
-          <h4 className="font-semibold text-fg mb-3">Top ลูกค้า</h4>
-          <div className="overflow-x-auto max-h-[70vh] rounded-xl border border-border">
-            <table className="min-w-full bg-surface text-sm">
-              <thead className="sticky top-0 z-10 bg-surface-muted">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-fg-muted">ชื่อ</th>
-                  <th className="px-4 py-3 text-left font-semibold text-fg-muted">อีเมล</th>
-                  <th className="px-4 py-3 text-right font-semibold text-fg-muted">ออเดอร์</th>
-                  <th className="px-4 py-3 text-right font-semibold text-fg-muted">ยอดรวม</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {data.topCustomers.map((c, i) => (
-                  <tr key={i} className="hover:bg-surface-muted">
-                    <td className="px-4 py-2 font-medium text-fg">{c.name || "-"}</td>
-                    <td className="px-4 py-2 text-fg-muted">{c.email || "-"}</td>
-                    <td className="px-4 py-2 text-right text-fg">{c.orderCount ?? "-"}</td>
-                    <td className="px-4 py-2 text-right font-semibold text-fg">฿{Number(c.totalSpent || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+const chip = (active) =>
+  `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+    active ? "bg-fg text-canvas" : "text-fg-muted hover:bg-surface-muted hover:text-fg"
+  }`;
 
 export function ReportsPanel() {
-  const [activeTab, setActiveTab] = useState("sales");
-  const [data, setData] = useState({ sales: null, inventory: null, customer: null });
-  const [loading, setLoading] = useState({});
-  const [errors, setErrors] = useState({});
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
-  });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [tabId, setTabId] = useState("sales");
+  const [preset, setPreset] = useState("30d");
+  const [custom, setCustom] = useState(() => presetRange("30d"));
+  const [groupOverride, setGroupOverride] = useState(null);
+  const [compare, setCompare] = useState(true);
+  const [inventoryFilter, setInventoryFilter] = useState({ threshold: 5, categoryId: "" });
+  const [categories, setCategories] = useState([]);
+  const [state, setState] = useState({ loading: true, error: null, data: null, previous: null });
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const loadReport = (tab) => {
-    const params = { startDate, endDate };
-    setLoading((l) => ({ ...l, [tab]: true }));
-    setErrors((e) => ({ ...e, [tab]: null }));
+  const tab = TABS.find((t) => t.id === tabId);
+  const range = preset === "custom" ? custom : presetRange(preset);
+  const prevRange = previousRange(range, preset);
+  const groupBy = groupOverride ?? autoGroupBy(range);
+  const validRange = range.start && range.end && range.start <= range.end;
 
-    const fetchers = {
-      sales: () => adminAPI.getSalesReport(params),
-      inventory: () => adminAPI.getProductReport(params),
-      customer: () => adminAPI.getCustomerReport(params),
-    };
-
-    fetchers[tab]?.()
-      .then((d) => {
-        setData((prev) => ({ ...prev, [tab]: d }));
-        setLoading((l) => ({ ...l, [tab]: false }));
-      })
-      .catch((err) => {
-        setErrors((e) => ({ ...e, [tab]: err.response?.data?.message || err.message || "โหลดข้อมูลไม่สำเร็จ" }));
-        setLoading((l) => ({ ...l, [tab]: false }));
-      });
+  // Remember the last tab.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TAB_KEY);
+      if (saved && TABS.some((t) => t.id === saved)) setTabId(saved);
+    } catch {}
+  }, []);
+  const chooseTab = (id) => {
+    setTabId(id);
+    try {
+      localStorage.setItem(TAB_KEY, id);
+    } catch {}
   };
 
   useEffect(() => {
-    loadReport(activeTab);
-  }, [activeTab]);
+    categoriesAPI
+      .getAllCategories()
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : rows?.data ?? []))
+      .catch(() => setCategories([]));
+  }, []);
 
-  const handleApplyFilter = () => {
-    setData((prev) => ({ ...prev, [activeTab]: null }));
-    loadReport(activeTab);
-  };
+  const params = useMemo(() => {
+    if (tab.id === "inventory") {
+      return { threshold: inventoryFilter.threshold, ...(inventoryFilter.categoryId && { categoryId: inventoryFilter.categoryId }) };
+    }
+    if (!tab.dated) return {};
+    return { startDate: range.start, endDate: range.end, ...(tab.id !== "customer" && { groupBy }) };
+  }, [tab, range.start, range.end, groupBy, inventoryFilter]);
 
-  const renderContent = () => {
-    if (loading[activeTab]) return <PanelSkeleton cards={4} rows={6} />;
-    if (errors[activeTab])
-      return (
-        <ErrorState
-          message={errors[activeTab]}
-          onRetry={() => loadReport(activeTab)}
-        />
-      );
-    if (activeTab === "sales") return <SalesReportView data={data.sales} />;
-    if (activeTab === "inventory") return <InventoryReportView data={data.inventory} />;
-    if (activeTab === "customer") return <CustomerReportView data={data.customer} />;
-    return null;
+  const load = useCallback(async () => {
+    if (tab.dated && !validRange) return;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const wantPrevious = tab.compare && compare;
+      const [data, previous] = await Promise.all([
+        tab.fetch(params),
+        wantPrevious ? tab.fetch({ ...params, startDate: prevRange.start, endDate: prevRange.end }) : null,
+      ]);
+      setState({ loading: false, error: null, data, previous });
+    } catch (err) {
+      setState({ loading: false, error: err?.response?.data?.message || err.message || "โหลดรายงานไม่สำเร็จ", data: null, previous: null });
+    }
+    // prevRange is derived from params' dates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, params, compare, validRange, reloadKey]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const exportCsv = () => {
+    if (!state.data) return;
+    const suffix = tab.dated ? `${range.start}_${range.end}` : today();
+    downloadCsv(`report-${tab.id}-${suffix}.csv`, tab.csv(state.data, { range, prevRange, previous: state.previous, groupBy }));
   };
 
   return (
-    <div className="p-2">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-fg">รายงาน</h2>
-        <div className="flex gap-2 items-center flex-wrap">
-          <input
-            type="date"
-            value={startDate}
-            max={endDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fg"
-          />
-          <span className="text-fg-subtle text-sm">ถึง</span>
-          <input
-            type="date"
-            value={endDate}
-            min={startDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fg"
-          />
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-fg">รายงาน</h2>
+          <p className="mt-1 text-sm text-fg-muted">
+            {tab.dated
+              ? `${rangeLabel(range)}${tab.compare && compare ? ` · เทียบกับ ${rangeLabel(prevRange)}` : ""}`
+              : "ข้อมูล ณ ตอนนี้ ไม่ขึ้นกับช่วงวันที่"}
+          </p>
+        </div>
+        <div className="flex gap-2">
           <button
-            onClick={handleApplyFilter}
-            className="bg-fg hover:bg-fg text-canvas px-4 py-2 rounded-lg text-sm font-medium transition"
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-fg hover:bg-surface-muted"
+            aria-label="โหลดใหม่"
           >
-            ดูรายงาน
+            <FaSyncAlt className={`h-3.5 w-3.5 ${state.loading ? "animate-spin" : ""}`} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={!state.data || state.loading}
+            className="inline-flex items-center gap-2 rounded-xl bg-fg px-4 py-2 text-sm font-semibold text-canvas hover:bg-fg/85 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <FaDownload className="h-3.5 w-3.5" aria-hidden /> ดาวน์โหลด CSV
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-surface-muted p-1 rounded-xl w-fit">
-        {REPORT_TABS.map((tab) => (
+      <nav className="flex gap-1 overflow-x-auto border-b border-border" aria-label="ประเภทรายงาน">
+        {TABS.map((t) => (
           <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === tab.key
-                ? "bg-surface text-fg shadow-sm"
-                : "text-fg-muted hover:text-fg"
+            key={t.id}
+            type="button"
+            onClick={() => chooseTab(t.id)}
+            aria-current={t.id === tabId ? "page" : undefined}
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+              t.id === tabId ? "border-fg text-fg" : "border-transparent text-fg-muted hover:text-fg"
             }`}
           >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
+            {t.label}
           </button>
         ))}
-      </div>
+      </nav>
 
-      {/* Content */}
-      {renderContent()}
+      {tab.dated ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-1" role="group" aria-label="ช่วงเวลา">
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={chip(preset === p.id)}
+                onClick={() => {
+                  if (p.id === "custom") setCustom(range);
+                  setPreset(p.id);
+                  setGroupOverride(null);
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {preset === "custom" && (
+              <div className="flex items-center gap-2 text-sm">
+                <input
+                  type="date"
+                  value={custom.start}
+                  max={custom.end || today()}
+                  onChange={(e) => setCustom((c) => ({ ...c, start: e.target.value }))}
+                  className="rounded-lg border border-border px-2 py-1.5 text-sm"
+                  aria-label="ตั้งแต่วันที่"
+                />
+                <span className="text-fg-muted">ถึง</span>
+                <input
+                  type="date"
+                  value={custom.end}
+                  min={custom.start}
+                  max={today()}
+                  onChange={(e) => setCustom((c) => ({ ...c, end: e.target.value }))}
+                  className="rounded-lg border border-border px-2 py-1.5 text-sm"
+                  aria-label="ถึงวันที่"
+                />
+              </div>
+            )}
+            {tab.id !== "customer" && (
+              <div className="flex rounded-lg bg-surface-muted p-0.5" role="group" aria-label="แบ่งตาม">
+                {GROUPS.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium ${groupBy === g.id ? "bg-surface text-fg shadow-sm" : "text-fg-muted"}`}
+                    onClick={() => setGroupOverride(g.id)}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-sm text-fg-muted">
+              <input type="checkbox" className="h-4 w-4 rounded" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
+              เทียบช่วงก่อน
+            </label>
+          </div>
+        </div>
+      ) : tab.id === "inventory" ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3 text-sm">
+          <label className="flex items-center gap-2 text-fg-muted">
+            หมวดหมู่
+            <select
+              value={inventoryFilter.categoryId}
+              onChange={(e) => setInventoryFilter((f) => ({ ...f, categoryId: e.target.value }))}
+              className="rounded-lg border border-border py-1.5 pl-2 pr-8 text-sm"
+            >
+              <option value="">ทั้งหมด</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-fg-muted">
+            ถือว่าใกล้หมดเมื่อเหลือ ≤
+            <input
+              type="number"
+              min="0"
+              max="999"
+              value={inventoryFilter.threshold}
+              onChange={(e) => setInventoryFilter((f) => ({ ...f, threshold: Math.max(0, Number(e.target.value) || 0) }))}
+              className="w-20 rounded-lg border border-border px-2 py-1.5 text-sm"
+            />
+            ชิ้น
+          </label>
+        </div>
+      ) : null}
+
+      {tab.dated && !validRange ? (
+        <p className="rounded-xl bg-warning-soft p-4 text-sm text-warning">เลือกวันที่เริ่มต้นให้ไม่เกินวันที่สิ้นสุด</p>
+      ) : state.loading && !state.data ? (
+        <PanelSkeleton cards={4} rows={6} />
+      ) : state.error ? (
+        <ErrorState message={state.error} onRetry={() => setReloadKey((k) => k + 1)} />
+      ) : state.data ? (
+        <div className={state.loading ? "opacity-60 transition-opacity" : "transition-opacity"} aria-busy={state.loading}>
+          <tab.View data={state.data} previous={state.previous} range={range} prevRange={prevRange} groupBy={groupBy} />
+        </div>
+      ) : null}
     </div>
   );
 }

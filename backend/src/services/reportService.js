@@ -22,30 +22,64 @@ const LOW_STOCK = 5;
 const BUCKETS = { day: "day", week: "week", month: "month", year: "year" };
 
 /**
- * Default range: the last 30 days. A plain date as endDate includes that whole
- * day. Without endDate there is no upper bound: comparing against the API
- * server's "now" would drop just-created rows whenever the database clock is
- * slightly ahead.
+ * Reports read days in the shop's time zone (timestamps are stored in UTC), so
+ * "1 Oct" means 1 Oct in Thailand and daily totals do not split at 07:00.
+ */
+const TZ = /^[A-Za-z_]+(\/[A-Za-z_]+)*$/.test(process.env.REPORT_TIMEZONE ?? "") ? process.env.REPORT_TIMEZONE : "Asia/Bangkok";
+const local = (column) => sql`(${column} at time zone 'UTC' at time zone ${sql.raw(`'${TZ}'`)})`;
+const PLAIN_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Today's date (YYYY-MM-DD) in the shop's time zone. */
+export const localToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+
+/**
+ * Default range: the last 30 days including today. Plain dates are whole days
+ * in the shop's time zone (endDate included). Without endDate there is no upper
+ * bound: comparing against the API server's "now" would drop just-created rows
+ * whenever the database clock is slightly ahead.
  */
 export function dateRange({ startDate, endDate }) {
-  const end = endDate ? new Date(endDate) : null;
-  if (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) end.setUTCDate(end.getUTCDate() + 1);
-  const start = startDate ? new Date(startDate) : new Date((end ?? new Date()).getTime() - 30 * 24 * 60 * 60 * 1000);
-  return { start, end };
+  let start = startDate;
+  if (!start) {
+    const base = new Date(`${endDate && PLAIN_DATE.test(endDate) ? endDate : localToday()}T00:00:00Z`);
+    base.setUTCDate(base.getUTCDate() - 29);
+    start = base.toISOString().slice(0, 10);
+  }
+  return { start, end: endDate ?? null, timeZone: TZ };
 }
 
-const inRange = (column, { start, end }) => and(gte(column, start), end ? lt(column, end) : undefined);
+function inRange(column, { start, end }) {
+  const lower = PLAIN_DATE.test(start) ? sql`${local(column)} >= ${start}::date` : gte(column, new Date(start));
+  if (!end) return lower;
+  const upper = PLAIN_DATE.test(end)
+    ? sql`${local(column)} < ${end}::date + 1`
+    : lt(column, new Date(end));
+  return and(lower, upper);
+}
+
 const net = sql`coalesce(sum(${orders.total}) - coalesce(sum(${orders.refundAmount}), 0), 0)`;
+const sumOf = (column) => sql`coalesce(sum(${column}), 0)`;
 
 export const reportService = {
   async generateSalesReport(query) {
     const range = dateRange(query);
     const bucket = BUCKETS[query.groupBy] ?? "day";
     const paid = and(inArray(orders.paymentStatus, PAID), inRange(orders.createdAt, range));
-    const period = sql`to_char(date_trunc(${sql.raw(`'${bucket}'`)}, ${orders.createdAt}), 'YYYY-MM-DD')`;
+    const period = sql`to_char(date_trunc(${sql.raw(`'${bucket}'`)}, ${local(orders.createdAt)}), 'YYYY-MM-DD')`;
 
-    const [[summary], series, statusBreakdown, topProducts, byCategory] = await Promise.all([
-      db.select({ totalRevenue: net, totalOrders: sql`count(*)::int` }).from(orders).where(paid),
+    const [[summary], series, statusBreakdown, topProducts, byCategory, [items]] = await Promise.all([
+      db
+        .select({
+          totalRevenue: net,
+          totalOrders: sql`count(*)::int`,
+          grossSales: sumOf(orders.total),
+          refunds: sumOf(orders.refundAmount),
+          discounts: sumOf(orders.discount),
+          shipping: sumOf(orders.shippingCost),
+          tax: sumOf(orders.tax),
+        })
+        .from(orders)
+        .where(paid),
       db
         .select({ date: period, count: sql`count(*)::int`, total: net })
         .from(orders)
@@ -80,6 +114,11 @@ export const reportService = {
         .where(paid)
         .groupBy(categories.id, categories.name)
         .orderBy(desc(sql`sum(${orderItems.subtotal})`)),
+      db
+        .select({ itemsSold: sql`coalesce(sum(${orderItems.quantity}), 0)::int` })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(paid),
     ]);
 
     const totalRevenue = Number(summary.totalRevenue);
@@ -90,6 +129,16 @@ export const reportService = {
       totalSales: totalRevenue,
       totalOrders: summary.totalOrders,
       averageOrderValue: summary.totalOrders ? Number((totalRevenue / summary.totalOrders).toFixed(2)) : 0,
+      itemsSold: items.itemsSold,
+      // Money breakdown of paid orders: gross (what customers paid, incl. VAT
+      // and shipping, after discounts) minus refunds = totalRevenue.
+      breakdown: {
+        grossSales: Number(summary.grossSales),
+        discounts: Number(summary.discounts),
+        shipping: Number(summary.shipping),
+        tax: Number(summary.tax),
+        refunds: Number(summary.refunds),
+      },
       dailySales: series.map((row) => ({ ...row, total: Number(row.total) })),
       statusBreakdown,
       topProducts: topProducts.map((p) => ({ ...p, revenue: Number(p.revenue) })),
@@ -102,7 +151,7 @@ export const reportService = {
     const range = dateRange(query);
     const bucket = BUCKETS[query.groupBy] ?? "day";
     const where = inRange(orders.createdAt, range);
-    const period = sql`to_char(date_trunc(${sql.raw(`'${bucket}'`)}, ${orders.createdAt}), 'YYYY-MM-DD')`;
+    const period = sql`to_char(date_trunc(${sql.raw(`'${bucket}'`)}, ${local(orders.createdAt)}), 'YYYY-MM-DD')`;
     const [[summary], statusBreakdown, paymentBreakdown, series] = await Promise.all([
       db.select({ totalOrders: sql`count(*)::int` }).from(orders).where(where),
       db.select({ status: orders.status, count: sql`count(*)::int` }).from(orders).where(where).groupBy(orders.status),
@@ -122,6 +171,7 @@ export const reportService = {
     return {
       period: range,
       totalOrders: summary.totalOrders,
+      groupBy: bucket,
       cancellationRate: summary.totalOrders ? Number((cancelled / summary.totalOrders).toFixed(4)) : 0,
       statusBreakdown,
       paymentBreakdown,
@@ -149,7 +199,7 @@ export const reportService = {
     }
 
     const productFilter = categoryId ? eq(products.categoryId, categoryId) : undefined;
-    const [[counts], [variantCounts], lowStockItems, valueRow] = await Promise.all([
+    const [[counts], [variantCounts], lowStockItems, valueRow, outOfStockItems] = await Promise.all([
       db
         .select({
           totalProducts: sql`count(*)::int`,
@@ -186,12 +236,27 @@ export const reportService = {
         .from(productVariants)
         .innerJoin(products, eq(productVariants.productId, products.id))
         .where(and(eq(products.isActive, true), productFilter)),
+      db
+        .select({
+          product: { id: products.id, name: products.name },
+          sku: productVariants.sku,
+          color: productVariants.color,
+          size: productVariants.size,
+          stock: productVariants.stock,
+        })
+        .from(productVariants)
+        .innerJoin(products, eq(productVariants.productId, products.id))
+        .where(and(eq(products.isActive, true), productFilter, eq(productVariants.stock, 0)))
+        .orderBy(asc(products.name))
+        .limit(100),
     ]);
     return {
       ...counts,
       ...variantCounts,
+      threshold,
       stockValue: Number(valueRow[0].value),
       lowStockItems,
+      outOfStockItems,
     };
   },
 

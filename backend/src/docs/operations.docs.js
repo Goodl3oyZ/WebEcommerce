@@ -146,7 +146,7 @@ documentRoutes("Admin", [
   },
 ]);
 
-const paidNote = "Money figures count paid orders (minus refunds).";
+const paidNote = "Money figures count paid orders (minus refunds). Plain dates are whole days in Thai time (REPORT_TIMEZONE, default Asia/Bangkok), endDate included.";
 documentRoutes("Reports", [
   { method: "get", path: "/api/reports/sales", summary: "Sales by period, top products and categories", description: paidNote, auth: "admin", query: reportDto.salesQuery, responses: { 200: "Sales report" } },
   { method: "get", path: "/api/reports/orders", summary: "All orders by status, payment status and period", auth: "admin", query: reportDto.ordersQuery, responses: { 200: "Orders report" } },
