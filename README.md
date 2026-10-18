@@ -8,7 +8,7 @@ A full-stack online store with a Thai storefront and an admin back office, runni
   verified reviews, loyalty points, coupons, wishlist, notifications, and live support chat.
 - **Admin panel:** dashboard and reports, products and inventory, orders and shipping, payments, reviews
   moderation, brands and categories, coupons, users and roles, support inbox, blog and About content, store
-  settings (name, logo, maintenance mode).
+  settings (name, logo, maintenance mode), and an audit log of every staff change and sign-in.
 - **Accounts:** email sign-up with verification, Google / GitHub / Facebook sign-in, httpOnly JWT cookies with
   refresh-token rotation, login lockout, and roles (`user`, `moderator`, `admin`, `super_admin`).
 

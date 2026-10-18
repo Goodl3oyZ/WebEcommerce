@@ -6,7 +6,7 @@ import { inventoryDto } from "../dtos/inventory.dto.js";
 import { supplierDto } from "../dtos/supplier.dto.js";
 import { reportDto } from "../dtos/report.dto.js";
 import { settingsDto } from "../dtos/settings.dto.js";
-import { seedDto, demoRemoveDto } from "../routes/adminRoutes.js";
+import { seedDto, demoRemoveDto, auditLogQuery } from "../routes/adminRoutes.js";
 
 documentRoutes("Wishlist", [
   { method: "get", path: "/api/wishlist", summary: "Your wishlist (products include stock)", auth: "user", responses: { 200: "Items" } },
@@ -100,6 +100,16 @@ documentRoutes("Suppliers", [
 
 documentRoutes("Admin", [
   { method: "get", path: "/api/admin/dashboard", summary: "Dashboard figures (paid orders only) and alerts", auth: "admin", responses: { 200: "Dashboard" } },
+  {
+    method: "get",
+    path: "/api/admin/audit-logs",
+    summary: "Who did what: staff changes and sign-in events, newest first",
+    description:
+      "Every successful POST/PUT/PATCH/DELETE by staff (moderator and up) is recorded with the route, target id and request body (secrets hidden), plus sign-ins, failed sign-ins, sign-ups and password changes for every account. Entries older than AUDIT_RETENTION_DAYS (default 365) are deleted.",
+    auth: "admin",
+    query: auditLogQuery,
+    responses: { 200: "{ logs, pagination }" },
+  },
   {
     method: "get",
     path: "/api/admin/seed/preview",

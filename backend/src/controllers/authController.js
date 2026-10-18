@@ -3,6 +3,7 @@ import { sendEmail } from "../utils/email.js";
 import { ENV } from "../config/loadENV.js";
 import { renderEmail } from "../utils/emailLayout.js";
 import { settingsService } from "../services/settingsService.js";
+import { writeAuditLog } from "../services/auditService.js";
 import {
   setAuthCookies,
   clearAuthCookies,
@@ -39,6 +40,7 @@ const authController = {
   async register(req, res) {
     const { email, password, name } = req.body;
     const user = await authService.register({ email, password, name });
+    await writeAuditLog({ actorId: user.id, actorEmail: user.email, entity: "auth", entityId: user.id, action: "register" });
 
     try {
       await sendVerificationEmail(user);
@@ -56,11 +58,22 @@ const authController = {
 
   async login(req, res) {
     const { email, password } = req.body;
-    const { user, accessToken, refreshToken, sessionId, role } = await authService.login(
-      email,
-      password,
-      clientInfo(req)
-    );
+    let result;
+    try {
+      result = await authService.login(email, password, clientInfo(req));
+    } catch (error) {
+      // Failed attempts show password guessing and locked accounts.
+      await writeAuditLog({
+        actorEmail: String(email || "").trim().toLowerCase(),
+        entity: "auth",
+        action: "login_failed",
+        statusCode: error.statusCode,
+        after: { code: error.code },
+      });
+      throw error;
+    }
+    const { user, accessToken, refreshToken, sessionId, role } = result;
+    await writeAuditLog({ actorId: user.id, actorEmail: user.email, actorRole: role, entity: "auth", entityId: user.id, action: "login" });
 
     await saveSession(req, user, sessionId);
     setAuthCookies(res, { accessToken, refreshToken });
@@ -175,7 +188,14 @@ const authController = {
 
   async resetPassword(req, res) {
     const { token, newPassword } = req.body;
-    await authService.resetPassword(token, newPassword);
+    const resetUser = await authService.resetPassword(token, newPassword);
+    await writeAuditLog({
+      actorId: resetUser?.id,
+      actorEmail: resetUser?.email,
+      entity: "auth",
+      entityId: resetUser?.id,
+      action: "password_reset",
+    });
     res.json({ status: "success", message: "Password reset successful. Please log in." });
   },
 
@@ -205,6 +225,7 @@ const authController = {
   async changePassword(req, res) {
     const { currentPassword, newPassword } = req.body;
     await authService.changePassword(req.user.id, currentPassword, newPassword, req.sessionId);
+    await writeAuditLog({ entity: "auth", entityId: req.user.id, action: "password_change" });
     res.json({ status: "success", message: "Password changed successfully" });
   },
 };

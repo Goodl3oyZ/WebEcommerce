@@ -20,6 +20,7 @@ import { setupRealtime } from "./realtime/index.js";
 
 import swaggerUi from "swagger-ui-express";
 import { routeModules } from "./routes/index.js";
+import { auditTrail } from "./middlewares/auditTrail.js";
 import { swaggerSpec } from "./config/swagger.js";
 
 const isProduction = ENV.SERVER.NODE_ENV === "production";
@@ -220,6 +221,9 @@ if (swaggerEnabled) {
   );
 }
 
+
+// Staff changes and their author, recorded once each request finishes.
+app.use(auditTrail);
 
 for (const [mountPath, router] of routeModules) {
   app.use(mountPath, router);

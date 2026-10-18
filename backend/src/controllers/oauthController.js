@@ -2,6 +2,7 @@ import { authService } from "../services/authService.js";
 import { userService } from "../services/userService.js";
 import { ENV } from "../config/loadENV.js";
 import { parseUserAgent } from "../utils/parseUserAgent.js";
+import { writeAuditLog } from "../services/auditService.js";
 import {
   setAuthCookies,
   clearAuthCookies,
@@ -26,6 +27,15 @@ export const oauthController = {
       );
       await saveSession(req, req.user, sessionId);
       setAuthCookies(res, { accessToken, refreshToken });
+      await writeAuditLog({
+        req,
+        actorId: req.user.id,
+        actorEmail: req.user.email,
+        entity: "auth",
+        entityId: req.user.id,
+        action: "login",
+        after: { provider: req.originalUrl?.match(/^\/oauth\/([^/?]+)/)?.[1] ?? null },
+      });
       res.redirect(`${ENV.SERVER.FRONTEND_URL}/auth/callback?success=true`);
     } catch (error) {
       console.error("OAuth callback failed:", error);

@@ -314,7 +314,7 @@ export const authService = {
       .where(eq(users.id, user.id));
     await revokeSessions(user.id);
     await redis.del([`lockout:${user.id}`, `login_fail:${user.id}`]);
-    return true;
+    return { id: user.id, email: user.email };
   },
 
   async changePassword(userId, currentPassword, newPassword, currentSessionId) {

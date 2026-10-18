@@ -1,5 +1,8 @@
 # Middlewares Overview
 
+- **auditTrail.js**  
+  บันทึกทุก POST/PUT/PATCH/DELETE ที่สำเร็จของทีมงาน (moderator ขึ้นไป) ลงตาราง `audit_logs`: ใคร, route, รหัสรายการ, body (ซ่อนรหัสผ่าน/secret) ดูได้ที่แอดมิน → ประวัติการใช้งาน
+
 - **authMiddleware.js**  
   ตรวจสอบ JWT/cookie/session, ดึง user จาก DB, set req.user, ตรวจสอบ owner
 

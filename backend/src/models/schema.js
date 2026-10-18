@@ -87,6 +87,39 @@ export const userSessionsRelations = relations(userSessions, ({ one }) => ({
   }),
 }));
 
+// Who did what: staff changes (recorded per request by auditTrail) and
+// sign-in events. The actor's email and role are copied so entries stay
+// readable after the account changes or is deleted.
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null", onUpdate: "cascade" }),
+    actorEmail: varchar("actor_email", { length: 255 }),
+    actorRole: varchar("actor_role", { length: 20 }),
+    action: varchar("action", { length: 50 }).notNull(),
+    entity: varchar("entity", { length: 50 }).notNull(),
+    entityId: varchar("entity_id", { length: 100 }),
+    method: varchar("method", { length: 10 }),
+    route: varchar("route", { length: 255 }),
+    statusCode: integer("status_code"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
+    actorIdx: index("audit_logs_actor_idx").on(table.actorId),
+    entityIdx: index("audit_logs_entity_idx").on(table.entity, table.entityId),
+  })
+);
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  actor: one(users, { fields: [auditLogs.actorId], references: [users.id] }),
+}));
+
 // Categories
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -1660,6 +1693,7 @@ export const supportAgentsRelations = relations(supportAgents, ({ one }) => ({
 export const allRelations = {
   users: usersRelations,
   userSessions: userSessionsRelations,
+  auditLogs: auditLogsRelations,
   categories: categoriesRelations,
   brands: brandsRelations,
   products: productsRelations,

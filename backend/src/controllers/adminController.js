@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { adminService } from "../services/adminService.js";
 import { demoDataService } from "../services/demoDataService.js";
-import { writeAuditLog } from "../services/auditService.js";
+import { auditService, writeAuditLog } from "../services/auditService.js";
 import { ENV } from "../config/loadENV.js";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -46,6 +46,10 @@ export const adminController = {
 
   async getDashboard(req, res) {
     res.json(await adminService.getDashboardData());
+  },
+
+  async listAuditLogs(req, res) {
+    res.json(await auditService.list(req.query));
   },
 
   /**

@@ -91,6 +91,12 @@ export const ADMIN_NAV = [
     keywords: "settings theme",
   },
   {
+    value: "audit",
+    label: "ประวัติการใช้งาน",
+    group: "ระบบ",
+    keywords: "audit log history activity security login",
+  },
+  {
     value: "seed",
     label: "Seed ข้อมูล",
     group: "ระบบ",

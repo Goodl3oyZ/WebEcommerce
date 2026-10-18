@@ -2,6 +2,7 @@ import { ENV } from "./src/config/loadENV.js";
 import { app, httpServer, io, redisClient } from "./src/app.js";
 import { startPaymentWorker } from "./src/workers/paymentWorker.js";
 import { startNotificationListener } from "./src/services/notificationDelivery.js";
+import { startAuditPruner } from "./src/services/auditService.js";
 
 const PORT = ENV.SERVER.PORT;
 if (process.env.NODE_ENV !== "test") {
@@ -12,6 +13,8 @@ if (process.env.NODE_ENV !== "test") {
   const stopPaymentWorker = startPaymentWorker();
   // Pushes committed notifications to sockets and sends order emails.
   const stopNotificationListener = startNotificationListener();
+  // Deletes audit entries older than AUDIT_RETENTION_DAYS (default 365).
+  const stopAuditPruner = startAuditPruner();
 
   // Graceful shutdown so in-flight requests finish during deploys/restarts.
   let shuttingDown = false;
@@ -28,6 +31,7 @@ if (process.env.NODE_ENV !== "test") {
 
     stopPaymentWorker();
     stopNotificationListener();
+    stopAuditPruner();
     // Closes socket connections and the underlying HTTP server.
     io.close(async () => {
       try {

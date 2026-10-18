@@ -27,19 +27,19 @@ export const contentController = {
 
   async create(req, res) {
     const post = await contentService.create(req.body, req.user.id);
-    await writeAuditLog({ actorId: req.user.id, entity: "post", entityId: post.id, action: "create", after: { title: post.title, status: post.status } });
+    await writeAuditLog({ actorId: req.user.id, entity: "content", entityId: post.id, action: "create", after: { title: post.title, status: post.status } });
     res.status(201).json(post);
   },
 
   async update(req, res) {
     const post = await contentService.update(req.params.id, req.body);
-    await writeAuditLog({ actorId: req.user.id, entity: "post", entityId: post.id, action: "update", after: { title: post.title, status: post.status } });
+    await writeAuditLog({ actorId: req.user.id, entity: "content", entityId: post.id, action: "update", after: { title: post.title, status: post.status } });
     res.json(post);
   },
 
   async remove(req, res) {
     await contentService.remove(req.params.id);
-    await writeAuditLog({ actorId: req.user.id, entity: "post", entityId: req.params.id, action: "delete" });
+    await writeAuditLog({ actorId: req.user.id, entity: "content", entityId: req.params.id, action: "delete" });
     res.status(204).send();
   },
 };

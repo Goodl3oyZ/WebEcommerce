@@ -71,6 +71,8 @@ export const adminAPI = {
   updateShippingInfo: async (orderId, data) =>
     axiosInstance.put(`/orders/admin/${orderId}/shipping`, data).then((r) => r.data),
   /** { reviews, pagination } — params: page, limit, rating, search */
+  listAuditLogs: async (params = {}) =>
+    axiosInstance.get("/admin/audit-logs", { params }).then((r) => r.data),
   listProductReviews: async (params = {}) =>
     axiosInstance.get("/products/admin/reviews", { params }).then((r) => r.data),
   getOrderPayments: async (orderId) =>
