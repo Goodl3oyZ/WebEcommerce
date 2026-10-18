@@ -174,6 +174,11 @@ export function OrdersPanel() {
       render: (o) => (
         <span>
           {statusLabel(o.status)}
+          {o.status === "refund_requested" && o.refundReason && (
+            <span className="block max-w-xs truncate text-xs text-warning" title={o.refundReason}>
+              {o.refundReason}
+            </span>
+          )}
           {o.trackingNumber && (
             <a href={trackingUrl(o.carrier, o.trackingNumber)} target="_blank" rel="noreferrer" className="block text-xs text-fg-subtle underline underline-offset-2">
               {carrierName(o.carrier)} {o.trackingNumber}
@@ -310,6 +315,17 @@ export function OrdersPanel() {
             <p className="mb-4 text-sm text-fg-muted">
               สถานะปัจจุบัน: {statusLabel(selected.status)}
             </p>
+            {selected.status === "refund_requested" && (
+              <div className="mb-4 rounded-xl border border-warning/30 bg-warning-soft p-3 text-sm text-warning">
+                <div className="font-semibold">
+                  ลูกค้าขอคืนเงิน ฿{Number(selected.refundAmount ?? selected.total).toLocaleString()}
+                </div>
+                {selected.refundReason && <div className="mt-1 break-words">เหตุผล: {selected.refundReason}</div>}
+                <div className="mt-2 text-xs">
+                  อนุมัติ: กด Refund ในตาราง (คืนเงินผ่าน Omise) · ไม่อนุมัติ: เลือกสถานะด้านล่างแล้วบันทึก
+                </div>
+              </div>
+            )}
             {(NEXT_STATUS[selected.status] || []).length === 0 ? (
               <p className="text-sm text-fg-muted">ไม่สามารถเปลี่ยนสถานะต่อได้</p>
             ) : (
@@ -320,7 +336,7 @@ export function OrdersPanel() {
               >
                 {(NEXT_STATUS[selected.status] || []).map((s) => (
                   <option key={s} value={s}>
-                    {statusLabel(s)}
+                    {selected.status === "refund_requested" && s === "delivered" ? "ไม่อนุมัติคำขอคืนเงิน" : statusLabel(s)}
                   </option>
                 ))}
               </select>

@@ -448,6 +448,111 @@ function PaymentModal({
   );
 }
 
+const REFUND_REASONS = ["สินค้าชำรุดหรือเสียหาย", "ได้รับสินค้าไม่ตรงกับที่สั่ง", "ได้รับสินค้าไม่ครบ", "สินค้าไม่ตรงตามคำอธิบาย"];
+
+/** Ask the shop for a refund of a delivered order. No money moves until an admin approves. */
+function RefundModal({ order, onClose, onSent }) {
+  const [choice, setChoice] = useState(REFUND_REASONS[0]);
+  const [details, setDetails] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const other = choice === "other";
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const reason = other ? details.trim() : [choice, details.trim()].filter(Boolean).join(": ");
+    if (!reason) {
+      setError("กรุณาบอกเหตุผลที่ขอคืนเงิน");
+      return;
+    }
+    setSending(true);
+    try {
+      await orderAPI.refundOrder(order.id, { reason });
+      toast.success("ส่งคำขอคืนเงินแล้ว ร้านจะตรวจสอบและแจ้งผลให้ทราบ");
+      onSent();
+    } catch (err) {
+      setError(err.message || "ส่งคำขอไม่สำเร็จ ลองอีกครั้ง");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <form
+        onSubmit={submit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="refund-title"
+        className="relative w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl sm:p-8"
+      >
+        <button
+          type="button"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full text-xl text-fg-subtle hover:bg-fg/5 hover:text-fg"
+          onClick={onClose}
+          aria-label="ปิด"
+        >
+          ×
+        </button>
+        <h2 id="refund-title" className="mb-1 text-xl font-bold text-fg">
+          ขอคืนเงิน
+        </h2>
+        <p className="mb-5 text-sm text-fg-muted">
+          คำสั่งซื้อ #{order.orderNumber || order.id} ยอด ฿{Number(order.total).toLocaleString()}
+        </p>
+        <fieldset className="mb-4 space-y-2">
+          <legend className="mb-2 text-sm font-medium text-fg">เหตุผล</legend>
+          {[...REFUND_REASONS, "other"].map((value) => (
+            <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-fg">
+              <input type="radio" name="refund-reason" value={value} checked={choice === value} onChange={() => setChoice(value)} />
+              {value === "other" ? "อื่น ๆ" : value}
+            </label>
+          ))}
+        </fieldset>
+        <label htmlFor="refund-details" className="mb-1 block text-sm font-medium text-fg">
+          รายละเอียด{other ? "" : " (ถ้ามี)"}
+        </label>
+        <textarea
+          id="refund-details"
+          rows={3}
+          maxLength={800}
+          value={details}
+          onChange={(e) => {
+            setDetails(e.target.value);
+            setError("");
+          }}
+          placeholder="เช่น กล่องบุบ สินค้าแตก หรือได้สีผิด"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:border-fg focus:outline-none focus:ring-2 focus:ring-fg/10"
+        />
+        {error && (
+          <p role="alert" className="mt-2 rounded-lg bg-danger/10 px-3 py-2 text-sm font-medium text-danger">
+            {error}
+          </p>
+        )}
+        <p className="mt-3 text-xs text-fg-muted">
+          ร้านจะตรวจสอบคำขอก่อนคืนเงิน ถ้าอนุมัติ เงินจะคืนเข้าช่องทางที่ชำระไว้ หากต้องส่งรูปหรือส่งสินค้าคืน ทีมงานจะติดต่อทางแชท
+        </p>
+        <div className="mt-5 flex gap-3">
+          <button
+            type="submit"
+            disabled={sending}
+            className="flex-1 rounded-full bg-fg px-4 py-3 font-semibold text-canvas transition-colors hover:bg-fg/85 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {sending ? "กำลังส่ง..." : "ส่งคำขอ"}
+          </button>
+          <button
+            type="button"
+            className="flex-1 rounded-full border border-border px-4 py-3 font-semibold text-fg transition-colors hover:bg-fg/5"
+            onClick={onClose}
+          >
+            ยกเลิก
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function OrderDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -458,6 +563,7 @@ export default function OrderDetailsPage() {
   const [paymentMethod, setPaymentMethod] = useState("credit_card");
   const [isPaying, setIsPaying] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
+  const [showRefund, setShowRefund] = useState(false);
   const addToCart = useCartStore((state) => state.addItem);
   const [cardErrors, setCardErrors] = useState({});
   const [cardInfo, setCardInfo] = useState({
@@ -486,6 +592,15 @@ export default function OrderDetailsPage() {
   useEffect(() => {
     loadOrderDetails();
   }, [loadOrderDetails]);
+
+  // The orders list links here with ?refund=1 to open the refund form.
+  useEffect(() => {
+    if (order?.status !== "delivered") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("refund") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    setShowRefund(true);
+  }, [order?.status]);
 
   // Back from the bank's 3-D Secure page: ask for the result now instead of
   // waiting for the webhook.
@@ -682,6 +797,23 @@ export default function OrderDetailsPage() {
           </button>
         </div>
       )}
+      {order.status === "delivered" && order.paymentStatus === "completed" && (
+        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-fg">มีปัญหากับสินค้า? ขอคืนเงินได้ ร้านจะตรวจสอบและแจ้งผลให้ทราบ</div>
+          <button
+            className="border border-border hover:bg-fg/5 text-fg px-5 py-2 rounded-lg font-semibold"
+            onClick={() => setShowRefund(true)}
+          >
+            ขอคืนเงิน
+          </button>
+        </div>
+      )}
+      {order.status === "refund_requested" && (
+        <div className="rounded-xl border border-warning/30 bg-warning-soft p-4 text-sm text-warning" role="status">
+          <div className="font-semibold">ส่งคำขอคืนเงินแล้ว รอร้านตรวจสอบ</div>
+          {order.refundReason && <div className="mt-1">เหตุผล: {order.refundReason}</div>}
+        </div>
+      )}
       {/* Order Items */}
       <div className="bg-surface rounded-xl shadow p-6 border">
         <div className="flex items-center gap-2 mb-4 text-lg font-bold text-fg">
@@ -698,6 +830,16 @@ export default function OrderDetailsPage() {
         <ShippingInfo order={order} tracking={tracking} />
         <PaymentInfo order={order} />
       </div>
+      {showRefund && (
+        <RefundModal
+          order={order}
+          onClose={() => setShowRefund(false)}
+          onSent={() => {
+            setShowRefund(false);
+            loadOrderDetails();
+          }}
+        />
+      )}
       {/* Payment Modal */}
       <PaymentModal
         show={showPaymentModal}
