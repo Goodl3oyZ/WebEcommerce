@@ -4,12 +4,14 @@ Backend API for WebEcommerce.
 
 ## Tech Stack
 
-- Node.js (ESM)
+- Node.js 24 (ESM)
 - Express 5
 - Drizzle ORM + PostgreSQL
-- Redis
-- MinIO
-- JWT + Passport OAuth
+- Redis (sessions, rate limits)
+- SeaweedFS S3 gateway for images (through the `minio` S3 client)
+- JWT cookies with refresh-token rotation + Passport OAuth (Google, GitHub, Facebook)
+- Socket.IO (support chat, notifications), Omise (PromptPay, cards), Nodemailer
+- Jest + Supertest
 
 ## Directory Overview
 
@@ -45,7 +47,7 @@ npm install
 npm run dev
 ```
 
-You must provide working PostgreSQL, Redis, and MinIO endpoints in `.env`.
+You must provide working PostgreSQL, Redis, and S3 (SeaweedFS) endpoints in `.env`.
 
 ## Database Commands
 
@@ -62,24 +64,27 @@ npm run migrate:sql
 # Seed all sample data (users, shipping, Thai addresses)
 npm run seed:all
 
+# About page and starter blog posts (only adds what is missing)
+npm run seed:content
+
+# Give an account a role: user | moderator | admin | super_admin
+npm run user:role -- you@example.com super_admin
+
 # Migrate + seed in one step
 npm run db:setup
 
 npm run clearSeed   # wipe all tables
 ```
 
-For Docker (production compose):
+For the production stack, run these through the root compose file (see `../DEPLOYMENT.md`):
 
 ```bash
-docker compose exec backend npm run migrate
-docker compose exec backend npm run seed:all
-# or
-docker compose exec backend npm run db:setup
+docker compose --env-file .env.production -f docker-compose.prod.yml exec backend npm run seed:all
 ```
 
 Schema source: `src/models/schema.js`. Old migration chain (0000–0014) was removed.
 
-If seed fails with `relation does not exist`, run `npm run migrate` first. For a empty DB volume, `npm run db:setup` is enough.
+If seed fails with `relation does not exist`, run `npm run migrate` first. For an empty DB volume, `npm run db:setup` is enough.
 
 ## Request Flow
 
@@ -95,6 +100,12 @@ Example:
   -> productController.getProducts
   -> productService.getProducts
   -> db.select(...).from(products)
+```
+
+## Tests
+
+```bash
+npm test   # starts docker-compose.test.yml (PostgreSQL, Redis, SeaweedFS) and runs Jest
 ```
 
 ## Notes

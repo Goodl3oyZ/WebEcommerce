@@ -4,11 +4,11 @@ Frontend application for WebEcommerce, built with Next.js App Router.
 
 ## Stack
 
-- Next.js 15
+- Next.js 16 (App Router)
 - React 19
-- Axios
-- React Query
 - Tailwind CSS
+- TanStack Query, Zustand (cart, UI state)
+- Axios (cookies + automatic session refresh, see `src/lib/api/sessionRefresh.js`)
 
 ## Run (Docker)
 
@@ -52,6 +52,14 @@ npm run docker:dev     # start frontend via backend compose file
 - `next.config.mjs` includes rewrite from `/api/*` to backend service.
 - For external images, configure `images.remotePatterns` in `next.config.mjs`.
 
+## Sign-in and protected pages
+
+- `src/middleware.js` guards `/admin`, `/profile`, `/orders`, and `/checkout` by checking the `accessToken`
+  cookie. When it has expired but a `refreshToken` cookie remains, the request goes to `/auth/refresh`,
+  which renews the session and returns to the page; otherwise to `/auth/login`.
+- API calls that get a 401 refresh the session once and retry. If the refresh fails, the signed-in user is
+  cleared from the UI (`AuthContext` listens for the session-expired event).
+
 ## Common Issues
 
 - **Image host blocked by Next/Image**
@@ -60,3 +68,5 @@ npm run docker:dev     # start frontend via backend compose file
   - Ensure backend migrate + seed are done.
 - **Cannot reach API in Docker**
   - Confirm backend container is healthy and port `5000` is exposed.
+- **Sent back to login on admin pages in local dev**
+  - The frontend needs the same `JWT_SECRET` as the backend to verify the access token in the middleware.
