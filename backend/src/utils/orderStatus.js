@@ -20,9 +20,19 @@ export const ORDER_TRANSITIONS = {
 
 export const ORDER_STATUSES = Object.keys(ORDER_TRANSITIONS);
 
-export function assertOrderTransition(from, to) {
+/**
+ * Pickup orders are never shipped: the customer collects the prepared order
+ * at the branch, which takes it from "processing" straight to "delivered".
+ */
+const PICKUP_TRANSITIONS = {
+  ...ORDER_TRANSITIONS,
+  processing: ["delivered", "cancelled", "refunded"],
+};
+
+export function assertOrderTransition(from, to, fulfillment = "delivery") {
   if (from === to) return;
-  const allowed = ORDER_TRANSITIONS[from] || [];
+  const table = fulfillment === "pickup" ? PICKUP_TRANSITIONS : ORDER_TRANSITIONS;
+  const allowed = table[from] || [];
   if (!allowed.includes(to)) {
     throw ApiError.badRequest(`ไม่สามารถเปลี่ยนสถานะจาก "${from}" เป็น "${to}" ได้`);
   }

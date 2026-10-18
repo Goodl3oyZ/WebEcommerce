@@ -14,6 +14,8 @@ import {
   shippingMethods,
   shipments,
   paymentTransactions,
+  stores,
+  storePickups,
 } from "../models/schema.js";
 import { eq, and, desc, sql, gte, lte, ilike, or, inArray, isNull } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
@@ -24,6 +26,7 @@ import { paymentService, chargeForClient } from "./paymentService.js";
 import { settingsService } from "./settingsService.js";
 import { couponService } from "./couponService.js";
 import { setOrderStatus, cancelOrder, recordMovements } from "./orderLifecycle.js";
+import { notifyPickupReady } from "./orderNotifications.js";
 
 /** Minutes a customer has to pay before an unpaid order expires (stock released). */
 export const PAYMENT_DEADLINE_MINUTES = Number(process.env.PAYMENT_DEADLINE_MINUTES) || 30;
@@ -81,9 +84,16 @@ const orderDetails = {
   shippingAddress: true,
   billingAddress: true,
   paymentMethod: true,
+  pickups: { with: { store: true } },
 };
 
+/** Image URLs resolved, and the pickup branch (if any) as `pickup`. */
 function withImageUrls(order) {
+  if (order.pickups) {
+    const [pickup] = order.pickups;
+    order.pickup = pickup ? { ...pickup, store: pickup.store && publicStore(pickup.store) } : null;
+    delete order.pickups;
+  }
   for (const item of order.items ?? []) {
     const product = item.product;
     if (!product?.imageUrl) continue;
@@ -106,6 +116,35 @@ function mergeItems(items) {
     else byVariant.set(item.variantId, { ...item });
   }
   return [...byVariant.values()];
+}
+
+const publicStore = ({ id, name, address, city, state, postalCode, phone, description }) => ({
+  id,
+  name,
+  address,
+  city,
+  state,
+  postalCode,
+  phone,
+  description,
+});
+
+/** The customer collected a pickup order (it must be ready first). */
+async function collectPickup(tx, order, actorId) {
+  const pickup = await tx.query.storePickups.findFirst({ where: eq(storePickups.orderId, order.id) });
+  if (pickup?.status !== "ready") {
+    throw ApiError.badRequest("Mark the order ready for pickup before handing it over");
+  }
+  const updated = await setOrderStatus(tx, order, "delivered", {
+    comment: "Collected at the branch",
+    actorId,
+    extra: { shippingStatus: "delivered" },
+  });
+  await tx
+    .update(storePickups)
+    .set({ status: "collected", pickupDate: new Date() })
+    .where(eq(storePickups.id, pickup.id));
+  return updated;
 }
 
 export const orderService = {
@@ -158,7 +197,9 @@ export const orderService = {
     // Reserve rows in one global order (by variant id) so two checkouts with
     // the same products can never deadlock on each other.
     items.sort((a, b) => a.variantId.localeCompare(b.variantId));
-    const shippingAddressId = orderData.shippingAddressId;
+    // Pickup orders are collected at a branch: no address, shipping method or fee.
+    const pickupStoreId = orderData.pickupStoreId ?? null;
+    const shippingAddressId = pickupStoreId ? null : orderData.shippingAddressId;
     const billingAddressId = orderData.billingAddressId ?? shippingAddressId;
 
     // Idempotency: a retried checkout (double click, network retry) with the
@@ -178,23 +219,34 @@ export const orderService = {
     let created;
     try {
       created = await withRetry(() => db.transaction(async (tx) => {
-      const [shippingAddress, billingAddress] = await Promise.all([
+      const ownAddress = (id) =>
         tx.query.addresses.findFirst({
-          where: and(eq(addresses.id, shippingAddressId), eq(addresses.userId, userId), isNull(addresses.archivedAt)),
-        }),
-        tx.query.addresses.findFirst({
-          where: and(eq(addresses.id, billingAddressId), eq(addresses.userId, userId), isNull(addresses.archivedAt)),
-        }),
-      ]);
-      if (!shippingAddress || !billingAddress) {
-        throw ApiError.badRequest("Invalid shipping or billing address");
-      }
-
-      const shippingMethod = await tx.query.shippingMethods.findFirst({
-        where: eq(shippingMethods.id, orderData.shippingMethodId),
-      });
-      if (!shippingMethod?.isActive) {
-        throw ApiError.badRequest("Invalid shipping method");
+          where: and(eq(addresses.id, id), eq(addresses.userId, userId), isNull(addresses.archivedAt)),
+        });
+      let shippingMethod = null;
+      let pickupStore = null;
+      if (pickupStoreId) {
+        pickupStore = await tx.query.stores.findFirst({ where: eq(stores.id, pickupStoreId) });
+        if (!pickupStore?.isActive) {
+          throw ApiError.badRequest("This branch is not available for pickup");
+        }
+        if (billingAddressId && !(await ownAddress(billingAddressId))) {
+          throw ApiError.badRequest("Invalid billing address");
+        }
+      } else {
+        const [shippingAddress, billingAddress] = await Promise.all([
+          ownAddress(shippingAddressId),
+          ownAddress(billingAddressId),
+        ]);
+        if (!shippingAddress || !billingAddress) {
+          throw ApiError.badRequest("Invalid shipping or billing address");
+        }
+        shippingMethod = await tx.query.shippingMethods.findFirst({
+          where: eq(shippingMethods.id, orderData.shippingMethodId),
+        });
+        if (!shippingMethod?.isActive) {
+          throw ApiError.badRequest("Invalid shipping method");
+        }
       }
       const paymentMethod = await tx.query.paymentMethods.findFirst({
         where: eq(paymentMethods.id, orderData.paymentMethodId),
@@ -236,12 +288,15 @@ export const orderService = {
         lines.push({ ...item, price, lineTotal: price * item.quantity });
       }
 
-      const shippingOptions = await shippingService.calculateShippingCost(shippingAddressId, items);
-      const shippingOption = shippingOptions.find((m) => m.methodId === shippingMethod.id);
-      if (!shippingOption) {
-        throw ApiError.badRequest("Shipping method not available for this address");
+      let shippingCost = 0;
+      if (shippingMethod) {
+        const shippingOptions = await shippingService.calculateShippingCost(shippingAddressId, items);
+        const shippingOption = shippingOptions.find((m) => m.methodId === shippingMethod.id);
+        if (!shippingOption) {
+          throw ApiError.badRequest("Shipping method not available for this address");
+        }
+        shippingCost = toSatang(shippingOption.cost);
       }
-      const shippingCost = toSatang(shippingOption.cost);
 
       let coupon = null;
       let discount = 0;
@@ -264,6 +319,7 @@ export const orderService = {
           status: "pending",
           paymentStatus: "pending",
           shippingStatus: "pending",
+          fulfillment: pickupStore ? "pickup" : "delivery",
           subtotal: fromSatang(subtotal),
           shippingCost: fromSatang(shippingCost),
           discount: fromSatang(discount),
@@ -271,7 +327,7 @@ export const orderService = {
           total: fromSatang(total),
           shippingAddressId,
           billingAddressId,
-          shippingMethodId: shippingMethod.id,
+          shippingMethodId: shippingMethod?.id ?? null,
           paymentMethodId: paymentMethod.id,
           notes: orderData.notes ?? null,
           idempotencyKey,
@@ -306,11 +362,15 @@ export const orderService = {
         createdBy: userId,
       });
 
-      const shipment = await shippingService.createShippingLabel(order.id, shippingMethod.id, tx);
-      await tx
-        .update(orders)
-        .set({ trackingNumber: shipment.trackingNumber, carrier: shippingMethod.name })
-        .where(eq(orders.id, order.id));
+      if (pickupStore) {
+        await tx.insert(storePickups).values({ orderId: order.id, storeId: pickupStore.id });
+      } else {
+        const shipment = await shippingService.createShippingLabel(order.id, shippingMethod.id, tx);
+        await tx
+          .update(orders)
+          .set({ trackingNumber: shipment.trackingNumber, carrier: shippingMethod.name })
+          .where(eq(orders.id, order.id));
+      }
 
       // The purchased variants leave the cart.
       const cart = await tx.query.carts.findFirst({ where: eq(carts.userId, userId) });
@@ -460,6 +520,9 @@ export const orderService = {
         return cancelOrder(tx, order, { reason: notes, actorId });
       }
 
+      if (order.fulfillment === "pickup" && status === "delivered") {
+        return collectPickup(tx, order, actorId);
+      }
       const extra = {};
       if (notes) extra.statusNotes = notes;
       if (trackingNumber) extra.trackingNumber = trackingNumber;
@@ -478,6 +541,54 @@ export const orderService = {
     return updated;
   },
 
+  /**
+   * Admin: a pickup order is "ready" (prepared and waiting at the branch; the
+   * customer is told to come) or "collected" (handed over: the order is delivered).
+   */
+  async updatePickup(orderId, { status }, actorId) {
+    await db.transaction(async (tx) => {
+      const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderId) });
+      if (!order) throw ApiError.notFound("ไม่พบออเดอร์");
+      if (order.fulfillment !== "pickup") throw ApiError.badRequest("This order is shipped, not collected at a branch");
+      if (status === "collected") return collectPickup(tx, order, actorId);
+
+      if (!["paid", "confirmed", "processing"].includes(order.status)) {
+        throw ApiError.badRequest(`A ${order.status} order cannot be made ready for pickup`);
+      }
+      const current =
+        order.status === "processing"
+          ? order
+          : await setOrderStatus(tx, order, "processing", { comment: "Prepared for pickup", actorId });
+      const pickup = await tx.query.storePickups.findFirst({
+        where: eq(storePickups.orderId, order.id),
+        with: { store: true },
+      });
+      if (!pickup) throw ApiError.notFound("Pickup branch not found for this order");
+      if (pickup.status !== "ready") {
+        await tx
+          .update(storePickups)
+          .set({ status: "ready", readyAt: new Date() })
+          .where(eq(storePickups.id, pickup.id));
+        await tx.insert(orderStatusHistory).values({
+          orderId: order.id,
+          status: current.status,
+          comment: `Ready for pickup at ${pickup.store?.name ?? "the branch"}`,
+          createdBy: actorId ?? null,
+        });
+        await notifyPickupReady(tx, current, pickup.store?.name);
+      }
+      return current;
+    });
+    await writeAuditLog({
+      actorId,
+      entity: "orders",
+      entityId: orderId,
+      action: status === "collected" ? "pickup_collected" : "pickup_ready",
+      after: { status },
+    });
+    return this.getOrderById(null, orderId, db, { isAdmin: true });
+  },
+
   /** Admin: carrier/tracking details, mirrored onto the shipment record. */
   async updateShippingInfo(orderId, { trackingNumber, carrier, status, estimatedDelivery }, actorId) {
     return db.transaction(async (tx) => {
@@ -485,6 +596,9 @@ export const orderService = {
       if (!order) throw ApiError.notFound("ไม่พบออเดอร์");
       if (["cancelled", "refunded"].includes(order.status)) {
         throw ApiError.badRequest(`Cannot update shipping for a ${order.status} order`);
+      }
+      if (order.fulfillment === "pickup") {
+        throw ApiError.badRequest("This order is collected at a branch, not shipped");
       }
 
       const changes = { trackingNumber, updatedAt: new Date() };

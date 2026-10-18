@@ -16,6 +16,7 @@ import {
   MapPin,
   Calendar,
   AlertCircle,
+  Store,
 } from "lucide-react";
 import { paymentsAPI } from "@/lib/api/payment";
 import useCartStore from "@/store/cartStore";
@@ -193,8 +194,8 @@ function OrderSummary({ order }) {
         <span>฿{Number(order.subtotal).toLocaleString()}</span>
       </div>
       <div className="flex justify-between text-sm mb-1">
-        <span>ค่าจัดส่ง</span>
-        <span>฿{Number(order.shippingCost).toLocaleString()}</span>
+        <span>{order.fulfillment === "pickup" ? "รับที่สาขา" : "ค่าจัดส่ง"}</span>
+        <span>{order.fulfillment === "pickup" ? "ฟรี" : `฿${Number(order.shippingCost).toLocaleString()}`}</span>
       </div>
       <div className="flex justify-between text-sm mb-1">
         <span>VAT 7%</span>
@@ -269,6 +270,31 @@ function ShippingInfo({ order, tracking }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+const PICKUP_STATUS = { pending: "กำลังเตรียมสินค้า", ready: "พร้อมให้รับ", collected: "รับสินค้าแล้ว" };
+
+function PickupInfo({ order }) {
+  const store = order.pickup?.store;
+  return (
+    <div className="bg-surface rounded-xl shadow p-5 border flex flex-col gap-2">
+      <div className="font-semibold text-fg mb-1 flex items-center gap-2">
+        <Store className="w-5 h-5 text-fg-subtle" /> รับที่สาขา
+      </div>
+      <div className="text-sm text-fg font-medium">{store?.name ?? "-"}</div>
+      {store && (store.address || store.city) && (
+        <div className="text-sm text-fg">
+          <MapPin className="w-4 h-4 inline-block mr-1 text-fg-subtle" />
+          {[store.address, store.city, store.postalCode].filter(Boolean).join(" ")}
+        </div>
+      )}
+      {store?.phone && <div className="text-sm text-fg">เบอร์โทร: {store.phone}</div>}
+      <div className="text-sm text-fg">
+        สถานะ: {PICKUP_STATUS[order.pickup?.status] ?? "-"}
+        {order.pickup?.pickupDate && ` (${new Date(order.pickup.pickupDate).toLocaleString("th-TH")})`}
+      </div>
     </div>
   );
 }
@@ -827,7 +853,7 @@ export default function OrderDetailsPage() {
       </div>
       {/* Shipping & Payment Info */}
       <div className="grid md:grid-cols-2 gap-6">
-        <ShippingInfo order={order} tracking={tracking} />
+        {order.fulfillment === "pickup" ? <PickupInfo order={order} /> : <ShippingInfo order={order} tracking={tracking} />}
         <PaymentInfo order={order} />
       </div>
       {showRefund && (

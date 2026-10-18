@@ -70,6 +70,15 @@ export const adminAPI = {
     axiosInstance.get("/orders/admin/stats", { params }).then((r) => r.data),
   updateShippingInfo: async (orderId, data) =>
     axiosInstance.put(`/orders/admin/${orderId}/shipping`, data).then((r) => r.data),
+  /** Pickup order: "ready" (customer notified) or "collected". */
+  updatePickup: async (orderId, status) =>
+    axiosInstance.put(`/orders/admin/${orderId}/pickup`, { status }).then((r) => r.data),
+
+  // --- Branches (pickup points); admins also see closed ones ---
+  listStores: async (params = {}) =>
+    axiosInstance.get("/stores", { params: { limit: 100, ...params } }).then((r) => r.data),
+  createStore: async (data) => axiosInstance.post("/stores", data).then((r) => r.data),
+  updateStore: async (storeId, data) => axiosInstance.put(`/stores/${storeId}`, data).then((r) => r.data),
   /** { reviews, pagination } — params: page, limit, rating, search */
   listAuditLogs: async (params = {}) =>
     axiosInstance.get("/admin/audit-logs", { params }).then((r) => r.data),

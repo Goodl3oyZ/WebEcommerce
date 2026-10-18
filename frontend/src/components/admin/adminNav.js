@@ -61,6 +61,12 @@ export const ADMIN_NAV = [
     keywords: "shipping zones",
   },
   {
+    value: "stores",
+    label: "สาขา (รับที่ร้าน)",
+    group: "ปฏิบัติการ",
+    keywords: "stores branches pickup click collect",
+  },
+  {
     value: "payments",
     label: "การชำระเงิน",
     group: "ปฏิบัติการ",

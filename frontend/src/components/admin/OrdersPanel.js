@@ -37,6 +37,8 @@ const NEXT_STATUS = {
 const REFUNDABLE_ORDER = ["paid", "confirmed", "processing", "delivered", "refund_requested"];
 const CAN_PREPARE = ["paid", "confirmed"];
 const CAN_SHIP = ["paid", "confirmed", "processing"];
+const isPickup = (order) => order.fulfillment === "pickup";
+const pickupReady = (order) => order.status === "processing" && order.pickup?.status === "ready";
 const statusLabel = (s) => (s === "all" ? "ทุกสถานะ" : s === "to_ship" ? "รอจัดส่ง" : ORDER_STATUS_TH[s] ?? s);
 
 /** Carrier + tracking number; shipping moves the order to "shipped" and tells the customer. */
@@ -138,6 +140,25 @@ export function OrdersPanel() {
     }
   };
 
+  // Click & collect: "ready" tells the customer to come; "collected" completes the order.
+  const updatePickup = async (order, pickupStatus) => {
+    const question =
+      pickupStatus === "ready"
+        ? `ออเดอร์ ${order.orderNumber} พร้อมให้รับที่ ${order.pickup?.store?.name ?? "สาขา"}? ระบบจะแจ้งลูกค้า`
+        : `ยืนยันว่าลูกค้ารับออเดอร์ ${order.orderNumber} แล้ว?`;
+    if (!confirm(question)) return;
+    setSubmitting(true);
+    try {
+      await adminAPI.updatePickup(order.id, pickupStatus);
+      toast.success(pickupStatus === "ready" ? "แจ้งลูกค้าแล้ว" : "บันทึกการรับสินค้าแล้ว");
+      load();
+    } catch (err) {
+      toast.error(err.message || "บันทึกไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Refund the order's online payment (money goes back through Omise).
   const refundOrder = async (order) => {
     const reason = prompt(`เหตุผลการคืนเงินออเดอร์ ${order.orderNumber}`, order.refundReason || "");
@@ -173,7 +194,10 @@ export function OrdersPanel() {
       header: "สถานะ",
       render: (o) => (
         <span>
-          {statusLabel(o.status)}
+          {pickupReady(o) ? "พร้อมให้รับ" : statusLabel(o.status)}
+          {isPickup(o) && (
+            <span className="block text-xs text-fg-subtle">รับที่สาขา: {o.pickup?.store?.name ?? "-"}</span>
+          )}
           {o.status === "refund_requested" && o.refundReason && (
             <span className="block max-w-xs truncate text-xs text-warning" title={o.refundReason}>
               {o.refundReason}
@@ -186,7 +210,7 @@ export function OrdersPanel() {
           )}
         </span>
       ),
-      searchValue: (o) => `${statusLabel(o.status)} ${o.trackingNumber ?? ""}`,
+      searchValue: (o) => `${statusLabel(o.status)} ${o.trackingNumber ?? ""} ${o.pickup?.store?.name ?? ""}`,
     },
     {
       key: "total",
@@ -211,7 +235,17 @@ export function OrdersPanel() {
                 เริ่มเตรียมสินค้า
               </button>
             )}
-            {CAN_SHIP.includes(order.status) && (
+            {isPickup(order) && CAN_SHIP.includes(order.status) && !pickupReady(order) && (
+              <button type="button" className="font-semibold text-fg hover:underline" disabled={submitting} onClick={() => updatePickup(order, "ready")}>
+                พร้อมให้รับ
+              </button>
+            )}
+            {pickupReady(order) && (
+              <button type="button" className="font-semibold text-fg hover:underline" disabled={submitting} onClick={() => updatePickup(order, "collected")}>
+                ลูกค้ารับแล้ว
+              </button>
+            )}
+            {!isPickup(order) && CAN_SHIP.includes(order.status) && (
               <button type="button" className="font-semibold text-fg hover:underline" onClick={() => setShipping(order)}>
                 จัดส่ง
               </button>

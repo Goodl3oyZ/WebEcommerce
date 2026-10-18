@@ -80,4 +80,9 @@ export const orderController = {
     const order = await orderService.updateShippingInfo(req.params.orderId, req.body, req.user.id);
     res.json({ success: true, data: order });
   },
+
+  async updatePickup(req, res) {
+    const order = await orderService.updatePickup(req.params.orderId, req.body, req.user.id);
+    res.json({ success: true, data: order });
+  },
 };

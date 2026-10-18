@@ -4,9 +4,9 @@ A full-stack online store with a Thai storefront and an admin back office, runni
 **[shop.flukelnwza.online](https://shop.flukelnwza.online)** on my self-hosted HomeLab.
 
 - **Storefront:** catalog with variants, search and collections, cart (guest carts merge on sign-in), checkout
-  with Thai addresses and shipping methods, PromptPay QR and card payments through Omise, order tracking,
-  verified reviews, loyalty points, coupons, wishlist, notifications, and live support chat.
-- **Admin panel:** dashboard and reports, products and inventory, orders and shipping, payments, reviews
+  with Thai addresses and shipping methods or pickup at a branch (click & collect), PromptPay QR and card
+  payments through Omise, order tracking, refund requests, verified reviews, loyalty points, coupons, wishlist, notifications, and live support chat.
+- **Admin panel:** dashboard and reports, products and inventory, orders, shipping and pickup branches, payments, reviews
   moderation, brands and categories, coupons, users and roles, support inbox, blog and About content, store
   settings (name, logo, maintenance mode), and an audit log of every staff change and sign-in.
 - **Accounts:** email sign-up with verification, Google / GitHub / Facebook sign-in, httpOnly JWT cookies with

@@ -11,6 +11,7 @@ import { OrdersPanel } from "@/components/admin/OrdersPanel";
 import { UsersPanel } from "@/components/admin/UsersPanel";
 import { CouponsPanel } from "@/components/admin/CouponsPanel";
 import { ShippingPanel } from "@/components/admin/ShippingPanel";
+import { StoresPanel } from "@/components/admin/StoresPanel";
 import { PaymentsPanel } from "@/components/admin/PaymentsPanel";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { ReportsPanel } from "@/components/admin/ReportsPanel";
@@ -118,6 +119,9 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="shipping" className="mt-0">
             <ShippingPanel />
+          </TabsContent>
+          <TabsContent value="stores" className="mt-0">
+            <StoresPanel />
           </TabsContent>
           <TabsContent value="payments" className="mt-0">
             <PaymentsPanel />

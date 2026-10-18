@@ -18,6 +18,7 @@ import {
   FaHeadset,
   FaNewspaper,
   FaHistory,
+  FaStore,
 } from "react-icons/fa";
 import { TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { navFor } from "@/components/admin/adminNav";
@@ -41,6 +42,7 @@ const ICONS = {
   seed: FaDatabase,
   content: FaNewspaper,
   audit: FaHistory,
+  stores: FaStore,
 };
 
 export function AdminSidebar({ onNavigate }) {

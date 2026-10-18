@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, ExternalLink, PackageCheck, Star } from "lucide-react";
+import { Check, ExternalLink, PackageCheck, Star, Store } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { orderAPI } from "@/lib/api/orders";
 import { AUTO_DELIVER_DAYS, carrierName, trackingUrl } from "@/lib/shipping";
@@ -16,13 +16,53 @@ const STEPS = [
 // How far along each order status is (index into STEPS).
 const REACHED = { paid: 0, confirmed: 0, processing: 1, shipped: 2, delivered: 3, refund_requested: 3 };
 
+// Click & collect: "ready" is the pickup's status, not the order's.
+const PICKUP_STEPS = [
+  { key: "paid", label: "ชำระแล้ว" },
+  { key: "processing", label: "เตรียมสินค้า" },
+  { key: "ready", label: "พร้อมให้รับ" },
+  { key: "collected", label: "รับสินค้าแล้ว" },
+];
+
+function pickupReached(order) {
+  if (order.status === "processing") return order.pickup?.status === "ready" ? 2 : 1;
+  return REACHED[order.status];
+}
+
+/** The branch a pickup order is collected from, and what to do there. */
+function PickupBranch({ order }) {
+  const { store, status } = order.pickup ?? {};
+  if (!store) return null;
+  return (
+    <div className="mt-6 rounded-lg bg-surface-muted px-4 py-3 text-sm">
+      <p className="flex items-center gap-2 font-semibold text-fg">
+        <Store className="h-4 w-4" aria-hidden /> รับที่ {store.name}
+      </p>
+      {(store.address || store.city) && (
+        <p className="mt-1 text-fg-muted">{[store.address, store.city, store.postalCode].filter(Boolean).join(" ")}</p>
+      )}
+      {store.description && <p className="mt-1 text-fg-muted">{store.description}</p>}
+      {store.phone && <p className="mt-1 text-fg-muted">โทร {store.phone}</p>}
+      {order.status === "processing" && (
+        <p className="mt-3 font-medium text-fg">
+          {status === "ready"
+            ? `สินค้าพร้อมแล้ว แสดงเลขคำสั่งซื้อ #${order.orderNumber} กับพนักงานเพื่อรับสินค้า`
+            : "กำลังเตรียมสินค้า เราจะแจ้งเตือนเมื่อพร้อมให้รับ"}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Where a paid order is: a four-step timeline, the parcel's tracking link,
  * and the "received" button while it is on its way.
  */
 export default function ShipmentProgress({ order, onChanged, reviewPoints = 20 }) {
   const [confirming, setConfirming] = useState(false);
-  const reached = REACHED[order.status];
+  const isPickup = order.fulfillment === "pickup";
+  const steps = isPickup ? PICKUP_STEPS : STEPS;
+  const reached = isPickup ? pickupReached(order) : REACHED[order.status];
   if (reached === undefined) return null; // unpaid, cancelled or refunded
 
   const link = trackingUrl(order.carrier, order.trackingNumber);
@@ -43,9 +83,9 @@ export default function ShipmentProgress({ order, onChanged, reviewPoints = 20 }
 
   return (
     <section aria-labelledby="progress-title" className="rounded-xl border bg-surface p-6 shadow">
-      <h2 id="progress-title" className="sr-only">สถานะการจัดส่ง</h2>
+      <h2 id="progress-title" className="sr-only">{isPickup ? "สถานะการรับสินค้า" : "สถานะการจัดส่ง"}</h2>
       <ol className="grid grid-cols-4 gap-2">
-        {STEPS.map((step, i) => {
+        {steps.map((step, i) => {
           const done = i <= reached;
           return (
             <li key={step.key} className="relative flex flex-col items-center text-center" aria-current={i === reached ? "step" : undefined}>
@@ -64,6 +104,8 @@ export default function ShipmentProgress({ order, onChanged, reviewPoints = 20 }
           );
         })}
       </ol>
+
+      {isPickup && <PickupBranch order={order} />}
 
       {order.trackingNumber && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3 text-sm">

@@ -45,6 +45,12 @@ router.put(
   validationMiddleware(orderDto.updateShippingInfo),
   orderController.updateShippingInfo
 );
+router.put(
+  "/admin/:orderId/pickup",
+  requireAdmin,
+  validationMiddleware(orderDto.updatePickup),
+  orderController.updatePickup
+);
 
 // --- Customer ----------------------------------------------------------------
 router.post("/checkout", validationMiddleware(orderDto.checkout), orderController.createOrder);

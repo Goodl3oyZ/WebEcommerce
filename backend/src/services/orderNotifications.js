@@ -50,8 +50,22 @@ const REFUND_REJECTED = {
   text: (n) => `คำขอคืนเงินสำหรับคำสั่งซื้อ #${n} ไม่ได้รับอนุมัติ หากมีคำถามติดต่อเราผ่านแชทได้เลย`,
 };
 
+const PICKED_UP = {
+  type: "order",
+  title: "รับสินค้าเรียบร้อย",
+  text: (n) => `คุณรับคำสั่งซื้อ #${n} ที่สาขาแล้ว รีวิวสินค้าในหน้าคำสั่งซื้อ รับ ${REVIEW_REWARD_POINTS} แต้มต่อชิ้น`,
+};
+
+const PICKUP_READY = {
+  type: "order",
+  email: true,
+  title: "สินค้าพร้อมให้รับที่สาขา",
+  text: (n, order) => `คำสั่งซื้อ #${n} พร้อมให้รับที่${order.storeName ? ` ${order.storeName}` : "สาขา"}แล้ว แสดงเลขคำสั่งซื้อกับพนักงานเพื่อรับสินค้า`,
+};
+
 export function orderStatusMessage(fromStatus, order) {
   if (fromStatus === "refund_requested" && order.status === "delivered") return REFUND_REJECTED;
+  if (order.fulfillment === "pickup" && order.status === "delivered") return PICKED_UP;
   return MESSAGES[order.status] ?? null;
 }
 
@@ -61,7 +75,16 @@ export async function notifyOrderStatus(tx, fromStatus, order, actorId) {
   if (actorId && actorId === order.userId) return null; // their own action
   const spec = orderStatusMessage(fromStatus, order);
   if (!spec) return null;
+  return notify(tx, order, spec);
+}
 
+/** Tell the customer their pickup order is waiting at `storeName`. Call inside the transaction. */
+export function notifyPickupReady(tx, order, storeName) {
+  if (!order.userId) return null;
+  return notify(tx, { ...order, storeName }, PICKUP_READY);
+}
+
+async function notify(tx, order, spec) {
   const [created] = await tx
     .insert(notifications)
     .values({

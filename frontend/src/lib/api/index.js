@@ -19,3 +19,4 @@ export { notificationsAPI } from "./notifications";
 export { couponsAPI } from "./coupons";
 export { usersAPI } from "./users";
 export { shippingAPI } from "./shipping";
+export { storesAPI } from "./stores";

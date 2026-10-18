@@ -6,8 +6,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import { Check, CreditCard, Loader2, Lock, MapPin, QrCode, Tag, Truck, X } from "lucide-react";
-import { addressAPI, cartAPI, couponsAPI, orderAPI, paymentsAPI, shippingAPI } from "@/lib/api";
+import { Check, CreditCard, Loader2, Lock, MapPin, PackageCheck, QrCode, Store, Tag, Truck, X } from "lucide-react";
+import { addressAPI, cartAPI, couponsAPI, orderAPI, paymentsAPI, shippingAPI, storesAPI } from "@/lib/api";
 import { createCardToken } from "@/lib/omise";
 import { cardErrorMessage, formatCardNumber, formatCvc, formatExpiry, validateCard } from "@/lib/cardInput";
 import { couponErrorMessage } from "@/lib/api/coupons";
@@ -90,6 +90,9 @@ export default function CheckoutPage() {
   const [addressId, setAddressId] = useState("");
   const [shipping, setShipping] = useState({ loading: false, options: [], error: null });
   const [shippingMethodId, setShippingMethodId] = useState("");
+  const [branches, setBranches] = useState([]);
+  const [pickupStoreId, setPickupStoreId] = useState(""); // set = collect at that branch
+  const [pickupMode, setPickupMode] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [card, setCard] = useState({ number: "", name: "", expiry: "", cvc: "" });
@@ -113,11 +116,14 @@ export default function CheckoutPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [cartRes, addrRes, methods] = await Promise.all([
+        const [cartRes, addrRes, methods, stores] = await Promise.all([
           cartAPI.getCart(),
           addressAPI.getAddresses(),
           paymentsAPI.getPaymentMethods(),
+          storesAPI.list().catch(() => []), // no branches: delivery only
         ]);
+        setBranches(stores);
+        setPickupStoreId(stores[0]?.id ?? "");
         setCart({ items: cartRes.items ?? [], subtotal: Number(cartRes.subtotal ?? 0) });
         const list = addrRes.addresses ?? [];
         setAddresses(list);
@@ -162,7 +168,9 @@ export default function CheckoutPage() {
 
   const selectedMethod = paymentMethods.find((m) => m.id === paymentMethodId);
   const payKind = methodKey(selectedMethod);
-  const shippingCost = shipping.options.find((o) => o.methodId === shippingMethodId)?.cost ?? null;
+  const pickup = pickupMode && Boolean(pickupStoreId);
+  const shippingCost = pickupMode ? 0 : shipping.options.find((o) => o.methodId === shippingMethodId)?.cost ?? null;
+  const readyToOrder = Boolean(selectedMethod) && (pickupMode ? Boolean(pickupStoreId) : Boolean(addressId && shippingMethodId));
 
   // Integer-satang totals, rounded exactly like the backend.
   const totals = useMemo(() => {
@@ -215,8 +223,9 @@ export default function CheckoutPage() {
 
   const placeOrder = async () => {
     setFormError(null);
-    if (!addressId) return setFormError("กรุณาเลือกที่อยู่จัดส่ง");
-    if (!shippingMethodId) return setFormError("กรุณาเลือกวิธีจัดส่ง");
+    if (pickupMode && !pickupStoreId) return setFormError("กรุณาเลือกสาขาที่จะไปรับสินค้า");
+    if (!pickupMode && !addressId) return setFormError("กรุณาเลือกที่อยู่จัดส่ง");
+    if (!pickupMode && !shippingMethodId) return setFormError("กรุณาเลือกวิธีจัดส่ง");
     if (!selectedMethod) return setFormError("กรุณาเลือกวิธีชำระเงิน");
 
     let omiseToken;
@@ -241,9 +250,9 @@ export default function CheckoutPage() {
       }
       if (!attemptKey.current) newAttemptKey();
       const res = await orderAPI.createOrder({
-        shippingAddressId: addressId,
-        billingAddressId: addressId,
-        shippingMethodId,
+        ...(pickup
+          ? { pickupStoreId }
+          : { shippingAddressId: addressId, billingAddressId: addressId, shippingMethodId }),
         paymentMethodId,
         items: cart.items.map((i) => ({ productId: i.productId, variantId: i.variantId ?? null, quantity: i.quantity })),
         ...(coupon ? { couponCode: coupon.code } : {}),
@@ -366,6 +375,9 @@ export default function CheckoutPage() {
     );
   }
 
+  // Step numbers: "how to receive" comes first only when there are branches.
+  const first = branches.length > 0 ? 2 : 1;
+  const payStep = pickupMode ? 3 : first + 2;
   const ctaLabel = payKind === "promptpay" ? "สร้าง QR ชำระเงิน" : `ชำระเงิน ${formatTHB(totals.total)}`;
 
   return (
@@ -379,76 +391,119 @@ export default function CheckoutPage() {
 
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-[1fr_24rem]">
         <div className="space-y-4">
-          <Step
-            n={1}
-            title="ที่อยู่จัดส่ง"
-            Icon={MapPin}
-            action={
-              <Link href="/profile" className="text-sm font-semibold underline underline-offset-4">
-                จัดการที่อยู่
-              </Link>
-            }
-          >
-            {addresses.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-5 text-sm">
-                <p className="font-medium">ยังไม่มีที่อยู่จัดส่ง</p>
-                <p className="mt-1 text-fg-muted">เพิ่มที่อยู่ในหน้าบัญชี แล้วกลับมาที่หน้านี้</p>
-                <Link href="/profile" className={buttonClasses({ variant: "outline", size: "sm", className: "mt-4" })}>
-                  เพิ่มที่อยู่
-                </Link>
-              </div>
-            ) : (
+          {branches.length > 0 && (
+            <Step n={1} title="วิธีรับสินค้า" Icon={PackageCheck}>
               <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-labelledby="step-1">
-                {addresses.map((a) => (
-                  <ChoiceCard key={a.id} name="address" value={a.id} checked={addressId === a.id} onChange={() => setAddressId(a.id)}>
-                    <span className="flex items-center gap-2 font-semibold">
-                      {a.fullName || "ผู้รับ"}
-                      {a.isDefault && <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium">ค่าเริ่มต้น</span>}
-                    </span>
-                    <span className="mt-1 block leading-relaxed text-fg-muted">
-                      {[a.addressLine1, a.addressLine2, a.subdistrict, a.district, a.province, a.postalCode].filter(Boolean).join(" ")}
-                    </span>
-                    {a.phoneNumber && <span className="mt-1 block text-fg-muted">โทร {a.phoneNumber}</span>}
+                <ChoiceCard name="fulfillment" value="delivery" checked={!pickupMode} onChange={() => setPickupMode(false)}>
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Truck className="h-4 w-4" aria-hidden /> จัดส่งถึงบ้าน
+                  </span>
+                  <span className="mt-1 block text-fg-muted">ส่งตามที่อยู่ ค่าส่งตามพื้นที่</span>
+                </ChoiceCard>
+                <ChoiceCard name="fulfillment" value="pickup" checked={pickupMode} onChange={() => setPickupMode(true)}>
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Store className="h-4 w-4" aria-hidden /> รับที่สาขา
+                  </span>
+                  <span className="mt-1 block text-fg-muted">ไม่มีค่าจัดส่ง แจ้งเตือนเมื่อสินค้าพร้อมให้รับ</span>
+                </ChoiceCard>
+              </div>
+            </Step>
+          )}
+
+          {pickupMode ? (
+            <Step n={2} title="เลือกสาขา" Icon={Store}>
+              <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-labelledby="step-2">
+                {branches.map((b) => (
+                  <ChoiceCard key={b.id} name="branch" value={b.id} checked={pickupStoreId === b.id} onChange={() => setPickupStoreId(b.id)}>
+                    <span className="block font-semibold">{b.name}</span>
+                    {(b.address || b.city) && (
+                      <span className="mt-1 block leading-relaxed text-fg-muted">
+                        {[b.address, b.city, b.postalCode].filter(Boolean).join(" ")}
+                      </span>
+                    )}
+                    {b.description && <span className="mt-1 block text-fg-muted">{b.description}</span>}
+                    {b.phone && <span className="mt-1 block text-fg-muted">โทร {b.phone}</span>}
                   </ChoiceCard>
                 ))}
               </div>
-            )}
-          </Step>
-
-          <Step n={2} title="วิธีจัดส่ง" Icon={Truck}>
-            {!addressId ? (
-              <p className="text-sm text-fg-muted">เลือกที่อยู่ก่อน เพื่อดูวิธีจัดส่งและค่าส่ง</p>
-            ) : shipping.loading ? (
-              <p className="flex items-center gap-2 text-sm text-fg-muted">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> กำลังคำนวณค่าจัดส่ง…
+              <p className="mt-3 text-xs text-fg-muted">
+                เมื่อสินค้าพร้อม เราจะแจ้งเตือนในเว็บและทางอีเมล แสดงเลขคำสั่งซื้อกับพนักงานที่สาขาเพื่อรับสินค้า
               </p>
-            ) : shipping.error ? (
-              <p className="text-sm font-medium text-danger">{shipping.error}</p>
-            ) : (
-              <div className="grid gap-3" role="radiogroup" aria-labelledby="step-2">
-                {shipping.options.map((o) => (
-                  <ChoiceCard
-                    key={o.methodId}
-                    name="shipping"
-                    value={o.methodId}
-                    checked={shippingMethodId === o.methodId}
-                    onChange={() => setShippingMethodId(o.methodId)}
-                  >
-                    <span className="flex justify-between gap-3">
-                      <span className="font-medium">{o.methodName}</span>
-                      <span className="font-semibold tabular-nums">{o.cost > 0 ? formatTHB(o.cost) : "ฟรี"}</span>
-                    </span>
-                  </ChoiceCard>
-                ))}
-              </div>
-            )}
-          </Step>
+            </Step>
+          ) : (
+            <>
+            <Step
+              n={first}
+              title="ที่อยู่จัดส่ง"
+              Icon={MapPin}
+              action={
+                <Link href="/profile" className="text-sm font-semibold underline underline-offset-4">
+                  จัดการที่อยู่
+                </Link>
+              }
+            >
+              {addresses.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-5 text-sm">
+                  <p className="font-medium">ยังไม่มีที่อยู่จัดส่ง</p>
+                  <p className="mt-1 text-fg-muted">เพิ่มที่อยู่ในหน้าบัญชี แล้วกลับมาที่หน้านี้</p>
+                  <Link href="/profile" className={buttonClasses({ variant: "outline", size: "sm", className: "mt-4" })}>
+                    เพิ่มที่อยู่
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-labelledby={`step-${first}`}>
+                  {addresses.map((a) => (
+                    <ChoiceCard key={a.id} name="address" value={a.id} checked={addressId === a.id} onChange={() => setAddressId(a.id)}>
+                      <span className="flex items-center gap-2 font-semibold">
+                        {a.fullName || "ผู้รับ"}
+                        {a.isDefault && <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium">ค่าเริ่มต้น</span>}
+                      </span>
+                      <span className="mt-1 block leading-relaxed text-fg-muted">
+                        {[a.addressLine1, a.addressLine2, a.subdistrict, a.district, a.province, a.postalCode].filter(Boolean).join(" ")}
+                      </span>
+                      {a.phoneNumber && <span className="mt-1 block text-fg-muted">โทร {a.phoneNumber}</span>}
+                    </ChoiceCard>
+                  ))}
+                </div>
+              )}
+            </Step>
 
-          <Step n={3} title="วิธีชำระเงิน" Icon={Lock}>
+            <Step n={first + 1} title="วิธีจัดส่ง" Icon={Truck}>
+              {!addressId ? (
+                <p className="text-sm text-fg-muted">เลือกที่อยู่ก่อน เพื่อดูวิธีจัดส่งและค่าส่ง</p>
+              ) : shipping.loading ? (
+                <p className="flex items-center gap-2 text-sm text-fg-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> กำลังคำนวณค่าจัดส่ง…
+                </p>
+              ) : shipping.error ? (
+                <p className="text-sm font-medium text-danger">{shipping.error}</p>
+              ) : (
+                <div className="grid gap-3" role="radiogroup" aria-labelledby={`step-${first + 1}`}>
+                  {shipping.options.map((o) => (
+                    <ChoiceCard
+                      key={o.methodId}
+                      name="shipping"
+                      value={o.methodId}
+                      checked={shippingMethodId === o.methodId}
+                      onChange={() => setShippingMethodId(o.methodId)}
+                    >
+                      <span className="flex justify-between gap-3">
+                        <span className="font-medium">{o.methodName}</span>
+                        <span className="font-semibold tabular-nums">{o.cost > 0 ? formatTHB(o.cost) : "ฟรี"}</span>
+                      </span>
+                    </ChoiceCard>
+                  ))}
+                </div>
+              )}
+            </Step>
+            </>
+          )}
+
+          <Step n={payStep} title="วิธีชำระเงิน" Icon={Lock}>
             {paymentMethods.length === 0 ? (
               <p className="text-sm text-fg-muted">ยังไม่มีวิธีชำระเงินที่เปิดใช้งาน</p>
             ) : (
-              <div className="grid gap-3" role="radiogroup" aria-labelledby="step-3">
+              <div className="grid gap-3" role="radiogroup" aria-labelledby={`step-${payStep}`}>
                 {paymentMethods.map((m) => {
                   const ui = METHOD_UI[methodKey(m)] ?? { Icon: CreditCard, hint: m.description };
                   const on = paymentMethodId === m.id;
@@ -639,7 +694,7 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between">
-              <dt className="text-fg-muted">ค่าจัดส่ง</dt>
+              <dt className="text-fg-muted">{pickupMode ? "รับที่สาขา" : "ค่าจัดส่ง"}</dt>
               <dd className="tabular-nums">{totals.shipping == null ? "–" : totals.shipping > 0 ? formatTHB(totals.shipping) : "ฟรี"}</dd>
             </div>
             <div className="flex justify-between">
@@ -662,7 +717,7 @@ export default function CheckoutPage() {
             size="lg"
             className="mt-5 w-full"
             onClick={placeOrder}
-            disabled={submitting || !addressId || !shippingMethodId || !selectedMethod}
+            disabled={submitting || !readyToOrder}
           >
             {submitting && <Loader2 className="h-5 w-5 animate-spin" aria-hidden />}
             {submitting ? "กำลังดำเนินการ…" : ctaLabel}

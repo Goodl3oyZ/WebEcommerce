@@ -8,9 +8,12 @@ export const orderDto = {
   // paymentAmount, ...) are accepted for compatibility but ignored: the server
   // computes every amount.
   checkout: z.object({
-    shippingAddressId: id(),
+    shippingAddressId: id().optional().describe("Required for delivery"),
     billingAddressId: id().optional().describe("Defaults to the shipping address"),
-    shippingMethodId: id(),
+    shippingMethodId: id().optional().describe("Required for delivery"),
+    pickupStoreId: id()
+      .optional()
+      .describe("Collect at this branch instead of delivery (no address, shipping method or fee)"),
     paymentMethodId: id(),
     items: z
       .array(
@@ -34,6 +37,9 @@ export const orderDto = {
       .describe("Same as the Idempotency-Key header: repeating a checkout with it returns the first order"),
     shippingCost: z.number().optional().describe("Ignored: computed by the server"),
     paymentAmount: z.number().optional().describe("Ignored: computed by the server"),
+  }).refine((data) => data.pickupStoreId || (data.shippingAddressId && data.shippingMethodId), {
+    message: "Choose a pickup branch, or a shipping address and shipping method",
+    path: ["shippingAddressId"],
   }),
 
   listQuery: z.object({
@@ -78,6 +84,10 @@ export const orderDto = {
     carrier: z.string().trim().min(1).max(100).optional(),
     status: z.enum(["pending", "processing", "shipped", "delivered"]).optional(),
     estimatedDelivery: z.string().datetime({ offset: true }).optional(),
+  }),
+
+  updatePickup: z.object({
+    status: z.enum(["ready", "collected"]).describe("ready = waiting at the branch (customer notified); collected = handed over"),
   }),
 
   refundOrder: z

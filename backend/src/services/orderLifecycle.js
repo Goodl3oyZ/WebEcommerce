@@ -42,7 +42,7 @@ export async function releaseOrderStock(tx, orderId) {
 
 /** Move an order to a new status, recording history. Validates the transition. */
 export async function setOrderStatus(tx, order, status, { comment, actorId, extra = {} } = {}) {
-  assertOrderTransition(order.status, status);
+  assertOrderTransition(order.status, status, order.fulfillment);
   // Compare-and-set: only if nobody changed the status since `order` was read.
   // Concurrent cancel / expire / payment therefore cannot both win.
   const [updated] = await tx

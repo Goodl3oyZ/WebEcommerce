@@ -139,6 +139,14 @@ export default function Orders() {
                 <span>
                   ยอดรวม: <span className="font-semibold">฿{Number(order.total).toLocaleString()}</span>
                 </span>
+                {order.pickup?.store && (
+                  <span>
+                    รับที่สาขา: <span className="font-semibold">{order.pickup.store.name}</span>
+                    {order.status === "processing" && order.pickup.status === "ready" && (
+                      <span className="ml-2 rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">พร้อมให้รับ</span>
+                    )}
+                  </span>
+                )}
                 {order.trackingNumber && (
                   <span>
                     เลขพัสดุ: <span className="font-mono font-semibold">{order.trackingNumber}</span>

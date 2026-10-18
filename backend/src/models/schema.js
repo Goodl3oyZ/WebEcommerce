@@ -536,6 +536,8 @@ export const orders = pgTable("orders", {
   shippingStatus: varchar("shipping_status", { length: 50 })
     .notNull()
     .default("pending"),
+  // "delivery" (shipped to an address) or "pickup" (collected at a branch, see store_pickups).
+  fulfillment: varchar("fulfillment", { length: 20 }).notNull().default("delivery"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).notNull(),
   tax: decimal("tax", { precision: 10, scale: 2 }).notNull(),
@@ -841,7 +843,8 @@ export const storeInventoryRelations = relations(storeInventory, ({ one }) => ({
   }),
 }));
 
-// Store Pickups
+// Store Pickups: the branch a "pickup" order is collected from.
+// status: pending (being prepared) → ready (customer told to come) → collected.
 export const storePickups = pgTable("store_pickups", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id")
@@ -856,6 +859,8 @@ export const storePickups = pgTable("store_pickups", {
       onDelete: "cascade",
       onUpdate: "cascade",
     }),
+  readyAt: timestamp("ready_at"),
+  // When the customer collected the order.
   pickupDate: timestamp("pickup_date"),
   status: varchar("status", { length: 50 }).notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow(),

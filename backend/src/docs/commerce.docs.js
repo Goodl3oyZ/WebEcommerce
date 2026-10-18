@@ -141,6 +141,16 @@ documentRoutes("Orders", [
     body: orderDto.updateShippingInfo,
     responses: { 200: "Updated order", 404: "Order not found" },
   },
+  {
+    method: "put",
+    path: "/api/orders/admin/:orderId/pickup",
+    summary: "Pickup order: ready at the branch, or collected",
+    description:
+      "ready moves a paid order to processing (if needed) and tells the customer to come. collected (only after ready) moves it to delivered.",
+    auth: "admin",
+    body: orderDto.updatePickup,
+    responses: { 200: "Updated order", 400: "Not a pickup order, or not ready yet", 404: "Order not found" },
+  },
 ]);
 
 const paymentIdNote = "Customers can only access their own payments; admins can read any payment.";
