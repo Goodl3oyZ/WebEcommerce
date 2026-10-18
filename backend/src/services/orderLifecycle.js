@@ -10,6 +10,8 @@ import {
   productVariants,
   paymentTransactions,
   inventoryMovements,
+  storeInventory,
+  storePickups,
 } from "../models/schema.js";
 import { assertOrderTransition } from "../utils/orderStatus.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -20,23 +22,42 @@ export async function recordMovements(tx, rows) {
   if (rows.length) await tx.insert(inventoryMovements).values(rows);
 }
 
-/** Put an order's reserved stock back into inventory. */
+/**
+ * Put an order's reserved stock back where it came from: the pickup branch's
+ * shelf for a pickup order, the online stock otherwise.
+ */
 export async function releaseOrderStock(tx, orderId) {
   const items = await tx
-    .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
+    .select({ productId: orderItems.productId, variantId: orderItems.variantId, quantity: orderItems.quantity })
     .from(orderItems)
     .where(eq(orderItems.orderId, orderId));
+  const pickup = await tx.query.storePickups.findFirst({ where: eq(storePickups.orderId, orderId) });
+  const storeId = pickup?.storeId ?? null;
   // Same lock order as checkout (by variant id) to avoid deadlocks.
   const lines = items.filter((i) => i.variantId).sort((a, b) => a.variantId.localeCompare(b.variantId));
   for (const item of lines) {
-    await tx
-      .update(productVariants)
-      .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
-      .where(eq(productVariants.id, item.variantId));
+    if (storeId) {
+      const [restocked] = await tx
+        .update(storeInventory)
+        .set({ quantity: sql`${storeInventory.quantity} + ${item.quantity}`, updatedAt: new Date() })
+        .where(and(eq(storeInventory.storeId, storeId), eq(storeInventory.variantId, item.variantId)))
+        .returning({ id: storeInventory.id });
+      // The branch stopped tracking the variant meanwhile: track it again.
+      if (!restocked) {
+        await tx
+          .insert(storeInventory)
+          .values({ storeId, productId: item.productId, variantId: item.variantId, quantity: item.quantity });
+      }
+    } else {
+      await tx
+        .update(productVariants)
+        .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
+        .where(eq(productVariants.id, item.variantId));
+    }
   }
   await recordMovements(
     tx,
-    lines.map((i) => ({ variantId: i.variantId, orderId, change: i.quantity, reason: "order_release" }))
+    lines.map((i) => ({ variantId: i.variantId, orderId, storeId, change: i.quantity, reason: "order_release" }))
   );
 }
 

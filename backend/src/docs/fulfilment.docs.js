@@ -122,6 +122,15 @@ const branchNote = "Stores are physical branches (pickup points with their own s
 
 documentRoutes("Stores", [
   { method: "get", path: "/api/stores", summary: "Branches", description: `${branchNote} Inactive branches are returned to admins only.`, auth: "public", query: storeDto.listQuery, responses: { 200: "Branches and pagination" } },
+  {
+    method: "post",
+    path: "/api/stores/availability",
+    summary: "Which branches can fill a pickup order",
+    description: "For each open branch: whether it holds enough of every item, and the items it is short of.",
+    auth: "public",
+    body: storeDto.availability,
+    responses: { 200: "{ stores: [{ storeId, available, short: [{ variantId, requested, available }] }] }" },
+  },
   { method: "get", path: "/api/stores/:id", summary: "A branch", auth: "public", responses: { 200: "Branch", 404: "Store not found" } },
   { method: "get", path: "/api/stores/:id/products", summary: "Products in stock at a branch", auth: "public", query: storeDto.listQuery, responses: { 200: "Products and pagination", 404: "Store not found" } },
   { method: "get", path: "/api/stores/:id/reviews", summary: "A branch's reviews and average rating", auth: "public", query: storeDto.listQuery, responses: { 200: "Reviews and pagination", 404: "Store not found" } },

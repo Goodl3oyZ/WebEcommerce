@@ -29,6 +29,30 @@ const pickupOrderIds = (storeId) =>
   db.select({ id: storePickups.orderId }).from(storePickups).where(eq(storePickups.storeId, storeId));
 
 export const storeService = {
+  /**
+   * Which open branches hold enough of every item for pickup. `short` lists
+   * the items a branch is missing (with what it has).
+   */
+  async getAvailability(items) {
+    const variantIds = [...new Set(items.map((i) => i.variantId))];
+    const wanted = new Map();
+    for (const { variantId, quantity } of items) wanted.set(variantId, (wanted.get(variantId) ?? 0) + quantity);
+    const [open, stock] = await Promise.all([
+      db.query.stores.findMany({ where: eq(stores.isActive, true), columns: { id: true }, orderBy: [asc(stores.name)] }),
+      db
+        .select({ storeId: storeInventory.storeId, variantId: storeInventory.variantId, quantity: storeInventory.quantity })
+        .from(storeInventory)
+        .where(inArray(storeInventory.variantId, variantIds)),
+    ]);
+    const held = new Map(stock.map((row) => [`${row.storeId}:${row.variantId}`, row.quantity]));
+    return open.map(({ id }) => {
+      const short = [...wanted]
+        .map(([variantId, requested]) => ({ variantId, requested, available: held.get(`${id}:${variantId}`) ?? 0 }))
+        .filter((line) => line.available < line.requested);
+      return { storeId: id, available: short.length === 0, short };
+    });
+  },
+
   async getAllStores({ search, includeInactive }, pagination) {
     const conditions = [];
     if (!includeInactive) conditions.push(eq(stores.isActive, true));

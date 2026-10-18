@@ -16,6 +16,7 @@ import {
   paymentTransactions,
   stores,
   storePickups,
+  storeInventory,
 } from "../models/schema.js";
 import { eq, and, desc, sql, gte, lte, ilike, or, inArray, isNull } from "drizzle-orm";
 import { ApiError } from "../utils/ApiError.js";
@@ -270,11 +271,32 @@ export const orderService = {
         if (!variant || variant.product?.isActive === false) {
           throw ApiError.notFound(`Product variant not found: ${item.variantId}`);
         }
-        const [reserved] = await tx
-          .update(productVariants)
-          .set({ stock: sql`${productVariants.stock} - ${item.quantity}` })
-          .where(and(eq(productVariants.id, variant.id), gte(productVariants.stock, item.quantity)))
-          .returning({ id: productVariants.id });
+        // Pickup orders take the branch's own stock; delivery takes the online stock.
+        const [reserved] = pickupStore
+          ? await tx
+              .update(storeInventory)
+              .set({ quantity: sql`${storeInventory.quantity} - ${item.quantity}`, updatedAt: new Date() })
+              .where(
+                and(
+                  eq(storeInventory.storeId, pickupStore.id),
+                  eq(storeInventory.variantId, variant.id),
+                  gte(storeInventory.quantity, item.quantity)
+                )
+              )
+              .returning({ id: storeInventory.id })
+          : await tx
+              .update(productVariants)
+              .set({ stock: sql`${productVariants.stock} - ${item.quantity}` })
+              .where(and(eq(productVariants.id, variant.id), gte(productVariants.stock, item.quantity)))
+              .returning({ id: productVariants.id });
+        if (!reserved && pickupStore) {
+          throw new ApiError(
+            `${pickupStore.name} does not have enough ${variant.product.name} (${variant.color} ${variant.size})`,
+            409,
+            null,
+            "INSUFFICIENT_BRANCH_STOCK"
+          );
+        }
         if (!reserved) {
           throw new ApiError(
             `Insufficient stock for ${variant.product.name} (${variant.color} ${variant.size}). Available: ${variant.stock}`,
@@ -337,7 +359,13 @@ export const orderService = {
         .returning();
       await recordMovements(
         tx,
-        lines.map((l) => ({ variantId: l.variantId, orderId: order.id, change: -l.quantity, reason: "order_reserve" }))
+        lines.map((l) => ({
+          variantId: l.variantId,
+          orderId: order.id,
+          storeId: pickupStore?.id ?? null,
+          change: -l.quantity,
+          reason: "order_reserve",
+        }))
       );
 
       await tx.insert(orderItems).values(

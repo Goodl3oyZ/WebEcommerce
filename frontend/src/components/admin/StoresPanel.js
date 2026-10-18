@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { FaEdit, FaPlusCircle, FaStore, FaTimesCircle } from "react-icons/fa";
+import { FaBoxes, FaEdit, FaPlusCircle, FaStore, FaTimesCircle } from "react-icons/fa";
 import { adminAPI } from "@/lib/api/admin";
+import { BranchStockDialog } from "@/components/admin/BranchStockDialog";
 
 const EMPTY = { name: "", address: "", city: "", postalCode: "", phone: "", description: "", isActive: true };
 const card = "rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-6";
@@ -29,6 +30,7 @@ export function StoresPanel() {
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [stockOf, setStockOf] = useState(null); // branch whose shelf is open
 
   const load = async () => {
     try {
@@ -215,6 +217,13 @@ export function StoresPanel() {
                 <div className="flex shrink-0 gap-1">
                   <button
                     type="button"
+                    onClick={() => setStockOf(s)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-fg hover:bg-surface-muted"
+                  >
+                    <FaBoxes aria-hidden /> สต็อก<span className="sr-only"> {s.name}</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => edit(s)}
                     className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-fg hover:bg-surface-muted"
                   >
@@ -236,6 +245,7 @@ export function StoresPanel() {
           </ul>
         )}
       </section>
+      {stockOf && <BranchStockDialog store={stockOf} onClose={() => setStockOf(null)} />}
     </div>
   );
 }

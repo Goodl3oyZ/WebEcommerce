@@ -269,6 +269,8 @@ export const inventoryMovements = pgTable(
       .notNull()
       .references(() => productVariants.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    // Set for a branch's stock (pickup orders); null for the online stock.
+    storeId: uuid("store_id").references(() => stores.id, { onDelete: "set null" }),
     change: integer("change").notNull(),
     // order_reserve | order_release | admin_initial | admin_adjust
     reason: varchar("reason", { length: 30 }).notNull(),

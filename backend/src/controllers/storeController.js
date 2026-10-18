@@ -15,6 +15,10 @@ export const storeController = {
     );
   },
 
+  async getAvailability(req, res) {
+    res.json({ stores: await storeService.getAvailability(req.body.items) });
+  },
+
   async getStoreById(req, res) {
     res.json(await storeService.getStoreById(req.params.id, { includeInactive: adminView(req) }));
   },

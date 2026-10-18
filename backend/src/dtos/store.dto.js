@@ -28,6 +28,12 @@ export const storeDto = {
     .strict()
     .refine((data) => Object.keys(data).length > 0, { message: "At least one field must be provided for update" }),
   updateSettings: settings,
+  availability: z.object({
+    items: z
+      .array(z.object({ variantId: z.string().uuid(), quantity: z.number().int().min(1).max(99) }))
+      .min(1)
+      .max(50),
+  }),
   listQuery: z.object({
     search: z.string().trim().max(100).optional().describe("Name or city"),
     page: z.coerce.number().int().min(1).optional(),

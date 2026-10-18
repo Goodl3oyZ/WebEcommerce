@@ -15,6 +15,7 @@ router.use(apiRateLimiter);
 
 // Public: branches, what they stock, and their reviews.
 router.get("/", optionalAuth, validationMiddleware(storeDto.listQuery, "query"), storeController.getAllStores);
+router.post("/availability", validationMiddleware(storeDto.availability), storeController.getAvailability);
 router.get("/:id", optionalAuth, storeController.getStoreById);
 router.get("/:id/products", validationMiddleware(storeDto.listQuery, "query"), storeController.getStoreProducts);
 router.get("/:id/reviews", validationMiddleware(storeDto.listQuery, "query"), storeController.getStoreReviews);

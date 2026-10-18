@@ -13,7 +13,7 @@ export const orderDto = {
     shippingMethodId: id().optional().describe("Required for delivery"),
     pickupStoreId: id()
       .optional()
-      .describe("Collect at this branch instead of delivery (no address, shipping method or fee)"),
+      .describe("Collect at this branch instead of delivery: no address, shipping method or fee; stock comes from the branch"),
     paymentMethodId: id(),
     items: z
       .array(

@@ -47,14 +47,26 @@ function Step({ n, title, Icon, children, action }) {
   );
 }
 
-function ChoiceCard({ name, value, checked, onChange, children }) {
+function ChoiceCard({ name, value, checked, onChange, disabled = false, children }) {
   return (
     <label
-      className={`relative flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors ${
-        checked ? "border-fg bg-fg/[0.03] ring-1 ring-fg" : "border-border hover:border-fg/50"
+      className={`relative flex gap-3 rounded-lg border p-4 transition-colors ${
+        disabled
+          ? "cursor-not-allowed border-border opacity-60"
+          : checked
+            ? "cursor-pointer border-fg bg-fg/[0.03] ring-1 ring-fg"
+            : "cursor-pointer border-border hover:border-fg/50"
       }`}
     >
-      <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="mt-0.5 h-4 w-4 focus:ring-fg" />
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked && !disabled}
+        disabled={disabled}
+        onChange={onChange}
+        className="mt-0.5 h-4 w-4 focus:ring-fg"
+      />
       <span className="min-w-0 flex-1 text-sm">{children}</span>
     </label>
   );
@@ -93,6 +105,7 @@ export default function CheckoutPage() {
   const [branches, setBranches] = useState([]);
   const [pickupStoreId, setPickupStoreId] = useState(""); // set = collect at that branch
   const [pickupMode, setPickupMode] = useState(false);
+  const [stockAt, setStockAt] = useState(null); // storeId -> { available, short }, null while loading
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [card, setCard] = useState({ number: "", name: "", expiry: "", cvc: "" });
@@ -168,9 +181,45 @@ export default function CheckoutPage() {
 
   const selectedMethod = paymentMethods.find((m) => m.id === paymentMethodId);
   const payKind = methodKey(selectedMethod);
+  // Each branch sells from its own shelf: check it holds the whole cart.
+  const cartKey = cart.items.map((i) => `${i.variantId}:${i.quantity}`).join(",");
+  useEffect(() => {
+    if (!pickupMode || !cartKey) return;
+    let active = true;
+    setStockAt(null);
+    storesAPI
+      .availability(cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })))
+      .then((list) => {
+        if (!active) return;
+        const byStore = Object.fromEntries(list.map((s) => [s.storeId, s]));
+        setStockAt(byStore);
+        // Keep the chosen branch if it can fill the order, otherwise pick the first that can.
+        setPickupStoreId((current) =>
+          byStore[current]?.available ? current : branches.find((b) => byStore[b.id]?.available)?.id ?? ""
+        );
+      })
+      .catch(() => active && setStockAt({}));
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cartKey stands for cart.items
+  }, [pickupMode, cartKey, branches]);
+
+  const shortText = (storeId) => {
+    const short = stockAt?.[storeId]?.short ?? [];
+    return short
+      .map((line) => {
+        const item = cart.items.find((i) => i.variantId === line.variantId);
+        const name = item?.product?.name ?? "สินค้า";
+        return line.available > 0 ? `${name} (มี ${line.available})` : name;
+      })
+      .join(", ");
+  };
+  const branchOk = (storeId) => Boolean(stockAt?.[storeId]?.available);
   const pickup = pickupMode && Boolean(pickupStoreId);
   const shippingCost = pickupMode ? 0 : shipping.options.find((o) => o.methodId === shippingMethodId)?.cost ?? null;
-  const readyToOrder = Boolean(selectedMethod) && (pickupMode ? Boolean(pickupStoreId) : Boolean(addressId && shippingMethodId));
+  const readyToOrder =
+    Boolean(selectedMethod) && (pickupMode ? branchOk(pickupStoreId) : Boolean(addressId && shippingMethodId));
 
   // Integer-satang totals, rounded exactly like the backend.
   const totals = useMemo(() => {
@@ -223,7 +272,7 @@ export default function CheckoutPage() {
 
   const placeOrder = async () => {
     setFormError(null);
-    if (pickupMode && !pickupStoreId) return setFormError("กรุณาเลือกสาขาที่จะไปรับสินค้า");
+    if (pickupMode && !branchOk(pickupStoreId)) return setFormError("กรุณาเลือกสาขาที่มีสินค้าครบ");
     if (!pickupMode && !addressId) return setFormError("กรุณาเลือกที่อยู่จัดส่ง");
     if (!pickupMode && !shippingMethodId) return setFormError("กรุณาเลือกวิธีจัดส่ง");
     if (!selectedMethod) return setFormError("กรุณาเลือกวิธีชำระเงิน");
@@ -294,6 +343,16 @@ export default function CheckoutPage() {
       const code = e?.response?.data?.code;
       // The server cancels an order whose payment fails; give the items back.
       if (code === "PAYMENT_FAILED" || code === "PAYMENT_DECLINED") await restoreCart();
+      if (code === "INSUFFICIENT_BRANCH_STOCK") {
+        // Someone took the last units meanwhile: re-check the branches.
+        setFormError("สาขานี้มีสินค้าไม่พอแล้ว เลือกสาขาอื่นหรือจัดส่งถึงบ้าน");
+        setStockAt(null);
+        storesAPI
+          .availability(cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })))
+          .then((list) => setStockAt(Object.fromEntries(list.map((x) => [x.storeId, x]))))
+          .catch(() => setStockAt({}));
+        return;
+      }
       setFormError(apiMessage(e, "สั่งซื้อไม่สำเร็จ กรุณาลองอีกครั้ง"));
     } finally {
       setSubmitting(false);
@@ -412,10 +471,41 @@ export default function CheckoutPage() {
 
           {pickupMode ? (
             <Step n={2} title="เลือกสาขา" Icon={Store}>
+              {stockAt === null && (
+                <p className="mb-3 flex items-center gap-2 text-sm text-fg-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> กำลังเช็กสินค้าในแต่ละสาขา…
+                </p>
+              )}
+              {stockAt && !branches.some((b) => branchOk(b.id)) && (
+                <p role="alert" className="mb-3 rounded-lg bg-warning-soft p-3 text-sm text-warning">
+                  ยังไม่มีสาขาไหนมีสินค้าครบตามตะกร้า เลือกจัดส่งถึงบ้านแทนได้
+                </p>
+              )}
               <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-labelledby="step-2">
                 {branches.map((b) => (
-                  <ChoiceCard key={b.id} name="branch" value={b.id} checked={pickupStoreId === b.id} onChange={() => setPickupStoreId(b.id)}>
-                    <span className="block font-semibold">{b.name}</span>
+                  <ChoiceCard
+                    key={b.id}
+                    name="branch"
+                    value={b.id}
+                    checked={pickupStoreId === b.id}
+                    disabled={!branchOk(b.id)}
+                    onChange={() => setPickupStoreId(b.id)}
+                  >
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="font-semibold">{b.name}</span>
+                      {stockAt && (
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            branchOk(b.id) ? "bg-success-soft text-success" : "bg-surface-muted text-fg-muted"
+                          }`}
+                        >
+                          {branchOk(b.id) ? "มีสินค้าครบ" : "สินค้าไม่พอ"}
+                        </span>
+                      )}
+                    </span>
+                    {stockAt && !branchOk(b.id) && shortText(b.id) && (
+                      <span className="mt-1 block text-xs text-danger">ขาด: {shortText(b.id)}</span>
+                    )}
                     {(b.address || b.city) && (
                       <span className="mt-1 block leading-relaxed text-fg-muted">
                         {[b.address, b.city, b.postalCode].filter(Boolean).join(" ")}

@@ -79,6 +79,12 @@ export const adminAPI = {
     axiosInstance.get("/stores", { params: { limit: 100, ...params } }).then((r) => r.data),
   createStore: async (data) => axiosInstance.post("/stores", data).then((r) => r.data),
   updateStore: async (storeId, data) => axiosInstance.put(`/stores/${storeId}`, data).then((r) => r.data),
+  /** A branch's shelf: { items: [{ id, quantity, product, variant }], pagination }. */
+  getBranchStock: async (storeId, params = {}) =>
+    axiosInstance.get(`/inventory/location/${storeId}`, { params: { limit: 100, ...params } }).then((r) => r.data),
+  addBranchStock: async (data) => axiosInstance.post("/inventory", data).then((r) => r.data),
+  setBranchStock: async (itemId, quantity) =>
+    axiosInstance.put(`/inventory/${itemId}`, { quantity }).then((r) => r.data),
   /** { reviews, pagination } — params: page, limit, rating, search */
   listAuditLogs: async (params = {}) =>
     axiosInstance.get("/admin/audit-logs", { params }).then((r) => r.data),
