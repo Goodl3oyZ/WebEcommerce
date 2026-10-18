@@ -31,7 +31,7 @@
 
 - **หน้าที่:** จัดการ authentication (สมัคร, ล็อกอิน, ลืมรหัส, เปลี่ยนรหัส, refresh token, logout)
 - **Controller:** authController
-- **Service ที่เกี่ยวข้อง:** authService, sessionService
+- **Service ที่เกี่ยวข้อง:** authService
 - **รายละเอียด:**
   - `/register`, `/login`, `/forgot-password`, `/reset-password`, `/verify-email` (POST/GET): สมัคร, เข้าสู่ระบบ, รีเซ็ตรหัส, ยืนยันอีเมล
   - `/change-password`, `/refresh-token`, `/logout`, `/logout-all` (POST): จัดการ session และรหัสผ่าน (ต้องล็อกอิน)

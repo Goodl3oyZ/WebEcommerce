@@ -39,9 +39,6 @@
   "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "bcryptjs": "^3.0.2",
-    "class-sanitizer": "^1.0.1",
-    "class-transformer": "^0.5.1",
     "compression": "^1.8.0",
     "connect-redis": "^8.1.0",
     "cookie": "^0.7.2",
@@ -53,8 +50,6 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "express": "^5.1.0",
-    "express-async-handler": "^1.2.0",
-    "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.1",
     "helmet": "^8.1.0",
@@ -76,8 +71,6 @@
     "swagger-ui-express": "^5.0.1",
     "ua-parser-js": "^2.0.3",
     "uuid": "^14.0.0",
-    "winston": "^3.17.0",
-    "xss-clean": "^0.1.4",
     "zod": "^3.24.4",
     "zod-to-json-schema": "^3.25.2"
   },

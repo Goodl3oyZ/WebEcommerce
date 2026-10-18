@@ -26,7 +26,6 @@
 | **supplierController.js**     | จัดการ supplier: ดู, เพิ่ม, ลบ, จัดการสินค้า supplier                                | ใช้ `AppError` และ `catchAsync`           |
 | **loyaltyController.js**      | จัดการ loyalty: point, reward, tier, สถิติ                                           | ใช้ `ApiError`                            |
 | **couponController.js**       | จัดการคูปอง: validate, สร้าง, แก้ไข, ลบ, สถิติ                                       | ใช้ `ApiError`                            |
-| **storePickupController.js**  | จัดการจุดรับสินค้าที่ร้าน: สร้าง, ดู, อัปเดต, ลบ, เช็คคิว, ประวัติ                   | ใช้ `error.message` (ไม่ใช้ ApiError)     |
 | **storeController.js**        | จัดการร้านค้า: สร้าง, ดู, อัปเดต, ลบ, สินค้า, ออเดอร์, analytics, settings           | ใช้ `error.message` (ไม่ใช้ ApiError)     |
 
 ---

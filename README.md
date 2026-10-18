@@ -28,7 +28,7 @@ publish no ports.
 
 | Part | Stack |
 | --- | --- |
-| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS, TanStack Query, Zustand, Axios, Zod |
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS, Zustand, Axios, React Hook Form |
 | Backend | Node.js 24 (ESM), Express 5, Drizzle ORM, PostgreSQL 15, Redis 7, Socket.IO, Passport, Zod, Nodemailer |
 | Storage | SeaweedFS (S3-compatible) for product, profile, store, and review images |
 | Payments | Omise: PromptPay QR and cards (3-D Secure), with webhooks |

@@ -7,7 +7,7 @@ Frontend application for WebEcommerce, built with Next.js App Router.
 - Next.js 16 (App Router)
 - React 19
 - Tailwind CSS
-- TanStack Query, Zustand (cart, UI state)
+- Zustand (cart, UI state), React Hook Form
 - Axios (cookies + automatic session refresh, see `src/lib/api/sessionRefresh.js`)
 
 ## Run (Docker)

@@ -24,9 +24,5 @@
 
   - ฟังก์ชันสำหรับสร้างและตรวจสอบ JSON Web Token (JWT) ใช้สำหรับ authentication และ authorization
 
-- **orderUtils.js**
-
-  - รวมฟังก์ชันช่วยเหลือเกี่ยวกับออเดอร์ เช่น การคำนวณยอดรวม, สถานะออเดอร์ ฯลฯ
-
 - **parseUserAgent.js**
   - ฟังก์ชันสำหรับแยกข้อมูล user agent string (browser, OS, device) จาก request header เพื่อวิเคราะห์หรือบันทึกข้อมูลอุปกรณ์ของผู้ใช้
