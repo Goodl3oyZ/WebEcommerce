@@ -18,8 +18,8 @@ let pendingRefresh = null;
 
 const isAuthEndpoint = (url = "") => AUTH_ENDPOINTS.some((path) => url.includes(path));
 
-/** One refresh at a time, shared by concurrent 401s. */
-const refreshSession = (baseURL) => {
+/** One refresh at a time, shared by concurrent 401s (the server rotates refresh tokens). */
+export const refreshSession = (baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api") => {
   pendingRefresh ??= axios
     .post(`${baseURL}/auth/refresh-token`, {}, { withCredentials: true })
     .finally(() => {
@@ -28,11 +28,16 @@ const refreshSession = (baseURL) => {
   return pendingRefresh;
 };
 
-function handleSessionExpired() {
+export const SESSION_EXPIRED_EVENT = "auth:session-expired";
+
+/** Forget the signed-in user everywhere (AuthContext listens) and leave pages that need a login. */
+export function handleSessionExpired() {
   if (typeof window === "undefined") return;
   localStorage.removeItem("user");
-  if (PROTECTED_PAGES.some((page) => window.location.pathname.startsWith(page))) {
-    window.location.href = "/auth/login";
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  const { pathname, search } = window.location;
+  if (PROTECTED_PAGES.some((page) => pathname.startsWith(page))) {
+    window.location.href = `/auth/login?expired=1&redirect=${encodeURIComponent(pathname + search)}`;
   }
 }
 

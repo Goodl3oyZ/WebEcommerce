@@ -11,7 +11,7 @@ import AuthShell, { EMAIL_RULES, Field, SocialLogin } from "@/components/auth/Au
 import VerifyEmailNotice from "@/components/auth/VerifyEmailNotice";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, clearAuthData } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
@@ -22,9 +22,14 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm();
 
-  // Messages from the email-verification link (backend redirects here).
+  // Messages from the email-verification link (backend redirects here),
+  // and from an expired session (no valid cookies left, so drop the stale user).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("expired") === "1") {
+      clearAuthData();
+      toast("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง", { id: "session-expired" });
+    }
     if (params.get("verified") === "1") {
       toast.success("ยืนยันอีเมลเรียบร้อยแล้ว กรุณาเข้าสู่ระบบ", { duration: 5000 });
     } else if (params.get("verifyError")) {
@@ -33,7 +38,7 @@ export default function LoginPage() {
         { duration: 5000 }
       );
     }
-  }, []);
+  }, [clearAuthData]);
 
   const onSubmit = async (data) => {
     setFormError("");

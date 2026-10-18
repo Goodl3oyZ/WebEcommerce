@@ -12,6 +12,7 @@ import { authAPI } from "@/lib/api/auth";
 import { config } from "@/lib/config";
 import { toast } from "react-hot-toast";
 import { apiClient } from "@/lib/api/apiClient";
+import { SESSION_EXPIRED_EVENT } from "@/lib/api/sessionRefresh";
 import useCartStore from "@/store/cartStore";
 
 const AuthContext = createContext();
@@ -99,6 +100,12 @@ export const AuthProvider = ({ children }) => {
 
     checkAuth();
   }, [setUserData]); // เพิ่ม setUserData ใน dependency array
+
+  // The session ended while the page was open (refresh failed): show signed-out UI.
+  useEffect(() => {
+    window.addEventListener(SESSION_EXPIRED_EVENT, clearAuthData);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, clearAuthData);
+  }, [clearAuthData]);
 
   const login = async (credentials) => {
     try {
