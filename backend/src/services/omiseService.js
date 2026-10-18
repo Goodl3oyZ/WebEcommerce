@@ -153,7 +153,4 @@ export const omiseService = {
       );
     }
   },
-
-  // TODO: รองรับการ handle webhook/callback จาก Omise ในอนาคต
-  // TODO: รองรับการบันทึก log การจ่ายเงิน/คืนเงิน เพิ่มเติม
 };

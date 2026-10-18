@@ -28,8 +28,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import ImageUploader from "@/components/ui/ImageUploader";
 import ProductTable from "@/components/ui/ProductTable";
-// Mock API functions (replace with your actual API)
-const mockAPI = {
+// The product, variant and lookup calls this panel uses.
+const api = {
   products: {
     getAll: async (params) => productsAPI.getAllProducts(params),
     create: async (data) => productsAPI.createProduct(data),
@@ -39,16 +39,11 @@ const mockAPI = {
   variants: {
     createBatch: async (productId, variants) => {
       // สร้าง variants ทีละตัว เพราะ backend รองรับทีละตัว
-      console.log("=== mockAPI.variants.createBatch START ==="); // Debug log
-      console.log("productId:", productId); // Debug log
-      console.log("variants:", variants); // Debug log
       const results = [];
       for (const variant of variants) {
-        console.log("Creating single variant:", variant); // Debug log
         const result = await productsAPI.createVariant(productId, variant);
         results.push(result);
       }
-      console.log("=== mockAPI.variants.createBatch END ==="); // Debug log
       return results;
     },
     update: async (productId, variantId, data) =>
@@ -169,9 +164,9 @@ export function ProductsPanel() {
     setIsLoading(true);
     try {
       const [productsRes, brandsRes, categoriesRes] = await Promise.all([
-        mockAPI.products.getAll({ includeInactive: "true" }),
-        mockAPI.brands.getAll(),
-        mockAPI.categories.getAll(),
+        api.products.getAll({ includeInactive: "true" }),
+        api.brands.getAll(),
+        api.categories.getAll(),
       ]);
 
       setProducts(productsRes.products || []);
@@ -443,7 +438,7 @@ export function ProductsPanel() {
       let productId = null;
 
       if (isEdit) {
-        const response = await mockAPI.products.update(
+        const response = await api.products.update(
           editingProduct.id,
           productPayload
         );
@@ -452,7 +447,7 @@ export function ProductsPanel() {
           toast.success("อัปเดตสินค้าสำเร็จ!");
         }
       } else {
-        const response = await mockAPI.products.create(productPayload);
+        const response = await api.products.create(productPayload);
         if (response.status === 201 || response.status === 200) {
           productId = response.data.id;
           toast.success("สร้างสินค้าใหม่สำเร็จ!");
@@ -476,7 +471,7 @@ export function ProductsPanel() {
           });
 
           if (!isEdit) {
-            await mockAPI.variants.createBatch(productId, variantsPayload);
+            await api.variants.createBatch(productId, variantsPayload);
           }
         }
 
@@ -492,13 +487,13 @@ export function ProductsPanel() {
               price: Number(variant.price) || 0,
               stock: Number(variant.stock) || 0,
             };
-            if (variant.id) await mockAPI.variants.update(productId, variant.id, body);
+            if (variant.id) await api.variants.update(productId, variant.id, body);
             else await productsAPI.createVariant(productId, body);
           }
           for (const original of editingProduct.variants || []) {
             if (keptIds.has(original.id)) continue;
             try {
-              await mockAPI.variants.delete(productId, original.id);
+              await api.variants.delete(productId, original.id);
             } catch {
               toast.error(
                 `ลบตัวเลือก ${original.sku} ไม่ได้ เพราะมีคำสั่งซื้ออ้างอิงอยู่ ตั้งสต็อกเป็น 0 แทน`
@@ -511,7 +506,7 @@ export function ProductsPanel() {
         if (uploadedImages.length > 0) {
           try {
             const uploadedUrls = await uploadImages(uploadedImages, productId);
-            await mockAPI.products.update(productId, {
+            await api.products.update(productId, {
               imageUrl: uploadedUrls,
             });
           } catch (imgErr) {
@@ -548,7 +543,7 @@ export function ProductsPanel() {
 
     setIsLoading(true);
     try {
-      await mockAPI.products.update(product.id, { isActive: newActiveState });
+      await api.products.update(product.id, { isActive: newActiveState });
       toast.success(`${actionLabel}สำเร็จ!`);
       loadInitialData();
     } catch (error) {
@@ -700,12 +695,6 @@ export function ProductsPanel() {
     const uploadedUrls = [];
     for (const image of images) {
       try {
-        console.log(
-          "Uploading file:",
-          image.file?.name || "existing image",
-          "for product:",
-          productId
-        );
 
         // If it's a new file, upload it
         if (image.file) {
@@ -713,7 +702,6 @@ export function ProductsPanel() {
             image.file,
             productId
           );
-          console.log("Upload response:", response);
 
           // ตรวจสอบ response format
           if (response.url) {
