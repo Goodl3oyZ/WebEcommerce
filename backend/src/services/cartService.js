@@ -5,6 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { FileService } from "./fileService.js";
 import { BUCKETS } from "../config/minio.js";
 import { toSatang, fromSatang } from "../utils/money.js";
+import { branchStockByVariant } from "./branchStock.js";
 
 export const MAX_QUANTITY_PER_ITEM = 99;
 
@@ -35,13 +36,24 @@ async function getPurchasableVariant(productId, variantId) {
   return variant;
 }
 
-function assertStock(variant, quantity) {
+/**
+ * Most units of a variant one order can get: online stock (delivery) or what a
+ * single open branch holds (pickup), whichever is more. Checkout then checks
+ * the chosen way of receiving.
+ */
+async function sellableStock(variant) {
+  const atBranch = (await branchStockByVariant([variant.id])).get(variant.id) ?? 0;
+  return Math.max(variant.stock, atBranch);
+}
+
+async function assertStock(variant, quantity) {
   if (quantity > MAX_QUANTITY_PER_ITEM) {
     throw ApiError.badRequest(`At most ${MAX_QUANTITY_PER_ITEM} of one item per order`);
   }
-  if (quantity > variant.stock) {
+  const available = await sellableStock(variant);
+  if (quantity > available) {
     throw new ApiError(
-      `Only ${variant.stock} left in stock for ${variant.product.name} (${variant.color} ${variant.size})`,
+      `Only ${available} left in stock for ${variant.product.name} (${variant.color} ${variant.size})`,
       409,
       null,
       "INSUFFICIENT_STOCK"
@@ -50,7 +62,11 @@ function assertStock(variant, quantity) {
 }
 
 export const cartService = {
-  /** Cart with current prices and stock (prices are never taken from the client). */
+  /**
+   * Cart with current prices and stock (prices are never taken from the client).
+   * `variant.stock` is online stock and `variant.branchStock` the most at one
+   * open branch; `deliverable` says whether the line can be shipped.
+   */
   async getCart(userId) {
     const cart = await getOrCreateCart(userId);
     const items = await db.query.cartItems.findMany({
@@ -59,8 +75,11 @@ export const cartService = {
       orderBy: (item, { asc }) => [asc(item.createdAt)],
     });
 
+    const branchStock = await branchStockByVariant(items.map((item) => item.variantId));
     let subtotal = 0;
     const lines = items.map((item) => {
+      const online = item.variant?.stock ?? 0;
+      const atBranch = branchStock.get(item.variantId) ?? 0;
       const currentPrice = toSatang(item.variant?.price ?? item.product?.price);
       subtotal += currentPrice * item.quantity;
       return {
@@ -71,7 +90,8 @@ export const cartService = {
         quantity: item.quantity,
         price: fromSatang(currentPrice),
         priceChanged: currentPrice !== toSatang(item.price),
-        inStock: item.variant ? item.variant.stock >= item.quantity : false,
+        inStock: item.variant ? Math.max(online, atBranch) >= item.quantity : false,
+        deliverable: item.variant ? online >= item.quantity : false,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
         product: item.product && {
@@ -88,6 +108,7 @@ export const cartService = {
           size: item.variant.size,
           sku: item.variant.sku,
           stock: item.variant.stock,
+          branchStock: atBranch,
           images: resolveImages(item.variant.imageUrl),
         },
       };
@@ -103,7 +124,7 @@ export const cartService = {
       where: and(eq(cartItems.cartId, cart.id), eq(cartItems.variantId, variantId)),
     });
     const newQuantity = (existing?.quantity ?? 0) + quantity;
-    assertStock(variant, newQuantity);
+    await assertStock(variant, newQuantity);
 
     if (existing) {
       await db
@@ -131,7 +152,7 @@ export const cartService = {
       throw ApiError.notFound("Cart item not found");
     }
     const variant = await getPurchasableVariant(item.productId, item.variantId);
-    assertStock(variant, quantity);
+    await assertStock(variant, quantity);
 
     await db
       .update(cartItems)
@@ -198,7 +219,7 @@ export const cartService = {
         where: and(eq(cartItems.cartId, cart.id), eq(cartItems.variantId, variantId)),
       });
       const wanted = Math.max(existing?.quantity ?? 0, quantity);
-      const allowed = Math.min(wanted, variant.stock, MAX_QUANTITY_PER_ITEM);
+      const allowed = Math.min(wanted, await sellableStock(variant), MAX_QUANTITY_PER_ITEM);
       if (allowed <= 0) {
         skipped.push({ productId, variantId, reason: "out of stock" });
         continue;

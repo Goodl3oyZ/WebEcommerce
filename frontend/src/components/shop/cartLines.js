@@ -1,4 +1,4 @@
-import { variantLabel } from "@/components/shop/productData";
+import { variantLabel, variantStock } from "@/components/shop/productData";
 
 /** One display shape for server cart lines (signed in) and local lines (guest). */
 export function normalizeCartLine(item, signedIn) {
@@ -13,8 +13,10 @@ export function normalizeCartLine(item, signedIn) {
       options: variantLabel(item.variant),
       price: Number(item.price),
       quantity: item.quantity,
-      maxStock: item.variant?.stock ?? 99,
+      maxStock: item.variant ? variantStock(item.variant) : 99,
       inStock: item.inStock !== false,
+      // In stock, but only a branch has enough: it has to be collected.
+      pickupOnly: item.inStock !== false && item.deliverable === false,
       priceChanged: !!item.priceChanged,
       available: item.product?.isActive !== false,
     };
@@ -29,8 +31,9 @@ export function normalizeCartLine(item, signedIn) {
     options: item.variantName || variantLabel(item.variant),
     price: Number(item.price),
     quantity: item.quantity,
-    maxStock: item.variant?.stock ?? 99,
+    maxStock: item.variant ? variantStock(item.variant) : 99,
     inStock: true,
+    pickupOnly: Boolean(item.variant) && item.quantity > (item.variant.stock || 0),
     priceChanged: false,
     available: true,
   };

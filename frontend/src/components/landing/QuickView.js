@@ -10,7 +10,7 @@ import useCartStore from "@/store/cartStore";
 import useUiStore from "@/store/uiStore";
 import ProductImage from "@/components/ui/ProductImage";
 import QuantityStepper from "@/components/shop/QuantityStepper";
-import { priceRange, productImages, variantLabel } from "@/components/shop/productData";
+import { pickupOnly, priceRange, productImages, variantLabel, variantStock } from "@/components/shop/productData";
 import { formatTHB, toPrice } from "@/lib/format";
 
 const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL"];
@@ -47,7 +47,7 @@ function usePicker(variants) {
   const matches = (v, sel) => Object.entries(sel).every(([k, val]) => !val || v[k] === val);
   const selected =
     variants.length === 1 ? variants[0] : groups.every((g) => picked[g.key]) ? variants.find((v) => matches(v, picked)) ?? null : null;
-  const available = (key, value) => variants.some((v) => v[key] === value && v.stock > 0 && matches(v, { ...picked, [key]: undefined }));
+  const available = (key, value) => variants.some((v) => v[key] === value && variantStock(v) > 0 && matches(v, { ...picked, [key]: undefined }));
   return { groups, picked, setPicked, selected, available };
 }
 
@@ -90,7 +90,8 @@ export default function QuickView({ product: initial, onClose }) {
   const images = product ? productImages(product) : [];
   const range = product ? priceRange(product) : { min: null };
   const price = selected ? toPrice(selected.price ?? product.price) : range.min;
-  const stock = selected ? selected.stock : variants.reduce((s, v) => s + (v.stock || 0), 0);
+  const stock = selected ? variantStock(selected) : variants.reduce((s, v) => s + variantStock(v), 0);
+  const branchOnly = pickupOnly(product, selected);
   const needsChoice = variants.length > 1 && !selected;
   const soldOut = !needsChoice && stock <= 0;
   const specs = Object.entries(product?.attributes ?? {}).slice(0, 4);
@@ -224,11 +225,12 @@ export default function QuickView({ product: initial, onClose }) {
 
                 <p className={`mt-4 text-sm ${soldOut ? "text-danger" : stock <= 5 && !needsChoice ? "text-warning" : "text-success"}`}>
                   {needsChoice ? "มีสินค้า เลือกตัวเลือกเพื่อดูจำนวนคงเหลือ" : soldOut ? "สินค้าหมด" : stock <= 5 ? `เหลือ ${stock} ชิ้น` : "มีสินค้า"}
+                  {branchOnly && !needsChoice && " · รับที่สาขาเท่านั้น"}
                 </p>
                 {loadError && <p className="mt-1 text-xs text-fg-subtle">โหลดข้อมูลล่าสุดไม่สำเร็จ แสดงข้อมูลจากหน้ารายการ</p>}
 
                 <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
-                  <QuantityStepper value={quantity} onChange={setQuantity} max={Math.max(1, Math.min(99, selected?.stock ?? 99))} disabled={adding || soldOut} />
+                  <QuantityStepper value={quantity} onChange={setQuantity} max={Math.max(1, Math.min(99, selected ? variantStock(selected) : 99))} disabled={adding || soldOut} />
                   <button
                     type="button"
                     onClick={add}

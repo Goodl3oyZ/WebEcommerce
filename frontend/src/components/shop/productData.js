@@ -19,10 +19,25 @@ export function priceRange(product) {
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }
 
-/** Total stock: the API's product.stock, else the sum of variant stock. */
+/**
+ * Units of a variant one order can get: online stock (delivery) or what one
+ * branch holds (pickup), whichever is more.
+ */
+export function variantStock(variant) {
+  return Math.max(variant?.stock || 0, variant?.branchStock || 0);
+}
+
+/** Total stock to sell, counting branch-only units; else the API's product.stock. */
 export function totalStock(product) {
-  if (typeof product?.stock === "number") return product.stock;
-  return (product?.variants ?? []).reduce((sum, v) => sum + (v.stock || 0), 0);
+  const variants = product?.variants ?? [];
+  if (variants.length > 0) return variants.reduce((sum, v) => sum + variantStock(v), 0);
+  return typeof product?.stock === "number" ? product.stock : 0;
+}
+
+/** Has stock, but none online: it can only be collected at a branch. */
+export function pickupOnly(product, variant) {
+  const online = variant ? variant.stock || 0 : (product?.variants ?? []).reduce((sum, v) => sum + (v.stock || 0), 0);
+  return online <= 0 && (variant ? variantStock(variant) : totalStock(product)) > 0;
 }
 
 export function variantLabel(variant) {

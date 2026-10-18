@@ -138,6 +138,8 @@ export default function CheckoutPage() {
         setBranches(stores);
         setPickupStoreId(stores[0]?.id ?? "");
         setCart({ items: cartRes.items ?? [], subtotal: Number(cartRes.subtotal ?? 0) });
+        // Something only a branch holds: the order has to be collected.
+        if (stores.length > 0 && (cartRes.items ?? []).some((i) => i.deliverable === false)) setPickupMode(true);
         const list = addrRes.addresses ?? [];
         setAddresses(list);
         setAddressId((list.find((a) => a.isDefault) || list[0])?.id ?? "");
@@ -216,10 +218,12 @@ export default function CheckoutPage() {
       .join(", ");
   };
   const branchOk = (storeId) => Boolean(stockAt?.[storeId]?.available);
+  // Online stock covers every line (false when some of it is only at a branch).
+  const shippable = cart.items.every((i) => i.deliverable !== false);
   const pickup = pickupMode && Boolean(pickupStoreId);
   const shippingCost = pickupMode ? 0 : shipping.options.find((o) => o.methodId === shippingMethodId)?.cost ?? null;
   const readyToOrder =
-    Boolean(selectedMethod) && (pickupMode ? branchOk(pickupStoreId) : Boolean(addressId && shippingMethodId));
+    Boolean(selectedMethod) && (pickupMode ? branchOk(pickupStoreId) : shippable && Boolean(addressId && shippingMethodId));
 
   // Integer-satang totals, rounded exactly like the backend.
   const totals = useMemo(() => {
@@ -273,6 +277,7 @@ export default function CheckoutPage() {
   const placeOrder = async () => {
     setFormError(null);
     if (pickupMode && !branchOk(pickupStoreId)) return setFormError("กรุณาเลือกสาขาที่มีสินค้าครบ");
+    if (!pickupMode && !shippable) return setFormError("บางรายการมีที่สาขาเท่านั้น กรุณาเลือกรับที่สาขา");
     if (!pickupMode && !addressId) return setFormError("กรุณาเลือกที่อยู่จัดส่ง");
     if (!pickupMode && !shippingMethodId) return setFormError("กรุณาเลือกวิธีจัดส่ง");
     if (!selectedMethod) return setFormError("กรุณาเลือกวิธีชำระเงิน");
@@ -453,11 +458,13 @@ export default function CheckoutPage() {
           {branches.length > 0 && (
             <Step n={1} title="วิธีรับสินค้า" Icon={PackageCheck}>
               <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-labelledby="step-1">
-                <ChoiceCard name="fulfillment" value="delivery" checked={!pickupMode} onChange={() => setPickupMode(false)}>
+                <ChoiceCard name="fulfillment" value="delivery" checked={!pickupMode} onChange={() => setPickupMode(false)} disabled={!shippable}>
                   <span className="flex items-center gap-2 font-semibold">
                     <Truck className="h-4 w-4" aria-hidden /> จัดส่งถึงบ้าน
                   </span>
-                  <span className="mt-1 block text-fg-muted">ส่งตามที่อยู่ ค่าส่งตามพื้นที่</span>
+                  <span className="mt-1 block text-fg-muted">
+                    {shippable ? "ส่งตามที่อยู่ ค่าส่งตามพื้นที่" : "ส่งไม่ได้ บางรายการมีที่สาขาเท่านั้น"}
+                  </span>
                 </ChoiceCard>
                 <ChoiceCard name="fulfillment" value="pickup" checked={pickupMode} onChange={() => setPickupMode(true)}>
                   <span className="flex items-center gap-2 font-semibold">
@@ -478,7 +485,9 @@ export default function CheckoutPage() {
               )}
               {stockAt && !branches.some((b) => branchOk(b.id)) && (
                 <p role="alert" className="mb-3 rounded-lg bg-warning-soft p-3 text-sm text-warning">
-                  ยังไม่มีสาขาไหนมีสินค้าครบตามตะกร้า เลือกจัดส่งถึงบ้านแทนได้
+                  {shippable
+                    ? "ยังไม่มีสาขาไหนมีสินค้าครบตามตะกร้า เลือกจัดส่งถึงบ้านแทนได้"
+                    : "ยังไม่มีสาขาไหนมีสินค้าครบตามตะกร้า กรุณาปรับจำนวนในตะกร้า"}
                 </p>
               )}
               <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-labelledby="step-2">

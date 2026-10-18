@@ -12,6 +12,7 @@ import { eq, ilike, and, or, desc, asc, sql, gte, lte, inArray, exists } from "d
 import { ApiError } from "../utils/ApiError.js";
 import { getFileUrl, toStoredKey, BUCKETS } from "../config/minio.js";
 import { paginationMeta } from "../utils/pagination.js";
+import { branchStockByVariant, heldAtABranch } from "./branchStock.js";
 import {
   loyaltyService,
   REVIEW_REWARD_POINTS,
@@ -63,14 +64,21 @@ function toStoredImages(value) {
 
 const actorNote = (actorId) => (actorId ? `by user ${actorId}` : null);
 
-/** Response shape: image URLs, total stock and rating summary. */
-export function presentProduct(product, ratings) {
+/**
+ * Response shape: image URLs, total stock and rating summary. `stock` is the
+ * online (delivery) stock; with `branchStock` (variantId -> most units at one
+ * open branch) each variant also says what can be bought for branch pickup.
+ */
+export function presentProduct(product, ratings, branchStock) {
   if (!product) return product;
-  const variants = product.variants ?? [];
+  const variants = branchStock
+    ? (product.variants ?? []).map((v) => ({ ...v, branchStock: branchStock.get(v.id) ?? 0 }))
+    : product.variants ?? [];
   const summary = ratings?.get(product.id);
   const reviews = product.reviews;
   return {
     ...product,
+    ...(branchStock && { variants, branchStock: variants.reduce((sum, v) => sum + v.branchStock, 0) }),
     imageUrl: resolveImages(product.imageUrl),
     stock: variants.reduce((sum, v) => sum + (v.stock ?? 0), 0),
     rating: summary ? summary.rating : reviews?.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0,
@@ -155,12 +163,16 @@ export async function listProducts(filters, pagination) {
     }
   }
   if (filters.inStock) {
+    // Online stock, or a branch that can hand it over (pickup).
     conditions.push(
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(productVariants)
-          .where(and(eq(productVariants.productId, products.id), sql`${productVariants.stock} > 0`))
+      or(
+        heldAtABranch(products.id),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(productVariants)
+            .where(and(eq(productVariants.productId, products.id), sql`${productVariants.stock} > 0`))
+        )
       )
     );
   }
@@ -177,9 +189,12 @@ export async function listProducts(filters, pagination) {
     }),
     db.select({ count: sql`count(*)::int` }).from(products).where(where),
   ]);
-  const ratings = await ratingSummaries(rows.map((p) => p.id));
+  const [ratings, branchStock] = await Promise.all([
+    ratingSummaries(rows.map((p) => p.id)),
+    branchStockByVariant(rows.flatMap((p) => p.variants.map((v) => v.id))),
+  ]);
   return {
-    products: rows.map((p) => presentProduct(p, ratings)),
+    products: rows.map((p) => presentProduct(p, ratings, branchStock)),
     pagination: paginationMeta(total[0].count, pagination),
   };
 }
@@ -230,8 +245,9 @@ export const productService = {
         reviews: { with: { user: reviewer }, orderBy: [desc(productReviews.createdAt)] },
       },
     });
+    const branchStock = await branchStockByVariant(product.variants.map((v) => v.id));
     return {
-      ...presentProduct(product),
+      ...presentProduct(product, undefined, branchStock),
       attributes: Object.fromEntries((product.attributes ?? []).map((a) => [a.name, a.value])),
     };
   },

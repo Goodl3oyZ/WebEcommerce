@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import DOMPurify from "isomorphic-dompurify";
-import { ChevronLeft, ChevronRight, Expand, Loader2, ShieldCheck, ShoppingBag, Star, Truck, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, Loader2, ShieldCheck, ShoppingBag, Star, Store, Truck, X } from "lucide-react";
 import { productsAPI } from "@/lib/api/products";
 import useCartStore from "@/store/cartStore";
 import ProductImage from "@/components/ui/ProductImage";
@@ -19,7 +19,7 @@ import Breadcrumbs from "@/components/shop/Breadcrumbs";
 import PriceTag from "@/components/shop/PriceTag";
 import QuantityStepper from "@/components/shop/QuantityStepper";
 import SectionHeader from "@/components/shop/SectionHeader";
-import { priceRange, productImages, totalStock, variantLabel } from "@/components/shop/productData";
+import { pickupOnly, priceRange, productImages, totalStock, variantLabel, variantStock } from "@/components/shop/productData";
 import { Button, buttonClasses } from "@/components/ui/Button";
 
 const ATTRS = [
@@ -184,16 +184,16 @@ function useVariantPicker(variants) {
         ? variants.find((v) => matches(v, picked)) ?? null
         : null;
   const available = (key, value) =>
-    variants.some((v) => v[key] === value && v.stock > 0 && matches(v, { ...picked, [key]: undefined }));
+    variants.some((v) => v[key] === value && variantStock(v) > 0 && matches(v, { ...picked, [key]: undefined }));
   const missing = groups.filter((g) => !picked[g.key]);
 
   return { groups, picked, setPicked, selected, available, missing };
 }
 
-function stockText(stock) {
+function stockText(stock, branchOnly) {
   if (stock <= 0) return { text: "สินค้าหมด", tone: "text-danger" };
   if (stock <= 5) return { text: `เหลือ ${stock} ชิ้น`, tone: "text-warning" };
-  return { text: "มีสินค้าพร้อมส่ง", tone: "text-success" };
+  return { text: branchOnly ? "มีสินค้า" : "มีสินค้าพร้อมส่ง", tone: "text-success" };
 }
 
 export default function ProductDetailPage() {
@@ -266,7 +266,7 @@ export default function ProductDetailPage() {
       name: product.name,
       imageUrl: productImages(product).slice(0, 1),
       price: product.price,
-      variants: product.variants?.map((v) => ({ price: v.price, stock: v.stock })),
+      variants: product.variants?.map((v) => ({ price: v.price, stock: v.stock, branchStock: v.branchStock })),
       stock: totalStock(product),
       brand: product.brand,
     };
@@ -314,8 +314,9 @@ export default function ProductDetailPage() {
   const images = productImages(product);
   const range = priceRange(product);
   const price = selected ? selected.price ?? product.price : range.min;
-  const stock = selected ? selected.stock : totalStock(product);
-  const stockInfo = stockText(stock);
+  const stock = selected ? variantStock(selected) : totalStock(product);
+  const branchOnly = pickupOnly(product, selected);
+  const stockInfo = stockText(stock, branchOnly);
   const unpriced = !(Number(price) > 0);
   const soldOut = stock <= 0;
   const reviews = product.reviews ?? [];
@@ -457,12 +458,18 @@ export default function ProductDetailPage() {
               <span className="h-2 w-2 rounded-full bg-current" aria-hidden />
               {needsChoice && stock > 0 ? "มีสินค้า — เลือกตัวเลือกเพื่อดูจำนวนคงเหลือ" : stockInfo.text}
             </p>
+            {branchOnly && (
+              <p className="mt-2 flex items-center gap-2 text-sm text-fg-muted">
+                <Store className="h-4 w-4 shrink-0" aria-hidden />
+                {needsChoice ? "มีเฉพาะที่สาขา" : "ตอนนี้มีที่สาขาเท่านั้น"} สั่งออนไลน์แล้วเลือก &quot;รับที่สาขา&quot; ตอนชำระเงิน
+              </p>
+            )}
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <QuantityStepper
                 value={quantity}
                 onChange={setQuantity}
-                max={Math.max(1, selected ? selected.stock : 99)}
+                max={Math.max(1, selected ? variantStock(selected) : 99)}
                 disabled={soldOut || needsChoice}
               />
               <Button variant="brand" size="lg" className="min-w-[12rem] flex-1" onClick={handleAdd} disabled={ctaDisabled}>

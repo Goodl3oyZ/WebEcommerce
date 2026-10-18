@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { AlertCircle, ArrowRight, Loader2, ShoppingBag, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, ShoppingBag, Store, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cartAPI } from "@/lib/api/cart";
 import useCartStore from "@/store/cartStore";
@@ -48,6 +48,12 @@ function CartLine({ line, busy, onQuantity, onRemove }) {
               : !line.inStock
                 ? `สต็อกไม่พอ (เหลือ ${line.maxStock} ชิ้น) กรุณาลดจำนวน`
                 : "ราคาสินค้าถูกปรับเป็นราคาปัจจุบันแล้ว"}
+          </p>
+        )}
+        {line.inStock && line.available && line.pickupOnly && (
+          <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-fg-muted">
+            <Store className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+            จำนวนนี้มีที่สาขาเท่านั้น เลือก &quot;รับที่สาขา&quot; ตอนชำระเงิน
           </p>
         )}
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from "@headlessui/react";
 import { toast } from "react-hot-toast";
-import { AlertCircle, Loader2, ShoppingBag, Trash2, X } from "lucide-react";
+import { AlertCircle, Loader2, ShoppingBag, Store, Trash2, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cartAPI } from "@/lib/api/cart";
 import useCartStore from "@/store/cartStore";
@@ -158,6 +158,12 @@ export default function CartDrawer() {
                         <p className="mt-1 flex items-center gap-1 text-xs text-danger">
                           <AlertCircle className="h-3.5 w-3.5" aria-hidden />
                           {!line.available ? "สินค้านี้ปิดการขายแล้ว" : "สต็อกไม่พอ ปรับจำนวนก่อนชำระเงิน"}
+                        </p>
+                      )}
+                      {line.inStock && line.available && line.pickupOnly && (
+                        <p className="mt-1 flex items-center gap-1 text-xs text-fg-muted">
+                          <Store className="h-3.5 w-3.5" aria-hidden />
+                          มีที่สาขาเท่านั้น รับที่ร้าน
                         </p>
                       )}
                       <div className="mt-auto flex items-center justify-between gap-2 pt-3">

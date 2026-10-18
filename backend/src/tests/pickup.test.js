@@ -163,6 +163,34 @@ describe("click & collect", () => {
     expect((await (await newAgent()).post("/api/stores/availability").send({ items: [] })).status).toBe(400);
   });
 
+  test("an item only a branch holds can be carted and picked up, not shipped", async () => {
+    const { agent, user } = await loginAs("user");
+    const setup = await checkoutSetup(user, { stock: 0 });
+    const { product, variant } = setup;
+    const store = await createBranch();
+    await stockBranch(store, setup, 2);
+    await stockBranch(await createBranch({ isActive: false }), setup, 9); // closed: does not count
+
+    const detail = (await agent.get(`/api/products/${product.id}`)).body;
+    expect(detail.variants[0]).toMatchObject({ stock: 0, branchStock: 2 });
+    const listed = (await agent.get("/api/products").query({ inStock: "true", search: product.name })).body.products;
+    expect(listed.map((p) => p.id)).toContain(product.id);
+
+    const add = (quantity) => agent.post("/api/cart/items").send({ productId: product.id, variantId: variant.id, quantity });
+    expect((await add(3)).body.code).toBe("INSUFFICIENT_STOCK");
+    const cart = (await add(2)).body;
+    expect(cart.items[0]).toMatchObject({ quantity: 2, inStock: true, deliverable: false, variant: { stock: 0, branchStock: 2 } });
+
+    const { shippingAddressId, shippingMethodId, ...rest } = setup.body();
+    const items = [{ productId: product.id, variantId: variant.id, quantity: 2 }];
+    const shipped = await agent.post("/api/orders/checkout").send(setup.body({ items }));
+    expect(shipped.status).toBe(409);
+    expect(shipped.body.code).toBe("INSUFFICIENT_STOCK");
+    const picked = await agent.post("/api/orders/checkout").send({ ...rest, items, pickupStoreId: store.id });
+    expect(picked.status).toBe(201);
+    expect(await branchStock(store, variant)).toBe(0);
+  });
+
   test("delivery orders cannot use the pickup endpoint", async () => {
     const { agent, user } = await loginAs("user");
     const setup = await checkoutSetup(user);
